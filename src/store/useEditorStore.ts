@@ -26,8 +26,11 @@ interface EditorStore {
   addObjectType: (name: string, kind: ObjectTypeKind) => void;
   updateObjectType: (objectTypeId: string, updates: any) => void;
   addInstance: (layoutId: string, objectTypeId: string, layerId: string, x: number, y: number, id?: string) => void;
+  cloneInstance: (layoutId: string, instanceId: string) => void;
   updateInstance: (layoutId: string, instanceId: string, updates: any) => void;
+  updateInstanceSilently: (layoutId: string, instanceId: string, updates: any) => void;
   removeInstance: (layoutId: string, instanceId: string) => void;
+  reorderInstance: (layoutId: string, instanceId: string, direction: 'front' | 'back' | 'forward' | 'backward') => void;
   addInstanceVariable: (objectTypeId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
   removeInstanceVariable: (objectTypeId: string, variableId: string) => void;
 
@@ -64,6 +67,9 @@ interface EditorStore {
   cutSelected: () => void;
   pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
   pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
+  
+  // History
+  commitProject: () => void;
 }
 
 const initialProject = createEmptyProject();
@@ -140,13 +146,32 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
+  cloneInstance: (layoutId, instanceId) => {
+    const layout = get().project.layouts.find(l => l.id === layoutId);
+    const source = layout?.instances.find(i => i.id === instanceId);
+    if (source) {
+      const newId = generateId();
+      const next = projectUpdates.addInstance(get().project, layoutId, source.objectTypeId, source.layerId, source.x + 32, source.y + 32, newId);
+      set({ project: next });
+      get().pushHistory(next);
+    }
+  },
   updateInstance: (layoutId, instanceId, updates) => {
     const next = projectUpdates.updateInstance(get().project, layoutId, instanceId, updates);
     set({ project: next });
     get().pushHistory(next);
   },
+  updateInstanceSilently: (layoutId, instanceId, updates) => {
+    const next = projectUpdates.updateInstance(get().project, layoutId, instanceId, updates);
+    set({ project: next });
+  },
   removeInstance: (layoutId, instanceId) => {
     const next = projectUpdates.removeInstance(get().project, layoutId, instanceId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  reorderInstance: (layoutId, instanceId, direction) => {
+    const next = projectUpdates.reorderInstance(get().project, layoutId, instanceId, direction);
     set({ project: next });
     get().pushHistory(next);
   },
@@ -360,5 +385,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       set({ project: nextProject });
       get().pushHistory(nextProject);
     }
+  },
+
+  commitProject: () => {
+    get().pushHistory(get().project);
   }
 }));

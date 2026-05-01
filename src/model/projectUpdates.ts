@@ -274,3 +274,45 @@ export function moveLayer(
     }),
   };
 }
+
+/**
+ * Reorders an instance in the layout's draw order.
+ */
+export function reorderInstance(
+  project: Project,
+  layoutId: string,
+  instanceId: string,
+  direction: 'front' | 'back' | 'forward' | 'backward'
+): Project {
+  return {
+    ...project,
+    layouts: project.layouts.map(l => {
+      if (l.id !== layoutId) return l;
+      const instances = [...l.instances];
+      const index = instances.findIndex(inst => inst.id === instanceId);
+      if (index === -1) return l;
+
+      const [instance] = instances.splice(index, 1);
+      let newIndex = index;
+
+      switch (direction) {
+        case 'front':
+          newIndex = instances.length;
+          break;
+        case 'back':
+          newIndex = 0;
+          break;
+        case 'forward':
+          newIndex = Math.min(instances.length, index + 1);
+          break;
+        case 'backward':
+          newIndex = Math.max(0, index - 1);
+          break;
+      }
+
+      instances.splice(newIndex, 0, instance!);
+      return { ...l, instances };
+    }),
+  };
+}
+
