@@ -42,6 +42,8 @@ interface EditorStore {
   setView: (zoom: number, panX: number, panY: number) => void;
   setTab: (tab: 'layout' | 'eventSheet') => void;
   setPreviewMode: (previewMode: boolean) => void;
+  setSelectedEventBlocks: (blockIds: string[]) => void;
+  setSelectedLogicItems: (itemIds: string[]) => void;
 }
 
 const initialProject = createEmptyProject();
@@ -138,5 +140,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
   })),
   setPreviewMode: (previewMode) => set((state) => ({
     editorState: editorUpdates.setPreviewMode(state.editorState, previewMode)
+  })),
+  setSelectedEventBlocks: (blockIds) => set((state) => ({
+    editorState: editorUpdates.setSelectedEventBlocks(state.editorState, blockIds)
+  })),
+  setSelectedLogicItems: (itemIds) => set((state) => ({
+    editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
   })),
 }));

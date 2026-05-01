@@ -14,6 +14,8 @@ export interface EditorState {
   selectedObjectTypeId: string | null;
   currentTab: 'layout' | 'eventSheet';
   previewMode: boolean;
+  selectedEventBlockIds: string[];
+  selectedLogicItemIds: string[]; // for conditions or actions
 }
 
 /**
@@ -35,6 +37,8 @@ export function createInitialEditorState(project: Project): EditorState {
     selectedObjectTypeId: null,
     currentTab: 'layout',
     previewMode: false,
+    selectedEventBlockIds: [],
+    selectedLogicItemIds: [],
   };
 }
 
@@ -128,5 +132,27 @@ export function setView(state: EditorState, zoom: number, panX: number, panY: nu
     zoom,
     panX,
     panY,
+  };
+}
+
+/**
+ * Sets the currently selected event blocks.
+ */
+export function setSelectedEventBlocks(state: EditorState, blockIds: string[]): EditorState {
+  return {
+    ...state,
+    selectedEventBlockIds: blockIds,
+    selectedLogicItemIds: [],
+  };
+}
+
+/**
+ * Sets the currently selected logic items (conditions/actions).
+ */
+export function setSelectedLogicItems(state: EditorState, itemIds: string[]): EditorState {
+  return {
+    ...state,
+    selectedLogicItemIds: itemIds,
+    selectedEventBlockIds: [],
   };
 }
