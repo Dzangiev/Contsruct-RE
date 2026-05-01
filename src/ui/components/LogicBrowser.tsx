@@ -8,11 +8,14 @@ interface LogicBrowserProps {
   mode: 'condition' | 'action';
   onSelect: (targetObjectTypeId: string | undefined, type: string, params: any[]) => void;
   onClose: () => void;
+  initialObjectTypeId?: string;
 }
 
-export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSelect, onClose }) => {
-  const [step, setStep] = React.useState<'object' | 'logic'>('object');
-  const [selectedObjectType, setSelectedObjectType] = React.useState<ObjectType | undefined>(undefined);
+export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSelect, onClose, initialObjectTypeId }) => {
+  const initialOT = initialObjectTypeId ? project.objectTypes.find(ot => ot.id === initialObjectTypeId) : undefined;
+  
+  const [step, setStep] = React.useState<'object' | 'logic'>(initialObjectTypeId !== undefined ? 'logic' : 'object');
+  const [selectedObjectType, setSelectedObjectType] = React.useState<ObjectType | undefined>(initialOT);
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const items = mode === 'condition' ? CONDITIONS : ACTIONS;
