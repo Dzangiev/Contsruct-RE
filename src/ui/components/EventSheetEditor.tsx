@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2 } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
@@ -12,7 +12,8 @@ export const EventSheetEditor: React.FC = () => {
     addCondition, updateCondition, removeCondition, 
     addAction, updateAction, removeAction,
     setSelectedEventBlocks, setSelectedLogicItems,
-    setActiveLayout // Use this to change active sheet indirectly if needed, or I should add setActiveEventSheet
+    setActiveLayout,
+    undo, redo, copySelected, cutSelected, pasteSelected
   } = useEditorStore();
   
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -49,11 +50,23 @@ export const EventSheetEditor: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
+      const isCtrl = e.ctrlKey || e.metaKey;
       const blockIds = editorState.selectedEventBlockIds;
       const logicIds = editorState.selectedLogicItemIds;
 
+      if (!eventSheet) return;
+
+      // History
+      if (isCtrl && e.key === 'z') { e.preventDefault(); undo(); }
+      if (isCtrl && e.key === 'y') { e.preventDefault(); redo(); }
+
+      // Clipboard
+      if (isCtrl && e.key === 'c') { e.preventDefault(); copySelected(); }
+      if (isCtrl && e.key === 'x') { e.preventDefault(); cutSelected(); }
+      if (isCtrl && e.key === 'v') { e.preventDefault(); pasteSelected(eventSheet.id, null); }
+
+      // Deletion
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (!eventSheet) return;
         blockIds.forEach(id => removeEventBlock(eventSheet.id, id));
         setSelectedEventBlocks([]);
         logicIds.forEach(fullId => {
@@ -64,16 +77,16 @@ export const EventSheetEditor: React.FC = () => {
         setSelectedLogicItems([]);
       }
 
+      // Toggle Disable
       if (e.key === 'd' || e.key === 'D') {
-        if (!eventSheet) return;
         blockIds.forEach(id => {
           const block = findBlockInTree(eventSheet.events, id);
           if (block) updateEventBlock(eventSheet.id, id, { disabled: !block.disabled });
         });
       }
 
+      // Invert
       if (e.key === 'i' || e.key === 'I') {
-        if (!eventSheet) return;
         logicIds.forEach(fullId => {
           const [blockId, itemId] = fullId.split(':');
           const block = findBlockInTree(eventSheet.events, blockId);
@@ -81,11 +94,29 @@ export const EventSheetEditor: React.FC = () => {
           if (cond) updateCondition(eventSheet.id, blockId, itemId, { inverted: !cond.inverted });
         });
       }
+
+      // Movement
+      if (isCtrl && e.key === 'ArrowUp') {
+        e.preventDefault();
+        blockIds.forEach(id => {
+          // Find index and move up
+          // This is a bit complex for multi-select, let's just do first for now
+          const idx = eventSheet.events.findIndex(b => b.id === id);
+          if (idx > 0) moveEventBlock(eventSheet.id, id, null, idx - 1);
+        });
+      }
+      if (isCtrl && e.key === 'ArrowDown') {
+        e.preventDefault();
+        blockIds.forEach(id => {
+          const idx = eventSheet.events.findIndex(b => b.id === id);
+          if (idx !== -1 && idx < eventSheet.events.length - 1) moveEventBlock(eventSheet.id, id, null, idx + 2); // idx+2 because splice(idx+1, 0, item) is after removal
+        });
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorState.selectedEventBlockIds, editorState.selectedLogicItemIds, eventSheet, updateEventBlock, removeEventBlock, updateCondition, removeCondition, removeAction, setSelectedEventBlocks, setSelectedLogicItems]);
+  }, [editorState.selectedEventBlockIds, editorState.selectedLogicItemIds, eventSheet, updateEventBlock, removeEventBlock, updateCondition, removeCondition, removeAction, setSelectedEventBlocks, setSelectedLogicItems, undo, redo, copySelected, cutSelected, pasteSelected, moveEventBlock]);
 
   const findBlockInTree = (blocks: EventBlock[], id: string): EventBlock | undefined => {
     for (const b of blocks) {
@@ -159,6 +190,16 @@ export const EventSheetEditor: React.FC = () => {
     return count;
   };
 
+  const expandAll = (expand: boolean) => {
+    const updateRecursive = (list: EventBlock[]) => {
+      list.forEach(b => {
+        if (b.type === 'group') updateEventBlock(eventSheet.id, b.id, { groupExpanded: expand });
+        updateRecursive(b.children);
+      });
+    };
+    updateRecursive(eventSheet.events);
+  };
+
   return (
     <div className="event-sheet-editor" 
       onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); closeContextMenu(); }}
@@ -175,7 +216,6 @@ export const EventSheetEditor: React.FC = () => {
             key={es.id} 
             onClick={(e) => {
               e.stopPropagation();
-              // Find first layout that uses this sheet and make it active
               const l = project.layouts.find(layout => layout.eventSheetId === es.id);
               if (l) setActiveLayout(l.id);
             }}
@@ -198,7 +238,11 @@ export const EventSheetEditor: React.FC = () => {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px',
         backgroundColor: '#2d2d2d', borderBottom: '1px solid #333', position: 'sticky', top: 0, zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '2px', marginRight: '10px', borderRight: '1px solid #444', paddingRight: '10px' }}>
+            <button onClick={(e) => { e.stopPropagation(); undo(); }} style={iconButtonStyle} title="Undo (Ctrl+Z)"><Undo size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); redo(); }} style={iconButtonStyle} title="Redo (Ctrl+Y)"><Redo size={14} /></button>
+          </div>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Search size={14} style={{ position: 'absolute', left: '8px', color: '#666' }} />
             <input 
@@ -208,9 +252,13 @@ export const EventSheetEditor: React.FC = () => {
               placeholder="Search..."
               style={{
                 backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px',
-                padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '150px', outline: 'none'
+                padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '130px', outline: 'none'
               }}
             />
+          </div>
+          <div style={{ display: 'flex', gap: '2px', marginLeft: '10px' }}>
+            <button onClick={(e) => { e.stopPropagation(); expandAll(true); }} style={iconButtonStyle} title="Expand All"><Maximize2 size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); expandAll(false); }} style={iconButtonStyle} title="Collapse All"><Minimize2 size={14} /></button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -630,7 +678,7 @@ const ActionItem: React.FC<{
 };
 
 const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, eventSheetId: string, onClose: () => void }> = ({ x, y, blockId, eventSheetId, onClose }) => {
-  const { addEventBlock, removeEventBlock, updateEventBlock } = useEditorStore();
+  const { addEventBlock, removeEventBlock, updateEventBlock, copySelected, cutSelected, pasteSelected } = useEditorStore();
 
   const handleAction = (action: () => void) => {
     action();
@@ -647,9 +695,9 @@ const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, even
           <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, blockId, 'event'))}><Plus size={14} /> Add sub-event</div>
           <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, blockId, 'group'))}><Plus size={14} /> Add sub-group</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Copy size={14} /> Copy</div>
-          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Scissors size={14} /> Cut</div>
-          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Clipboard size={14} /> Paste</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => copySelected())}> <Copy size={14} /> Copy</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => cutSelected())}> <Scissors size={14} /> Cut</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => pasteSelected(eventSheetId, blockId))}> <Clipboard size={14} /> Paste Inside</div>
           <div style={contextDividerStyle} />
           <div onClick={() => handleAction(() => removeEventBlock(eventSheetId, blockId))} style={{ ...contextItemStyle, color: '#f44336' }}> <Trash2 size={14} /> Delete</div>
         </>
@@ -657,8 +705,8 @@ const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, even
         <>
           <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'event'))}><Plus size={14} /> Add Event</div>
           <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'group'))}><Plus size={14} /> Add Group</div>
-          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'comment'))}><Plus size={14} /> Add Comment</div>
-          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'variable'))}><Plus size={14} /> Add Variable</div>
+          <div style={contextDividerStyle} />
+          <div style={contextItemStyle} onClick={() => handleAction(() => pasteSelected(eventSheetId, null))}> <Clipboard size={14} /> Paste</div>
         </>
       )}
     </div>
@@ -714,7 +762,7 @@ const cancelButtonStyle: React.CSSProperties = { backgroundColor: 'transparent',
 const toolbarButtonStyle: React.CSSProperties = { backgroundColor: '#3c3c3c', color: '#ccc', border: '1px solid #444', padding: '4px 10px', borderRadius: '3px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' };
 const logicItemStyle: React.CSSProperties = { padding: '4px 6px', borderRadius: '2px', display: 'flex', flexDirection: 'column', transition: 'background-color 0.1s', cursor: 'pointer' };
 const addLinkStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#007acc', fontSize: '12px', cursor: 'pointer', padding: '4px 0', textAlign: 'left' };
-const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px' };
+const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px' };
 const inputStyle: React.CSSProperties = { backgroundColor: '#1e1e1e', color: '#fff', border: '1px solid #444', borderRadius: '2px', fontSize: '11px', padding: '2px 4px' };
 const contextItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s' };
 const contextDividerStyle: React.CSSProperties = { height: '1px', backgroundColor: '#444', margin: '4px 0' };

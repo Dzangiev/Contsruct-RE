@@ -421,3 +421,61 @@ export function moveEventBlock(
     eventSheets: project.eventSheets.map(es => es.id === eventSheetId ? updatedSheet : es)
   };
 }
+/**
+ * Clones an event block with new IDs recursively.
+ */
+export function cloneEventBlock(block: EventBlock): EventBlock {
+  const newBlock: EventBlock = {
+    ...block,
+    id: generateId(),
+    conditions: block.conditions.map(c => ({ ...c, id: generateId() })),
+    actions: block.actions.map(a => ({ ...a, id: generateId() })),
+    children: block.children.map(c => cloneEventBlock(c))
+  };
+
+  if (block.variable) {
+    newBlock.variable = { ...block.variable, id: generateId() };
+  }
+
+  return newBlock;
+}
+
+/**
+ * Pastes event blocks into a target sheet/parent.
+ */
+export function pasteEventBlocks(
+  project: Project,
+  eventSheetId: string,
+  targetParentId: string | null,
+  blocks: EventBlock[]
+): Project {
+  const cloned = blocks.map(b => cloneEventBlock(b));
+  let updatedProject = project;
+
+  // If any cloned blocks have variables, add them to global variables
+  cloned.forEach(b => {
+    if (b.variable) {
+      updatedProject = {
+        ...updatedProject,
+        globalVariables: [...updatedProject.globalVariables, b.variable]
+      };
+    }
+  });
+
+  return {
+    ...updatedProject,
+    eventSheets: updatedProject.eventSheets.map(es => {
+      if (es.id !== eventSheetId) return es;
+      if (!targetParentId) {
+        return { ...es, events: [...es.events, ...cloned] };
+      }
+      return {
+        ...es,
+        events: updateInTree(es.events, targetParentId, p => ({
+          ...p,
+          children: [...p.children, ...cloned]
+        }))
+      };
+    })
+  };
+}

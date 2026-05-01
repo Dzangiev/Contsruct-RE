@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Project, createEmptyProject, ObjectTypeKind } from '../model/project';
-import { EditorState, createInitialEditorState, ToolType } from '../editor/editorState';
+import { Project, createEmptyProject, ObjectTypeKind, EventBlock } from '../model/project';
+import { EditorState, createInitialEditorState, ToolType, ClipboardData } from '../editor/editorState';
 import * as projectUpdates from '../model/projectUpdates';
 import * as eventUpdates from '../model/eventUpdates';
 import * as editorUpdates from '../editor/editorState';
@@ -8,6 +8,13 @@ import * as editorUpdates from '../editor/editorState';
 interface EditorStore {
   project: Project;
   editorState: EditorState;
+  
+  // History
+  history: Project[];
+  historyIndex: number;
+  pushHistory: (project: Project) => void;
+  undo: () => void;
+  redo: () => void;
 
   // Project Actions
   addLayout: (name: string) => void;
@@ -45,80 +52,154 @@ interface EditorStore {
   setPreviewMode: (previewMode: boolean) => void;
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
+  
+  // Clipboard
+  copySelected: () => void;
+  cutSelected: () => void;
+  pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
 }
 
 const initialProject = createEmptyProject();
 
-export const useEditorStore = create<EditorStore>((set) => ({
+export const useEditorStore = create<EditorStore>((set, get) => ({
   project: initialProject,
   editorState: createInitialEditorState(initialProject),
+  
+  history: [initialProject],
+  historyIndex: 0,
+
+  pushHistory: (newProject) => {
+    const { history, historyIndex } = get();
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(newProject))); // Deep clone to be safe
+    if (newHistory.length > 50) newHistory.shift(); // Limit history
+    set({ history: newHistory, historyIndex: newHistory.length - 1 });
+  },
+
+  undo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex > 0) {
+      const prev = history[historyIndex - 1];
+      set({ project: prev, historyIndex: historyIndex - 1 });
+    }
+  },
+
+  redo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex < history.length - 1) {
+      const next = history[historyIndex + 1];
+      set({ project: next, historyIndex: historyIndex + 1 });
+    }
+  },
 
   // Project Actions
-  addLayout: (name) => set((state) => ({
-    project: projectUpdates.addLayout(state.project, name)
-  })),
-  renameLayout: (layoutId, newName) => set((state) => ({
-    project: projectUpdates.renameLayout(state.project, layoutId, newName)
-  })),
-  addLayer: (layoutId, name) => set((state) => ({
-    project: projectUpdates.addLayer(state.project, layoutId, name)
-  })),
-  updateLayer: (layoutId, layerId, updates) => set((state) => ({
-    project: projectUpdates.updateLayer(state.project, layoutId, layerId, updates)
-  })),
-  moveLayer: (layoutId, layerId, direction) => set((state) => ({
-    project: projectUpdates.moveLayer(state.project, layoutId, layerId, direction)
-  })),
-  addObjectType: (name, kind) => set((state) => ({
-    project: projectUpdates.addObjectType(state.project, name, kind)
-  })),
-  updateObjectType: (objectTypeId, updates) => set((state) => ({
-    project: projectUpdates.updateObjectType(state.project, objectTypeId, updates)
-  })),
-  addInstance: (layoutId, objectTypeId, layerId, x, y, id) => set((state) => ({
-    project: projectUpdates.addInstance(state.project, layoutId, objectTypeId, layerId, x, y, id)
-  })),
-  updateInstance: (layoutId, instanceId, updates) => set((state) => ({
-    project: projectUpdates.updateInstance(state.project, layoutId, instanceId, updates)
-  })),
-  removeInstance: (layoutId, instanceId) => set((state) => ({
-    project: projectUpdates.removeInstance(state.project, layoutId, instanceId)
-  })),
+  addLayout: (name) => {
+    const next = projectUpdates.addLayout(get().project, name);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  renameLayout: (layoutId, newName) => {
+    const next = projectUpdates.renameLayout(get().project, layoutId, newName);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addLayer: (layoutId, name) => {
+    const next = projectUpdates.addLayer(get().project, layoutId, name);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateLayer: (layoutId, layerId, updates) => {
+    const next = projectUpdates.updateLayer(get().project, layoutId, layerId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  moveLayer: (layoutId, layerId, direction) => {
+    const next = projectUpdates.moveLayer(get().project, layoutId, layerId, direction);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addObjectType: (name, kind) => {
+    const next = projectUpdates.addObjectType(get().project, name, kind);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateObjectType: (objectTypeId, updates) => {
+    const next = projectUpdates.updateObjectType(get().project, objectTypeId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addInstance: (layoutId, objectTypeId, layerId, x, y, id) => {
+    const next = projectUpdates.addInstance(get().project, layoutId, objectTypeId, layerId, x, y, id);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateInstance: (layoutId, instanceId, updates) => {
+    const next = projectUpdates.updateInstance(get().project, layoutId, instanceId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeInstance: (layoutId, instanceId) => {
+    const next = projectUpdates.removeInstance(get().project, layoutId, instanceId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
 
   // Event Sheet Actions
-  addEventBlock: (eventSheetId, parentBlockId, type) => set((state) => ({
-    project: eventUpdates.addEventBlock(state.project, eventSheetId, parentBlockId, type)
-  })),
-  updateEventBlock: (eventSheetId, blockId, updates) => set((state) => ({
-    project: eventUpdates.updateEventBlock(state.project, eventSheetId, blockId, updates)
-  })),
-  removeEventBlock: (eventSheetId, blockId) => set((state) => ({
-    project: eventUpdates.removeEventBlock(state.project, eventSheetId, blockId)
-  })),
-  moveEventBlock: (eventSheetId, blockId, targetParentId, targetIndex) => set((state) => ({
-    project: eventUpdates.moveEventBlock(state.project, eventSheetId, blockId, targetParentId, targetIndex)
-  })),
-  addCondition: (eventSheetId, blockId, type, params, targetObjectTypeId) => set((state) => ({
-    project: eventUpdates.addCondition(state.project, eventSheetId, blockId, type, params, targetObjectTypeId)
-  })),
-  updateCondition: (eventSheetId, blockId, conditionId, updates) => set((state) => ({
-    project: eventUpdates.updateCondition(state.project, eventSheetId, blockId, conditionId, updates)
-  })),
-  removeCondition: (eventSheetId, blockId, conditionId) => set((state) => ({
-    project: eventUpdates.removeCondition(state.project, eventSheetId, blockId, conditionId)
-  })),
-  addAction: (eventSheetId, blockId, type, params, targetObjectTypeId) => set((state) => ({
-    project: eventUpdates.addAction(state.project, eventSheetId, blockId, type, params, targetObjectTypeId)
-  })),
-  updateAction: (eventSheetId, blockId, actionId, updates) => set((state) => ({
-    project: eventUpdates.updateAction(state.project, eventSheetId, blockId, actionId, updates)
-  })),
-  removeAction: (eventSheetId, blockId, actionId) => set((state) => ({
-    project: eventUpdates.removeAction(state.project, eventSheetId, blockId, actionId)
-  })),
-  addKeyboardMovementTemplate: (eventSheetId, objectTypeId) => set((state) => ({
-    project: eventUpdates.addKeyboardMovementTemplate(state.project, eventSheetId, objectTypeId)
-  })),
+  addEventBlock: (eventSheetId, parentBlockId, type) => {
+    const next = eventUpdates.addEventBlock(get().project, eventSheetId, parentBlockId, type);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateEventBlock: (eventSheetId, blockId, updates) => {
+    const next = eventUpdates.updateEventBlock(get().project, eventSheetId, blockId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeEventBlock: (eventSheetId, blockId) => {
+    const next = eventUpdates.removeEventBlock(get().project, eventSheetId, blockId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  moveEventBlock: (eventSheetId, blockId, targetParentId, targetIndex) => {
+    const next = eventUpdates.moveEventBlock(get().project, eventSheetId, blockId, targetParentId, targetIndex);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addCondition: (eventSheetId, blockId, type, params, targetObjectTypeId) => {
+    const next = eventUpdates.addCondition(get().project, eventSheetId, blockId, type, params, targetObjectTypeId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateCondition: (eventSheetId, blockId, conditionId, updates) => {
+    const next = eventUpdates.updateCondition(get().project, eventSheetId, blockId, conditionId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeCondition: (eventSheetId, blockId, conditionId) => {
+    const next = eventUpdates.removeCondition(get().project, eventSheetId, blockId, conditionId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addAction: (eventSheetId, blockId, type, params, targetObjectTypeId) => {
+    const next = eventUpdates.addAction(get().project, eventSheetId, blockId, type, params, targetObjectTypeId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateAction: (eventSheetId, blockId, actionId, updates) => {
+    const next = eventUpdates.updateAction(get().project, eventSheetId, blockId, actionId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeAction: (eventSheetId, blockId, actionId) => {
+    const next = eventUpdates.removeAction(get().project, eventSheetId, blockId, actionId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addKeyboardMovementTemplate: (eventSheetId, objectTypeId) => {
+    const next = eventUpdates.addKeyboardMovementTemplate(get().project, eventSheetId, objectTypeId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
 
   // Editor Actions
   setActiveLayout: (layoutId, layerId) => set((state) => ({
@@ -151,4 +232,46 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setSelectedLogicItems: (itemIds) => set((state) => ({
     editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
   })),
+
+  // Clipboard
+  copySelected: () => {
+    const { editorState, project } = get();
+    const blockIds = editorState.selectedEventBlockIds;
+    if (blockIds.length > 0) {
+      // Find blocks in any event sheet
+      const blocks: EventBlock[] = [];
+      project.eventSheets.forEach(es => {
+        const findBlocks = (list: EventBlock[]) => {
+          list.forEach(b => {
+            if (blockIds.includes(b.id)) blocks.push(b);
+            findBlocks(b.children);
+          });
+        };
+        findBlocks(es.events);
+      });
+      set({ editorState: { ...editorState, clipboard: { type: 'blocks', data: JSON.parse(JSON.stringify(blocks)) } } });
+    }
+  },
+  cutSelected: () => {
+    get().copySelected();
+    const { editorState, project } = get();
+    const blockIds = editorState.selectedEventBlockIds;
+    let nextProject = project;
+    project.eventSheets.forEach(es => {
+      blockIds.forEach(id => {
+        nextProject = eventUpdates.removeEventBlock(nextProject, es.id, id);
+      });
+    });
+    set({ project: nextProject, editorState: { ...editorState, selectedEventBlockIds: [] } });
+    get().pushHistory(nextProject);
+  },
+  pasteSelected: (eventSheetId, targetParentId) => {
+    const { editorState, project } = get();
+    const cb = editorState.clipboard;
+    if (cb && cb.type === 'blocks') {
+      const next = eventUpdates.pasteEventBlocks(project, eventSheetId, targetParentId, cb.data);
+      set({ project: next });
+      get().pushHistory(next);
+    }
+  }
 }));

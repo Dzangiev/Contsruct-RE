@@ -2,6 +2,11 @@ import { Project } from '../model/project';
 
 export type ToolType = 'select' | 'place' | 'pan';
 
+export interface ClipboardData {
+  type: 'blocks' | 'logic';
+  data: any[];
+}
+
 export interface EditorState {
   activeLayoutId: string | null;
   activeLayerId: string | null;
@@ -16,6 +21,7 @@ export interface EditorState {
   previewMode: boolean;
   selectedEventBlockIds: string[];
   selectedLogicItemIds: string[]; // for conditions or actions
+  clipboard: ClipboardData | null;
 }
 
 /**
@@ -39,6 +45,7 @@ export function createInitialEditorState(project: Project): EditorState {
     previewMode: false,
     selectedEventBlockIds: [],
     selectedLogicItemIds: [],
+    clipboard: null,
   };
 }
 
