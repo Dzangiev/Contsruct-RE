@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import { Project, createEmptyProject, ObjectTypeKind, EventBlock } from '../model/project';
+import { Project, createEmptyProject, ObjectTypeKind, EventBlock, Condition, Action } from '../model/project';
 import { EditorState, createInitialEditorState, ToolType, ClipboardData } from '../editor/editorState';
 import * as projectUpdates from '../model/projectUpdates';
 import * as eventUpdates from '../model/eventUpdates';
 import * as editorUpdates from '../editor/editorState';
+import { generateId } from '../utils/id';
 
 interface EditorStore {
   project: Project;
@@ -31,7 +32,7 @@ interface EditorStore {
   removeInstanceVariable: (objectTypeId: string, variableId: string) => void;
 
   // Event Sheet Actions
-  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable') => void;
+  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => void;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
   removeEventBlock: (eventSheetId: string, blockId: string) => void;
   moveEventBlock: (eventSheetId: string, blockId: string, targetParentId: string | null, targetIndex: number) => void;
@@ -44,6 +45,7 @@ interface EditorStore {
   removeAction: (eventSheetId: string, blockId: string, actionId: string) => void;
   moveAction: (eventSheetId: string, sourceBlockId: string, actionId: string, targetBlockId: string, targetIndex: number) => void;
   addKeyboardMovementTemplate: (eventSheetId: string, objectTypeId: string) => void;
+  toggleConditionInverted: (eventSheetId: string, blockId: string, conditionId: string) => void;
 
   // Editor Actions
   setActiveLayout: (layoutId: string, layerId?: string) => void;
@@ -61,6 +63,7 @@ interface EditorStore {
   copySelected: () => void;
   cutSelected: () => void;
   pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
+  pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
 }
 
 const initialProject = createEmptyProject();
@@ -75,8 +78,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   pushHistory: (newProject) => {
     const { history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(newProject))); // Deep clone to be safe
-    if (newHistory.length > 50) newHistory.shift(); // Limit history
+    newHistory.push(JSON.parse(JSON.stringify(newProject))); 
+    if (newHistory.length > 50) newHistory.shift(); 
     set({ history: newHistory, historyIndex: newHistory.length - 1 });
   },
 
@@ -224,6 +227,23 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
+  toggleConditionInverted: (eventSheetId, blockId, conditionId) => {
+    const { project } = get();
+    const es = project.eventSheets.find(s => s.id === eventSheetId);
+    const findCond = (blocks: EventBlock[]): any => {
+      for (const b of blocks) {
+        if (b.id === blockId) return b.conditions.find(c => c.id === conditionId);
+        const f = findCond(b.children);
+        if (f) return f;
+      }
+    };
+    const cond = es ? findCond(es.events) : null;
+    if (cond) {
+      const next = eventUpdates.updateCondition(project, eventSheetId, blockId, conditionId, { inverted: !cond.inverted });
+      set({ project: next });
+      get().pushHistory(next);
+    }
+  },
 
   // Editor Actions
   setActiveLayout: (layoutId, layerId) => set((state) => ({
@@ -261,6 +281,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   copySelected: () => {
     const { editorState, project } = get();
     const blockIds = editorState.selectedEventBlockIds;
+    const logicIds = editorState.selectedLogicItemIds;
+    
     if (blockIds.length > 0) {
       const blocks: EventBlock[] = [];
       project.eventSheets.forEach(es => {
@@ -273,19 +295,44 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         findBlocks(es.events);
       });
       set({ editorState: { ...editorState, clipboard: { type: 'blocks', data: JSON.parse(JSON.stringify(blocks)) } } });
+    } else if (logicIds.length > 0) {
+      const items: any[] = [];
+      project.eventSheets.forEach(es => {
+        const findLogic = (list: EventBlock[]) => {
+          list.forEach(b => {
+            logicIds.forEach(lId => {
+              const [blockId, itemId] = lId.split(':');
+              if (b.id === blockId) {
+                const c = b.conditions.find(c => c.id === itemId);
+                if (c) items.push({ type: 'condition', data: c });
+                const a = b.actions.find(a => a.id === itemId);
+                if (a) items.push({ type: 'action', data: a });
+              }
+            });
+            findLogic(b.children);
+          });
+        };
+        findLogic(es.events);
+      });
+      set({ editorState: { ...editorState, clipboard: { type: 'logicItems', data: JSON.parse(JSON.stringify(items)) } } });
     }
   },
   cutSelected: () => {
     get().copySelected();
     const { editorState, project } = get();
     const blockIds = editorState.selectedEventBlockIds;
+    const logicIds = editorState.selectedLogicItemIds;
     let nextProject = project;
+    
     project.eventSheets.forEach(es => {
-      blockIds.forEach(id => {
-        nextProject = eventUpdates.removeEventBlock(nextProject, es.id, id);
+      blockIds.forEach(id => { nextProject = eventUpdates.removeEventBlock(nextProject, es.id, id); });
+      logicIds.forEach(lId => {
+        const [blockId, itemId] = lId.split(':');
+        nextProject = eventUpdates.removeCondition(nextProject, es.id, blockId, itemId);
+        nextProject = eventUpdates.removeAction(nextProject, es.id, blockId, itemId);
       });
     });
-    set({ project: nextProject, editorState: { ...editorState, selectedEventBlockIds: [] } });
+    set({ project: nextProject, editorState: { ...editorState, selectedEventBlockIds: [], selectedLogicItemIds: [] } });
     get().pushHistory(nextProject);
   },
   pasteSelected: (eventSheetId, targetParentId) => {
@@ -295,6 +342,23 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const next = eventUpdates.pasteEventBlocks(project, eventSheetId, targetParentId, cb.data);
       set({ project: next });
       get().pushHistory(next);
+    }
+  },
+  pasteLogicItem: (eventSheetId, targetBlockId, targetIndex) => {
+    const { editorState, project } = get();
+    const cb = editorState.clipboard;
+    if (cb && cb.type === 'logicItems') {
+      let nextProject = project;
+      cb.data.forEach((item: any) => {
+        const cloned = { ...item.data, id: generateId() };
+        if (item.type === 'condition') {
+          nextProject = eventUpdates.addCondition(nextProject, eventSheetId, targetBlockId, cloned.type, cloned.params, cloned.targetObjectTypeId);
+        } else {
+          nextProject = eventUpdates.addAction(nextProject, eventSheetId, targetBlockId, cloned.type, cloned.params, cloned.targetObjectTypeId);
+        }
+      });
+      set({ project: nextProject });
+      get().pushHistory(nextProject);
     }
   }
 }));

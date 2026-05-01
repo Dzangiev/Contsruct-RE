@@ -152,6 +152,17 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Layer', type: 'layer' }
     ],
     category: 'System'
+  },
+  {
+    type: 'callFunction',
+    name: 'Call function',
+    description: 'Invoke a previously defined function.',
+    params: [
+      { name: 'Name', type: 'string', defaultValue: 'MyFunction' },
+      { name: 'Param 1', type: 'string', defaultValue: '' },
+      { name: 'Param 2', type: 'string', defaultValue: '' }
+    ],
+    category: 'Functions'
   }
 ];
 

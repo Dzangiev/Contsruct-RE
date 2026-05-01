@@ -3,7 +3,7 @@ import { Project } from '../model/project';
 export type ToolType = 'select' | 'place' | 'pan';
 
 export interface ClipboardData {
-  type: 'blocks' | 'logic';
+  type: 'blocks' | 'logicItems';
   data: any[];
 }
 

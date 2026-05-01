@@ -33,7 +33,7 @@ export function addEventBlock(
   project: Project, 
   eventSheetId: string, 
   parentBlockId: string | null, 
-  type: 'event' | 'group' | 'comment' | 'variable'
+  type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include'
 ): Project {
   const blockId = generateId();
   const newBlock: EventBlock = {
@@ -60,6 +60,13 @@ export function addEventBlock(
       ...project,
       globalVariables: [...project.globalVariables, newBlock.variable]
     };
+  } else if (type === 'function') {
+    newBlock.functionName = 'NewFunction';
+    newBlock.functionParams = [];
+  } else if (type === 'include') {
+    // Default to the first event sheet that isn't the current one
+    const otherSheet = project.eventSheets.find(es => es.id !== eventSheetId);
+    newBlock.includeSheetId = otherSheet?.id || '';
   }
 
   return {

@@ -31,6 +31,7 @@ export function addLayout(project: Project, name: string): Project {
     id: eventSheetId,
     name: `${name} events`,
     events: [],
+    includes: [],
   };
 
   return {

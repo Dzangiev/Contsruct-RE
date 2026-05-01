@@ -96,7 +96,7 @@ export interface GlobalVariable {
 
 export interface EventBlock {
   id: string;
-  type: 'event' | 'group' | 'comment' | 'variable';
+  type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include';
   disabled: boolean;
   conditions: Condition[];
   actions: Action[];
@@ -105,12 +105,18 @@ export interface EventBlock {
   groupExpanded?: boolean;
   commentText?: string;
   variable?: GlobalVariable;
+  functionName?: string;
+  functionParams?: string[];
+  includeSheetId?: string;
+  color?: string;
+  bookmarked?: boolean;
 }
 
 export interface EventSheet {
   id: string;
   name: string;
   events: EventBlock[];
+  includes: string[];
 }
 
 export interface Project {
@@ -164,6 +170,7 @@ export function createEmptyProject(name: string = 'New Project'): Project {
         id: defaultEventSheetId,
         name: 'Event sheet 1',
         events: [],
+        includes: [],
       },
     ],
     globalVariables: [],
