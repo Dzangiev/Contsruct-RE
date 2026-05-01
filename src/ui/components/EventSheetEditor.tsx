@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
@@ -99,8 +99,6 @@ export const EventSheetEditor: React.FC = () => {
       if (isCtrl && e.key === 'ArrowUp') {
         e.preventDefault();
         blockIds.forEach(id => {
-          // Find index and move up
-          // This is a bit complex for multi-select, let's just do first for now
           const idx = eventSheet.events.findIndex(b => b.id === id);
           if (idx > 0) moveEventBlock(eventSheet.id, id, null, idx - 1);
         });
@@ -109,7 +107,7 @@ export const EventSheetEditor: React.FC = () => {
         e.preventDefault();
         blockIds.forEach(id => {
           const idx = eventSheet.events.findIndex(b => b.id === id);
-          if (idx !== -1 && idx < eventSheet.events.length - 1) moveEventBlock(eventSheet.id, id, null, idx + 2); // idx+2 because splice(idx+1, 0, item) is after removal
+          if (idx !== -1 && idx < eventSheet.events.length - 1) moveEventBlock(eventSheet.id, id, null, idx + 2);
         });
       }
     };
@@ -530,21 +528,27 @@ const EventBlockItem: React.FC<{
           {index}
         </div>
 
-        <div style={{ flex: 1, padding: '8px', borderRight: '1px solid #333', minWidth: '300px' }}>
+        <div 
+          onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }}
+          style={{ flex: 1, padding: '8px', borderRight: '1px solid #333', minWidth: '300px', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {block.conditions.map(c => (
               <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} onOpenParamEditor={onOpenParamEditor} />
             ))}
-            <button onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ ...addLinkStyle, alignSelf: 'flex-start' }}>+ Add condition</button>
+            <div style={addLinkStyle}>+ Add condition</div>
           </div>
         </div>
 
-        <div style={{ flex: 1, padding: '8px', minWidth: '300px' }}>
+        <div 
+          onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }}
+          style={{ flex: 1, padding: '8px', minWidth: '300px', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {block.actions.map(a => (
               <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} onOpenParamEditor={onOpenParamEditor} />
             ))}
-            <button onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ ...addLinkStyle, alignSelf: 'flex-start' }}>+ Add action</button>
+            <div style={addLinkStyle}>+ Add action</div>
           </div>
         </div>
 
@@ -596,22 +600,23 @@ const ConditionItem: React.FC<{
   return (
     <div 
       onClick={handleSelect}
-      onDoubleClick={() => def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params)}
+      onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params); }}
       style={{
         ...logicItemStyle, 
         backgroundColor: isSelected ? '#004b7e' : 'transparent',
-        border: isSelected ? '1px solid #007acc' : '1px solid transparent'
+        border: isSelected ? '1px solid #007acc' : '1px solid transparent',
+        color: targetObject ? '#2ecc71' : '#3498db'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '16px', height: '16px', backgroundColor: targetObject?.assetId ? 'transparent' : '#555', borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+        <div style={{ width: '16px', height: '16px', backgroundColor: targetObject?.assetId ? 'transparent' : (targetObject ? '#27ae60' : '#2980b9'), borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff' }}>
           {targetObject?.name?.[0] || 'S'}
         </div>
         <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', opacity: isSelected ? 1 : 0.9 }}>
           {condition.inverted && <span style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '14px' }}>!</span>}
-          <span style={{ color: isSelected ? '#fff' : '#aaa', fontSize: '12px' }}>{targetObject?.name || 'System'}</span>
+          <span style={{ color: isSelected ? '#fff' : (targetObject ? '#2ecc71' : '#3498db'), fontSize: '12px', fontWeight: 600 }}>{targetObject?.name || 'System'}</span>
           <span style={{ color: '#fff', fontSize: '12px', fontWeight: 500 }}>{def?.name || condition.type}</span>
-          <span style={{ color: isSelected ? '#fff' : '#007acc', fontSize: '11px', fontWeight: 'bold' }}>
+          <span style={{ color: isSelected ? '#fff' : '#f1c40f', fontSize: '11px', fontWeight: 'bold' }}>
             ({condition.params.map((p: any, i: number) => {
               const pDef = def?.params[i];
               return pDef?.type === 'objectType' ? (project.objectTypes.find((ot: any) => ot.id === p)?.name || p) : String(p);
@@ -650,21 +655,22 @@ const ActionItem: React.FC<{
   return (
     <div 
       onClick={handleSelect}
-      onDoubleClick={() => def && onOpenParamEditor('action', blockId, action.id, def, action.params)}
+      onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('action', blockId, action.id, def, action.params); }}
       style={{
         ...logicItemStyle, 
         backgroundColor: isSelected ? '#004b7e' : 'transparent',
-        border: isSelected ? '1px solid #007acc' : '1px solid transparent'
+        border: isSelected ? '1px solid #007acc' : '1px solid transparent',
+        color: targetObject ? '#2ecc71' : '#3498db'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '16px', height: '16px', backgroundColor: targetObject?.assetId ? 'transparent' : '#555', borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+        <div style={{ width: '16px', height: '16px', backgroundColor: targetObject?.assetId ? 'transparent' : (targetObject ? '#27ae60' : '#2980b9'), borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff' }}>
           {targetObject?.name?.[0] || 'S'}
         </div>
         <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', opacity: isSelected ? 1 : 0.9 }}>
-          <span style={{ color: isSelected ? '#fff' : '#aaa', fontSize: '12px' }}>{targetObject?.name || 'System'}</span>
+          <span style={{ color: isSelected ? '#fff' : (targetObject ? '#2ecc71' : '#3498db'), fontSize: '12px', fontWeight: 600 }}>{targetObject?.name || 'System'}</span>
           <span style={{ color: '#fff', fontSize: '12px', fontWeight: 500 }}>{def?.name || action.type}</span>
-          <span style={{ color: isSelected ? '#fff' : '#007acc', fontSize: '11px', fontWeight: 'bold' }}>
+          <span style={{ color: isSelected ? '#fff' : '#f1c40f', fontSize: '11px', fontWeight: 'bold' }}>
             ({action.params.map((p: any, i: number) => {
               const pDef = def?.params[i];
               return pDef?.type === 'objectType' ? (project.objectTypes.find((ot: any) => ot.id === p)?.name || p) : String(p);
@@ -715,37 +721,75 @@ const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, even
 
 const ParamEditor: React.FC<{ project: any, def: LogicDefinition, initialParams: any[], onSave: (params: any[]) => void, onCancel: () => void }> = ({ project, def, initialParams, onSave, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
+  const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const updateParam = (index: number, value: any) => { const next = [...params]; next[index] = value; setParams(next); };
+
+  const assistantItems = [
+    ...project.globalVariables.map((v: any) => ({ name: v.name, type: 'variable', icon: <Terminal size={12} /> })),
+    ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object', icon: <Code size={12} /> })),
+    { name: 'dt', type: 'function', icon: <Code size={12} /> },
+    { name: 'time', type: 'function', icon: <Code size={12} /> },
+    { name: 'self', type: 'function', icon: <Code size={12} /> },
+  ];
 
   return (
     <div style={overlayStyle} onClick={(e) => e.stopPropagation()}>
-      <div style={modalStyle}>
-        <div style={modalHeaderStyle}><h3 style={{ margin: 0, fontSize: '14px' }}>Parameters: {def.name}</h3></div>
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {def.params.map((pDef, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '12px', color: '#888' }}>{pDef.name}</label>
-              {pDef.type === 'enum' ? (
-                <select value={params[i]} onChange={(e) => updateParam(i, e.target.value)} style={paramInputStyle}>
-                  {pDef.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              ) : pDef.type === 'objectType' ? (
-                <select value={params[i]} onChange={(e) => updateParam(i, e.target.value)} style={paramInputStyle}>
-                  <option value="">None</option>
-                  {project.objectTypes.map((ot: any) => <option key={ot.id} value={ot.id}>{ot.name}</option>)}
-                </select>
-              ) : pDef.type === 'boolean' ? (
-                <input type="checkbox" checked={!!params[i]} onChange={(e) => updateParam(i, e.target.checked)} />
-              ) : (
-                <input type={pDef.type === 'number' ? 'number' : 'text'} value={params[i]} onChange={(e) => updateParam(i, pDef.type === 'number' ? Number(e.target.value) : e.target.value)} style={paramInputStyle} />
-              )}
-            </div>
-          ))}
-          {def.params.length === 0 && <div style={{ color: '#666', fontSize: '13px' }}>No parameters for this action.</div>}
+      <div style={{ ...modalStyle, width: '600px', flexDirection: 'row' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={modalHeaderStyle}><h3 style={{ margin: 0, fontSize: '14px' }}>Parameters: {def.name}</h3></div>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }}>
+            {def.params.map((pDef, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: '#888' }}>{pDef.name}</label>
+                {pDef.type === 'enum' ? (
+                  <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => updateParam(i, e.target.value)} style={paramInputStyle}>
+                    {pDef.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : pDef.type === 'objectType' ? (
+                  <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => updateParam(i, e.target.value)} style={paramInputStyle}>
+                    <option value="">None</option>
+                    {project.objectTypes.map((ot: any) => <option key={ot.id} value={ot.id}>{ot.name}</option>)}
+                  </select>
+                ) : pDef.type === 'boolean' ? (
+                  <input type="checkbox" onFocus={() => setActiveParamIndex(i)} checked={!!params[i]} onChange={(e) => updateParam(i, e.target.checked)} />
+                ) : (
+                  <input 
+                    type={pDef.type === 'number' ? 'text' : 'text'} 
+                    onFocus={() => setActiveParamIndex(i)}
+                    value={params[i]} 
+                    onChange={(e) => updateParam(i, e.target.value)} 
+                    style={paramInputStyle} 
+                  />
+                )}
+              </div>
+            ))}
+            {def.params.length === 0 && <div style={{ color: '#666', fontSize: '13px' }}>No parameters for this action.</div>}
+          </div>
+          <div style={modalFooterStyle}>
+            <button onClick={() => onSave(params)} style={saveButtonStyle}>Done</button>
+            <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
+          </div>
         </div>
-        <div style={modalFooterStyle}>
-          <button onClick={() => onSave(params)} style={saveButtonStyle}>Done</button>
-          <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
+
+        {/* Expression Assistant Sidebar */}
+        <div style={{ width: '200px', backgroundColor: '#252526', borderLeft: '1px solid #444', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '10px', fontSize: '11px', fontWeight: 'bold', color: '#888', borderBottom: '1px solid #444', textTransform: 'uppercase' }}>Assistant</div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {assistantItems.map((item, idx) => (
+              <div 
+                key={idx} 
+                onClick={() => {
+                  const current = String(params[activeParamIndex]);
+                  updateParam(activeParamIndex, current + (current ? ' ' : '') + item.name);
+                }}
+                style={assistantItemStyle}
+              >
+                {item.icon}
+                <span style={{ flex: 1 }}>{item.name}</span>
+                <span style={{ fontSize: '9px', opacity: 0.5 }}>{item.type}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -766,3 +810,4 @@ const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none
 const inputStyle: React.CSSProperties = { backgroundColor: '#1e1e1e', color: '#fff', border: '1px solid #444', borderRadius: '2px', fontSize: '11px', padding: '2px 4px' };
 const contextItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s' };
 const contextDividerStyle: React.CSSProperties = { height: '1px', backgroundColor: '#444', margin: '4px 0' };
+const assistantItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s', borderBottom: '1px solid #333' };
