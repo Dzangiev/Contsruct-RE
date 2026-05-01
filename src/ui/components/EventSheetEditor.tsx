@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock, Project } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2 } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
@@ -22,8 +22,8 @@ export const EventSheetEditor: React.FC = () => {
   const { 
     project, editorState, 
     addEventBlock, updateEventBlock, removeEventBlock, moveEventBlock,
-    addCondition, updateCondition, removeCondition, 
-    addAction, updateAction, removeAction,
+    addCondition, updateCondition, removeCondition, moveCondition,
+    addAction, updateAction, removeAction, moveAction,
     setSelectedEventBlocks, setSelectedLogicItems,
     setActiveLayout,
     undo, redo, copySelected, cutSelected, pasteSelected
@@ -32,21 +32,11 @@ export const EventSheetEditor: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   
   const [browserState, setBrowserState] = React.useState<{
-    isOpen: boolean,
-    mode: 'condition' | 'action',
-    eventSheetId: string,
-    blockId: string,
-    targetObjectTypeId?: string
+    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, targetObjectTypeId?: string
   } | null>(null);
 
   const [paramEditorState, setParamEditorState] = React.useState<{
-    isOpen: boolean,
-    mode: 'condition' | 'action',
-    eventSheetId: string,
-    blockId: string,
-    itemId: string,
-    def: LogicDefinition,
-    params: any[]
+    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, itemId: string, def: LogicDefinition, params: any[]
   } | null>(null);
 
   const [contextMenu, setContextMenu] = React.useState<{
@@ -54,7 +44,7 @@ export const EventSheetEditor: React.FC = () => {
   } | null>(null);
 
   const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
-
+  const [draggedLogicItem, setDraggedLogicItem] = React.useState<{ type: 'condition' | 'action', blockId: string, itemId: string } | null>(null);
   const [selectionBox, setSelectionBox] = React.useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -65,12 +55,11 @@ export const EventSheetEditor: React.FC = () => {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      if (!eventSheet) return;
 
       const isCtrl = e.ctrlKey || e.metaKey;
       const blockIds = editorState.selectedEventBlockIds;
       const logicIds = editorState.selectedLogicItemIds;
-
-      if (!eventSheet) return;
 
       if (isCtrl && e.key === 'z') { e.preventDefault(); undo(); }
       if (isCtrl && e.key === 'y') { e.preventDefault(); redo(); }
@@ -105,6 +94,14 @@ export const EventSheetEditor: React.FC = () => {
         });
       }
 
+      if ((e.key === 'x' || e.key === 'X') && !isCtrl) {
+        if (blockIds.length > 0) {
+          addEventBlock(eventSheet.id, null, 'event');
+          const lastEventId = eventSheet.events[eventSheet.events.length - 1]?.id;
+          if (lastEventId) addCondition(eventSheet.id, lastEventId, 'else', []);
+        }
+      }
+
       if (e.key === 's' || e.key === 'S') {
         if (blockIds.length > 0) addEventBlock(eventSheet.id, blockIds[0], 'event');
       }
@@ -124,10 +121,9 @@ export const EventSheetEditor: React.FC = () => {
         });
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorState.selectedEventBlockIds, editorState.selectedLogicItemIds, eventSheet, updateEventBlock, removeEventBlock, updateCondition, removeCondition, removeAction, setSelectedEventBlocks, setSelectedLogicItems, undo, redo, copySelected, cutSelected, pasteSelected, moveEventBlock, addEventBlock]);
+  }, [editorState.selectedEventBlockIds, editorState.selectedLogicItemIds, eventSheet, updateEventBlock, removeEventBlock, updateCondition, removeCondition, removeAction, setSelectedEventBlocks, setSelectedLogicItems, undo, redo, copySelected, cutSelected, pasteSelected, moveEventBlock, addEventBlock, addCondition]);
 
   const findBlockInTree = (blocks: EventBlock[], id: string): EventBlock | undefined => {
     for (const b of blocks) {
@@ -141,33 +137,20 @@ export const EventSheetEditor: React.FC = () => {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains('event-sheet-bg')) return;
-    
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
     setSelectionBox({
-      x1: e.clientX - rect.left,
-      y1: e.clientY - rect.top + (containerRef.current?.scrollTop || 0),
-      x2: e.clientX - rect.left,
-      y2: e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
+      x1: e.clientX - rect.left, y1: e.clientY - rect.top + (containerRef.current?.scrollTop || 0),
+      x2: e.clientX - rect.left, y2: e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
     });
-    
-    if (!e.ctrlKey) {
-      setSelectedEventBlocks([]);
-      setSelectedLogicItems([]);
-    }
+    if (!e.ctrlKey) { setSelectedEventBlocks([]); setSelectedLogicItems([]); }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!selectionBox) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
-    setSelectionBox({
-      ...selectionBox,
-      x2: e.clientX - rect.left,
-      y2: e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
-    });
+    setSelectionBox({ ...selectionBox, x2: e.clientX - rect.left, y2: e.clientY - rect.top + (containerRef.current?.scrollTop || 0) });
   };
 
   const handleMouseUp = () => {
@@ -178,10 +161,8 @@ export const EventSheetEditor: React.FC = () => {
       const xEnd = Math.max(selectionBox.x1, selectionBox.x2);
       const yStart = Math.min(selectionBox.y1, selectionBox.y2);
       const yEnd = Math.max(selectionBox.y1, selectionBox.y2);
-
       const elements = containerRef.current?.querySelectorAll('.event-block-item-container');
       const selectedIds: string[] = [];
-      
       elements?.forEach(el => {
         const id = el.getAttribute('data-block-id');
         if (!id) return;
@@ -198,46 +179,6 @@ export const EventSheetEditor: React.FC = () => {
   };
 
   if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
-
-  const openBrowser = (mode: 'condition' | 'action', blockId: string, targetObjectTypeId?: string) => {
-    setBrowserState({ isOpen: true, mode, eventSheetId: eventSheet.id, blockId, targetObjectTypeId });
-  };
-
-  const openParamEditor = (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => {
-    setParamEditorState({ isOpen: true, mode, eventSheetId: eventSheet.id, blockId, itemId, def, params });
-  };
-
-  const handleBrowserSelect = (targetObjectTypeId: string | undefined, type: string, params: any[]) => {
-    if (!browserState) return;
-    if (browserState.mode === 'condition') addCondition(browserState.eventSheetId, browserState.blockId, type, params, targetObjectTypeId);
-    else addAction(browserState.eventSheetId, browserState.blockId, type, params, targetObjectTypeId);
-  };
-
-  const handleParamUpdate = (newParams: any[]) => {
-    if (!paramEditorState) return;
-    if (paramEditorState.mode === 'condition') updateCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: newParams });
-    else updateAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: newParams });
-    setParamEditorState(null);
-  };
-
-  const countTotalEvents = (blocks: EventBlock[]): number => {
-    let count = 0;
-    blocks.forEach(b => {
-      if (b.type === 'event') count++;
-      count += countTotalEvents(b.children);
-    });
-    return count;
-  };
-
-  const expandAll = (expand: boolean) => {
-    const updateRecursive = (list: EventBlock[]) => {
-      list.forEach(b => {
-        if (b.type === 'group') updateEventBlock(eventSheet.id, b.id, { groupExpanded: expand });
-        updateRecursive(b.children);
-      });
-    };
-    updateRecursive(eventSheet.events);
-  };
 
   return (
     <div className="event-sheet-editor" style={{ flex: 1, backgroundColor: '#1e1e1e', color: '#d4d4d4', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -260,8 +201,8 @@ export const EventSheetEditor: React.FC = () => {
             <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="Search..." style={{ backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '130px', outline: 'none' }} />
           </div>
           <div style={{ display: 'flex', gap: '2px', marginLeft: '10px' }}>
-            <button onClick={(e) => { e.stopPropagation(); expandAll(true); }} style={iconButtonStyle} title="Expand All"><Maximize2 size={14} /></button>
-            <button onClick={(e) => { e.stopPropagation(); expandAll(false); }} style={iconButtonStyle} title="Collapse All"><Minimize2 size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); const expandAll = (expand: boolean) => { const updateRecursive = (list: EventBlock[]) => { list.forEach(b => { if (b.type === 'group') updateEventBlock(eventSheet.id, b.id, { groupExpanded: expand }); updateRecursive(b.children); }); }; updateRecursive(eventSheet.events); }; expandAll(true); }} style={iconButtonStyle} title="Expand All"><Maximize2 size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); const expandAll = (expand: boolean) => { const updateRecursive = (list: EventBlock[]) => { list.forEach(b => { if (b.type === 'group') updateEventBlock(eventSheet.id, b.id, { groupExpanded: expand }); updateRecursive(b.children); }); }; updateRecursive(eventSheet.events); }; expandAll(false); }} style={iconButtonStyle} title="Collapse All"><Minimize2 size={14} /></button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -285,47 +226,45 @@ export const EventSheetEditor: React.FC = () => {
 
         <div ref={containerRef} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); setContextMenu(null); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: null }); }} className="event-sheet-bg" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto', position: 'relative' }}>
           {eventSheet.events.map((event, index) => (
-            <EventBlockItem key={event.id} eventSheetId={eventSheet.id} block={event} index={index + 1} onOpenBrowser={openBrowser} onOpenParamEditor={openParamEditor} onContextMenu={(e, id) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id }); }} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} searchTerm={searchTerm} />
+            <EventBlockItem 
+              key={event.id} eventSheetId={eventSheet.id} block={event} index={index + 1} 
+              onOpenBrowser={(m, b, t) => setBrowserState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, targetObjectTypeId: t })} 
+              onOpenParamEditor={(m, b, i, d, p) => setParamEditorState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, itemId: i, def: d, params: p })} 
+              onContextMenu={(e, id) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id }); }} 
+              draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} 
+              draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} 
+              searchTerm={searchTerm} 
+            />
           ))}
-          {eventSheet.events.length === 0 && (
-            <div className="event-sheet-bg" style={{ padding: '60px', textAlign: 'center', color: '#666', border: '2px dashed #333', borderRadius: '8px', marginTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', pointerEvents: 'none' }}>
-              <Info size={32} opacity={0.3} />
-              <div><div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>Empty Event Sheet</div><div style={{ fontSize: '12px' }}>Start by adding a new event or variable.</div></div>
-            </div>
-          )}
           {selectionBox && <div style={{ position: 'absolute', left: Math.min(selectionBox.x1, selectionBox.x2), top: Math.min(selectionBox.y1, selectionBox.y2), width: Math.abs(selectionBox.x2 - selectionBox.x1), height: Math.abs(selectionBox.y2 - selectionBox.y1), backgroundColor: 'rgba(0, 122, 204, 0.2)', border: '1px solid #007acc', pointerEvents: 'none', zIndex: 1000 }} />}
         </div>
       </div>
 
       <div style={{ padding: '4px 16px', backgroundColor: '#007acc', color: '#fff', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '12px' }}><span>{countTotalEvents(eventSheet.events)} Events</span><span>{project.globalVariables.length} Global Variables</span></div>
+        <div style={{ display: 'flex', gap: '12px' }}><span>{project.globalVariables.length} Global Variables</span></div>
         <div>{eventSheet.name}</div>
       </div>
 
-      {browserState?.isOpen && <LogicBrowser project={project} mode={browserState.mode} initialObjectTypeId={browserState.targetObjectTypeId} onSelect={handleBrowserSelect} onClose={() => setBrowserState(null)} />}
-      {paramEditorState?.isOpen && <ParamEditor project={project} def={paramEditorState.def} initialParams={paramEditorState.params} onSave={handleParamUpdate} onCancel={() => setParamEditorState(null)} />}
-      {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} eventSheetId={eventSheet.id} onClose={() => setContextMenu(null)} />}
+      {browserState?.isOpen && (
+        <LogicBrowser project={project} mode={browserState.mode} initialObjectTypeId={browserState.targetObjectTypeId} onSelect={(t, ty, p) => { if (browserState.mode === 'condition') addCondition(browserState.eventSheetId, browserState.blockId, ty, p, t); else addAction(browserState.eventSheetId, browserState.blockId, ty, p, t); }} onClose={() => setBrowserState(null)} />
+      )}
+      {paramEditorState?.isOpen && (
+        <ParamEditor project={project} def={paramEditorState.def} initialParams={paramEditorState.params} onSave={(p) => { if (paramEditorState.mode === 'condition') updateCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); else updateAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); setParamEditorState(null); }} onCancel={() => setParamEditorState(null)} />
+      )}
+      {contextMenu && (
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} eventSheetId={eventSheet.id} onClose={() => setContextMenu(null)} />
+      )}
     </div>
   );
 };
 
 const EventBlockItem: React.FC<{ 
-  eventSheetId: string, 
-  block: EventBlock, 
-  index?: number, 
-  onOpenBrowser: (mode: 'condition' | 'action', blockId: string, targetObjectTypeId?: string) => void, 
-  onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, 
-  onContextMenu: (e: React.MouseEvent, blockId: string) => void, 
-  draggedBlockId: string | null, 
-  setDraggedBlockId: (id: string | null) => void, 
-  depth?: number, 
-  searchTerm?: string
-}> = ({ eventSheetId, block, index, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId, depth = 0, searchTerm = '' }) => {
-  const { editorState, setSelectedEventBlocks, updateEventBlock, addEventBlock, moveEventBlock } = useEditorStore();
+  eventSheetId: string, block: EventBlock, index?: number, onOpenBrowser: (mode: 'condition' | 'action', blockId: string, targetObjectTypeId?: string) => void, onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, onContextMenu: (e: React.MouseEvent, blockId: string) => void, draggedBlockId: string | null, setDraggedBlockId: (id: string | null) => void, draggedLogicItem: { type: 'condition' | 'action', blockId: string, itemId: string } | null, setDraggedLogicItem: (item: { type: 'condition' | 'action', blockId: string, itemId: string } | null) => void, depth?: number, searchTerm?: string
+}> = ({ eventSheetId, block, index, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '' }) => {
+  const { editorState, setSelectedEventBlocks, updateEventBlock, addEventBlock, moveEventBlock, moveCondition, moveAction } = useEditorStore();
   const isSelected = editorState.selectedEventBlockIds.includes(block.id);
   const isDisabled = block.disabled;
 
-  // Search matching
   const hasMatch = searchTerm && (
     block.commentText?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     block.groupName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -334,15 +273,11 @@ const EventBlockItem: React.FC<{
     block.actions.some(a => a.type.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const isVisible = !searchTerm || hasMatch || block.children.some(c => true); // Simplification: let filter handle it at top level if needed, but here we want to auto-expand
-
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
     setDraggedBlockId(block.id);
     e.dataTransfer.setData('text/plain', block.id);
-    if (isSelected && editorState.selectedEventBlockIds.length > 1) {
-      e.dataTransfer.setData('multi', JSON.stringify(editorState.selectedEventBlockIds));
-    }
+    if (isSelected && editorState.selectedEventBlockIds.length > 1) e.dataTransfer.setData('multi', JSON.stringify(editorState.selectedEventBlockIds));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -350,6 +285,12 @@ const EventBlockItem: React.FC<{
     const otId = e.dataTransfer.getData('objectTypeId');
     if (otId) return onOpenBrowser('condition', block.id, otId);
     
+    if (draggedLogicItem) {
+      if (draggedLogicItem.type === 'condition') moveCondition(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.conditions.length);
+      else moveAction(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.actions.length);
+      return setDraggedLogicItem(null);
+    }
+
     const multiIds = e.dataTransfer.getData('multi');
     if (multiIds) {
       const ids = JSON.parse(multiIds);
@@ -372,11 +313,7 @@ const EventBlockItem: React.FC<{
     return (
       <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop} onClick={(e) => { e.stopPropagation(); if (e.ctrlKey) setSelectedEventBlocks([...editorState.selectedEventBlockIds, block.id]); else setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...commonStyle, backgroundColor: '#252526', borderLeftWidth: '4px', borderLeftColor: '#3498db', padding: '6px 12px', margin: '2px 0', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ color: '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px' }}>Global</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-          <span style={{ fontWeight: 'bold' }}><HighlightText text={block.variable.name} highlight={searchTerm} /></span>
-          <span style={{ color: '#888' }}>=</span>
-          <span style={{ color: '#fff' }}>{block.variable.initialValue}</span>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}><span style={{ fontWeight: 'bold' }}><HighlightText text={block.variable.name} highlight={searchTerm} /></span><span style={{ color: '#888' }}>=</span><span style={{ color: '#fff' }}>{block.variable.initialValue}</span></div>
       </div>
     );
   }
@@ -399,9 +336,7 @@ const EventBlockItem: React.FC<{
         </div>
         {isExpanded && (
           <div style={{ padding: '4px 4px 4px 24px', backgroundColor: '#1e1e1e', display: 'flex', flexDirection: 'column', gap: '2px', borderLeft: '1px solid #444', marginLeft: '12px' }}>
-            {block.children.map((child, i) => (
-              <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} depth={depth + 1} searchTerm={searchTerm} />
-            ))}
+            {block.children.map((child, i) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} />)}
           </div>
         )}
       </div>
@@ -413,11 +348,11 @@ const EventBlockItem: React.FC<{
       <div style={{ display: 'flex', minHeight: '60px' }}>
         <div style={{ width: '30px', backgroundColor: isSelected ? '#004b7e' : '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: isSelected ? '#fff' : '#888', borderRight: '1px solid #444' }}>{index}</div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ flex: 1, padding: '8px', borderRight: '1px solid #333', minWidth: '300px', cursor: 'pointer' }}>
-          {block.conditions.map(c => <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} onOpenParamEditor={onOpenParamEditor} searchTerm={searchTerm} />)}
+          {block.conditions.map(c => <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} onOpenParamEditor={onOpenParamEditor} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} />)}
           <div style={addLinkStyle}>+ Add condition</div>
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ flex: 1, padding: '8px', minWidth: '300px', cursor: 'pointer' }}>
-          {block.actions.map(a => <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} onOpenParamEditor={onOpenParamEditor} searchTerm={searchTerm} />)}
+          {block.actions.map(a => <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} onOpenParamEditor={onOpenParamEditor} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} />)}
           <div style={addLinkStyle}>+ Add action</div>
         </div>
         <div style={{ padding: '4px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: '1px solid #333', backgroundColor: '#252526', width: '28px' }}>
@@ -427,7 +362,7 @@ const EventBlockItem: React.FC<{
       </div>
       {block.children.length > 0 && (
         <div style={{ padding: '2px 0 2px 24px', backgroundColor: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '2px', borderLeft: '1px solid #444', marginLeft: '12px', marginTop: '1px' }}>
-          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} depth={depth + 1} searchTerm={searchTerm} />)}
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} />)}
         </div>
       )}
     </div>
@@ -435,13 +370,8 @@ const EventBlockItem: React.FC<{
 };
 
 const ConditionItem: React.FC<{ 
-  project: Project, 
-  eventSheetId: string, 
-  blockId: string, 
-  condition: any, 
-  onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, 
-  searchTerm: string 
-}> = ({ project, eventSheetId, blockId, condition, onOpenParamEditor, searchTerm }) => {
+  project: Project, eventSheetId: string, blockId: string, condition: any, onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, searchTerm: string, setDraggedLogicItem: (item: { type: 'condition' | 'action', blockId: string, itemId: string } | null) => void 
+}> = ({ project, eventSheetId, blockId, condition, onOpenParamEditor, searchTerm, setDraggedLogicItem }) => {
   const { editorState, setSelectedLogicItems, removeCondition } = useEditorStore();
   const def = findConditionDefinition(condition.type);
   const targetObject = project.objectTypes.find((ot: any) => ot.id === condition.targetObjectTypeId);
@@ -449,10 +379,11 @@ const ConditionItem: React.FC<{
   const isSelected = editorState.selectedLogicItemIds.includes(selectionId);
 
   return (
-    <div onClick={(e) => { e.stopPropagation(); if (e.ctrlKey) setSelectedLogicItems([...editorState.selectedLogicItemIds, selectionId]); else setSelectedLogicItems([selectionId]); }} onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params); }} style={{ ...logicItemStyle, backgroundColor: isSelected ? '#004b7e' : 'transparent', border: isSelected ? '1px solid #007acc' : '1px solid transparent', color: targetObject ? '#2ecc71' : '#3498db' }}>
+    <div draggable onDragStart={(e) => { e.stopPropagation(); setDraggedLogicItem({ type: 'condition', blockId, itemId: condition.id }); }} onClick={(e) => { e.stopPropagation(); if (e.ctrlKey) setSelectedLogicItems([...editorState.selectedLogicItemIds, selectionId]); else setSelectedLogicItems([selectionId]); }} onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params); }} style={{ ...logicItemStyle, backgroundColor: isSelected ? '#004b7e' : 'transparent', border: isSelected ? '1px solid #007acc' : '1px solid transparent', color: targetObject ? '#2ecc71' : '#3498db' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '16px', height: '16px', backgroundColor: targetObject ? '#27ae60' : '#2980b9', borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff' }}>{targetObject?.name?.[0] || 'S'}</div>
         <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
+          {condition.type === 'else' && <GitBranch size={12} color="#e67e22" />}
           {condition.inverted && <span style={{ color: '#e67e22', fontWeight: 'bold' }}>!</span>}
           <span style={{ fontWeight: 600 }}><HighlightText text={targetObject?.name || 'System'} highlight={searchTerm} /></span>
           <span style={{ color: '#fff' }}><HighlightText text={def?.name || condition.type} highlight={searchTerm} /></span>
@@ -465,13 +396,8 @@ const ConditionItem: React.FC<{
 };
 
 const ActionItem: React.FC<{ 
-  project: Project, 
-  eventSheetId: string, 
-  blockId: string, 
-  action: any, 
-  onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, 
-  searchTerm: string 
-}> = ({ project, eventSheetId, blockId, action, onOpenParamEditor, searchTerm }) => {
+  project: Project, eventSheetId: string, blockId: string, action: any, onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void, searchTerm: string, setDraggedLogicItem: (item: { type: 'condition' | 'action', blockId: string, itemId: string } | null) => void 
+}> = ({ project, eventSheetId, blockId, action, onOpenParamEditor, searchTerm, setDraggedLogicItem }) => {
   const { editorState, setSelectedLogicItems, removeAction } = useEditorStore();
   const def = findActionDefinition(action.type);
   const targetObject = project.objectTypes.find((ot: any) => ot.id === action.targetObjectTypeId);
@@ -479,33 +405,24 @@ const ActionItem: React.FC<{
   const isSelected = editorState.selectedLogicItemIds.includes(selectionId);
 
   return (
-    <div onClick={(e) => { e.stopPropagation(); if (e.ctrlKey) setSelectedLogicItems([...editorState.selectedLogicItemIds, selectionId]); else setSelectedLogicItems([selectionId]); }} onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('action', blockId, action.id, def, action.params); }} style={{ ...logicItemStyle, backgroundColor: isSelected ? '#004b7e' : 'transparent', border: isSelected ? '1px solid #007acc' : '1px solid transparent', color: targetObject ? '#2ecc71' : '#3498db' }}>
+    <div draggable onDragStart={(e) => { e.stopPropagation(); setDraggedLogicItem({ type: 'action', blockId, itemId: action.id }); }} onClick={(e) => { e.stopPropagation(); if (e.ctrlKey) setSelectedLogicItems([...editorState.selectedLogicItemIds, selectionId]); else setSelectedLogicItems([selectionId]); }} onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('action', blockId, action.id, def, action.params); }} style={{ ...logicItemStyle, backgroundColor: isSelected ? '#004b7e' : 'transparent', border: isSelected ? '1px solid #007acc' : '1px solid transparent', color: targetObject ? '#2ecc71' : '#3498db' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '16px', height: '16px', backgroundColor: targetObject ? '#27ae60' : '#2980b9', borderRadius: '2px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff' }}>{targetObject?.name?.[0] || 'S'}</div>
-        <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontWeight: 600 }}><HighlightText text={targetObject?.name || 'System'} highlight={searchTerm} /></span>
-          <span style={{ color: '#fff' }}><HighlightText text={def?.name || action.type} highlight={searchTerm} /></span>
-          <span style={{ color: '#f1c40f', fontSize: '11px', fontWeight: 'bold' }}>({action.params.join(', ')})</span>
-        </div>
+        <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}><span style={{ fontWeight: 600 }}><HighlightText text={targetObject?.name || 'System'} highlight={searchTerm} /></span><span style={{ color: '#fff' }}><HighlightText text={def?.name || action.type} highlight={searchTerm} /></span><span style={{ color: '#f1c40f', fontSize: '11px', fontWeight: 'bold' }}>({action.params.join(', ')})</span></div>
         <button onClick={(e) => { e.stopPropagation(); removeAction(eventSheetId, blockId, action.id); }} style={iconButtonStyle}><Trash2 size={12} /></button>
       </div>
     </div>
   );
 };
 
-const ContextMenu: React.FC<{ 
-  x: number, 
-  y: number, 
-  blockId: string | null, 
-  eventSheetId: string, 
-  onClose: () => void 
-}> = ({ x, y, blockId, eventSheetId, onClose }) => {
-  const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected } = useEditorStore();
+const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, eventSheetId: string, onClose: () => void }> = ({ x, y, blockId, eventSheetId, onClose }) => {
+  const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition } = useEditorStore();
   return (
     <div style={{ position: 'fixed', top: y, left: x, backgroundColor: '#2d2d2d', border: '1px solid #444', borderRadius: '4px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', zIndex: 3000, padding: '4px 0', minWidth: '150px' }}>
       {blockId ? (
         <>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> Add sub-event</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); addCondition(eventSheetId, 'LAST', 'else', []); onClose(); }}><GitBranch size={14} /> Add Else (X)</div>
           <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> Copy</div>
           <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> Cut</div>
@@ -520,13 +437,7 @@ const ContextMenu: React.FC<{
   );
 };
 
-const ParamEditor: React.FC<{ 
-  project: Project, 
-  def: LogicDefinition, 
-  initialParams: any[], 
-  onSave: (params: any[]) => void, 
-  onCancel: () => void 
-}> = ({ project, def, initialParams, onSave, onCancel }) => {
+const ParamEditor: React.FC<{ project: Project, def: LogicDefinition, initialParams: any[], onSave: (params: any[]) => void, onCancel: () => void }> = ({ project, def, initialParams, onSave, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const assistantItems = [...project.globalVariables.map((v: any) => ({ name: v.name, type: 'variable' })), ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object' })), { name: 'dt', type: 'function' }, { name: 'time', type: 'function' }];
@@ -570,4 +481,3 @@ const contextItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '
 const contextDividerStyle: React.CSSProperties = { height: '1px', backgroundColor: '#444', margin: '4px 0' };
 const assistantItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s', borderBottom: '1px solid #333' };
 const objectItemStyle: React.CSSProperties = { padding: '8px 12px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc', borderRadius: '4px', transition: 'background 0.1s', marginBottom: '2px' };
-const inputStyle: React.CSSProperties = { backgroundColor: '#1e1e1e', color: '#fff', border: '1px solid #444', borderRadius: '2px', fontSize: '11px', padding: '2px 4px' };

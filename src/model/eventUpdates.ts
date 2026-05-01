@@ -479,3 +479,103 @@ export function pasteEventBlocks(
     })
   };
 }
+
+/**
+ * Moves a condition between event blocks or within a block.
+ */
+export function moveCondition(
+  project: Project,
+  eventSheetId: string,
+  sourceBlockId: string,
+  conditionId: string,
+  targetBlockId: string,
+  targetIndex: number
+): Project {
+  const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
+  if (!eventSheet) return project;
+
+  const sourceBlock = findInTree(eventSheet.events, sourceBlockId);
+  const condition = sourceBlock?.conditions.find(c => c.id === conditionId);
+  if (!condition) return project;
+
+  // 1. Remove from source
+  let nextProject = {
+    ...project,
+    eventSheets: project.eventSheets.map(es => {
+      if (es.id !== eventSheetId) return es;
+      return {
+        ...es,
+        events: updateInTree(es.events, sourceBlockId, b => ({
+          ...b,
+          conditions: b.conditions.filter(c => c.id !== conditionId)
+        }))
+      };
+    })
+  };
+
+  // 2. Insert into target
+  return {
+    ...nextProject,
+    eventSheets: nextProject.eventSheets.map(es => {
+      if (es.id !== eventSheetId) return es;
+      return {
+        ...es,
+        events: updateInTree(es.events, targetBlockId, b => {
+          const next = [...b.conditions];
+          const safeIndex = Math.min(targetIndex, next.length);
+          next.splice(safeIndex, 0, condition);
+          return { ...b, conditions: next };
+        })
+      };
+    })
+  };
+}
+
+/**
+ * Moves an action between event blocks or within a block.
+ */
+export function moveAction(
+  project: Project,
+  eventSheetId: string,
+  sourceBlockId: string,
+  actionId: string,
+  targetBlockId: string,
+  targetIndex: number
+): Project {
+  const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
+  if (!eventSheet) return project;
+
+  const sourceBlock = findInTree(eventSheet.events, sourceBlockId);
+  const action = sourceBlock?.actions.find(a => a.id === actionId);
+  if (!action) return project;
+
+  let nextProject = {
+    ...project,
+    eventSheets: project.eventSheets.map(es => {
+      if (es.id !== eventSheetId) return es;
+      return {
+        ...es,
+        events: updateInTree(es.events, sourceBlockId, b => ({
+          ...b,
+          actions: b.actions.filter(a => a.id !== actionId)
+        }))
+      };
+    })
+  };
+
+  return {
+    ...nextProject,
+    eventSheets: nextProject.eventSheets.map(es => {
+      if (es.id !== eventSheetId) return es;
+      return {
+        ...es,
+        events: updateInTree(es.events, targetBlockId, b => {
+          const next = [...b.actions];
+          const safeIndex = Math.min(targetIndex, next.length);
+          next.splice(safeIndex, 0, action);
+          return { ...b, actions: next };
+        })
+      };
+    })
+  };
+}

@@ -36,9 +36,11 @@ interface EditorStore {
   addCondition: (eventSheetId: string, blockId: string, type: string, params?: any[], targetObjectTypeId?: string) => void;
   updateCondition: (eventSheetId: string, blockId: string, conditionId: string, updates: any) => void;
   removeCondition: (eventSheetId: string, blockId: string, conditionId: string) => void;
+  moveCondition: (eventSheetId: string, sourceBlockId: string, conditionId: string, targetBlockId: string, targetIndex: number) => void;
   addAction: (eventSheetId: string, blockId: string, type: string, params?: any[], targetObjectTypeId?: string) => void;
   updateAction: (eventSheetId: string, blockId: string, actionId: string, updates: any) => void;
   removeAction: (eventSheetId: string, blockId: string, actionId: string) => void;
+  moveAction: (eventSheetId: string, sourceBlockId: string, actionId: string, targetBlockId: string, targetIndex: number) => void;
   addKeyboardMovementTemplate: (eventSheetId: string, objectTypeId: string) => void;
 
   // Editor Actions
@@ -180,6 +182,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
+  moveCondition: (eventSheetId, sourceBlockId, conditionId, targetBlockId, targetIndex) => {
+    const next = eventUpdates.moveCondition(get().project, eventSheetId, sourceBlockId, conditionId, targetBlockId, targetIndex);
+    set({ project: next });
+    get().pushHistory(next);
+  },
   addAction: (eventSheetId, blockId, type, params, targetObjectTypeId) => {
     const next = eventUpdates.addAction(get().project, eventSheetId, blockId, type, params, targetObjectTypeId);
     set({ project: next });
@@ -192,6 +199,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   removeAction: (eventSheetId, blockId, actionId) => {
     const next = eventUpdates.removeAction(get().project, eventSheetId, blockId, actionId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  moveAction: (eventSheetId, sourceBlockId, actionId, targetBlockId, targetIndex) => {
+    const next = eventUpdates.moveAction(get().project, eventSheetId, sourceBlockId, actionId, targetBlockId, targetIndex);
     set({ project: next });
     get().pushHistory(next);
   },

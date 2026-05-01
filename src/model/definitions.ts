@@ -23,6 +23,13 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'System'
   },
   {
+    type: 'else',
+    name: 'Else',
+    description: 'Runs if the preceding event was false.',
+    params: [],
+    category: 'System'
+  },
+  {
     type: 'keyDown',
     name: 'Key is down',
     description: 'True if a specific key is currently held down.',
