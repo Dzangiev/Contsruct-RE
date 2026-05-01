@@ -237,10 +237,56 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         if (action.type === 'destroy') {
-          // Remove picked instances from the world
           nextInstances = nextInstances.filter(inst => !pickedIds.includes(inst.id));
-          // Clear picking for this type since they no longer exist
           currentPickedSets[otid] = [];
+          return;
+        }
+
+        if (action.type === 'createInstance') {
+          const spawnTypeId = action.params[0];
+          const objectType = project.objectTypes.find(ot => ot.id === spawnTypeId);
+          if (!objectType) return;
+
+          const targetLayerId = action.params[3] || layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id;
+
+          const spawn = (ctx: Record<string, any>) => {
+            const spawnX = Number(evaluateExpression(action.params[1], ctx) ?? 0);
+            const spawnY = Number(evaluateExpression(action.params[2], ctx) ?? 0);
+
+            const newInst: Instance = {
+              id: `rt-${Date.now()}-${Math.random()}`,
+              objectTypeId: spawnTypeId,
+              layerId: targetLayerId,
+              x: spawnX,
+              y: spawnY,
+              width: objectType.defaultWidth,
+              height: objectType.defaultHeight,
+              angle: 0,
+              opacity: 1,
+              visible: true,
+              properties: {}
+            };
+            nextInstances.push(newInst);
+          };
+
+          const globalContext = {
+            dt: dt,
+            pointerX: pointerPosRef.current.x,
+            pointerY: pointerPosRef.current.y
+          };
+
+          if (otid && currentPickedSets[otid] && currentPickedSets[otid].length > 0) {
+            // Spawn relative to each picked instance
+            currentPickedSets[otid].forEach(id => {
+              const inst = nextInstances.find(i => i.id === id);
+              if (inst) {
+                spawn({ ...globalContext, x: inst.x, y: inst.y, width: inst.width, height: inst.height, rotation: inst.angle });
+              }
+            });
+          } else {
+            // Global spawn
+            spawn(globalContext);
+          }
           return;
         }
 
