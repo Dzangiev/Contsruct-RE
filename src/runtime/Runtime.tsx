@@ -110,14 +110,13 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       return expr;
     };
 
-    const filterInstances = (condition: any, currentPicked: Instance[]): Instance[] => {
+    const filterInstances = (condition: any, currentPicked: Instance[], allInstances: Instance[]): Instance[] => {
       const px = pointerPosRef.current.x;
       const py = pointerPosRef.current.y;
 
       const checkInstance = (i: Instance): boolean => {
         const isUnderPointer = (): boolean => {
           if (!i.visible) return false;
-          // Simple rectangle hit-test
           return px >= i.x && px <= i.x + i.width &&
                  py >= i.y && py <= i.y + i.height;
         };
@@ -147,6 +146,17 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             return pointerPressedRef.current && isUnderPointer();
           case 'pointerReleasedOnObject':
             return pointerReleasedRef.current && isUnderPointer();
+          case 'isOverlapping': {
+            const otherTypeId = condition.params[0];
+            if (!otherTypeId) return false;
+            const others = allInstances.filter(o => o.objectTypeId === otherTypeId);
+            return others.some(o => {
+              return i.x < o.x + o.width &&
+                     i.x + i.width > o.x &&
+                     i.y < o.y + o.height &&
+                     i.y + i.height > o.y;
+            });
+          }
           default:
             return true;
         }
@@ -202,7 +212,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         const pickedInstances = instances.filter(i => currentPickedSets[otid].includes(i.id));
-        const filtered = filterInstances(condition, pickedInstances);
+        const filtered = filterInstances(condition, pickedInstances, instances);
 
         if (filtered.length === 0) {
           allPass = false;
@@ -224,6 +234,14 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         let pickedIds = currentPickedSets[otid];
         if (!pickedIds) {
           pickedIds = nextInstances.filter(i => i.objectTypeId === otid).map(i => i.id);
+        }
+
+        if (action.type === 'destroy') {
+          // Remove picked instances from the world
+          nextInstances = nextInstances.filter(inst => !pickedIds.includes(inst.id));
+          // Clear picking for this type since they no longer exist
+          currentPickedSets[otid] = [];
+          return;
         }
 
         nextInstances = nextInstances.map(inst => {
