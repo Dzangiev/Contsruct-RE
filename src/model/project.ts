@@ -78,9 +78,17 @@ export interface Action {
   params: any[];
 }
 
+export interface GlobalVariable {
+  id: string;
+  name: string;
+  type: 'number' | 'string' | 'boolean';
+  initialValue: any;
+  comment?: string;
+}
+
 export interface EventBlock {
   id: string;
-  type: 'event' | 'group' | 'comment';
+  type: 'event' | 'group' | 'comment' | 'variable';
   disabled: boolean;
   conditions: Condition[];
   actions: Action[];
@@ -88,6 +96,7 @@ export interface EventBlock {
   groupName?: string;
   groupExpanded?: boolean;
   commentText?: string;
+  variable?: GlobalVariable;
 }
 
 export interface EventSheet {
@@ -102,6 +111,7 @@ export interface Project {
   layouts: Layout[];
   objectTypes: ObjectType[];
   eventSheets: EventSheet[];
+  globalVariables: GlobalVariable[];
 }
 
 export function createEmptyProject(name: string = 'New Project'): Project {
@@ -148,5 +158,6 @@ export function createEmptyProject(name: string = 'New Project'): Project {
         events: [],
       },
     ],
+    globalVariables: [],
   };
 }

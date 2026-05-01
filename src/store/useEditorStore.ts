@@ -22,7 +22,7 @@ interface EditorStore {
   removeInstance: (layoutId: string, instanceId: string) => void;
 
   // Event Sheet Actions
-  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment') => void;
+  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable') => void;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
   removeEventBlock: (eventSheetId: string, blockId: string) => void;
   addCondition: (eventSheetId: string, blockId: string, type: string, params?: any[], targetObjectTypeId?: string) => void;

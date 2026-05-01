@@ -33,10 +33,11 @@ export function addEventBlock(
   project: Project, 
   eventSheetId: string, 
   parentBlockId: string | null, 
-  type: 'event' | 'group' | 'comment'
+  type: 'event' | 'group' | 'comment' | 'variable'
 ): Project {
+  const blockId = generateId();
   const newBlock: EventBlock = {
-    id: generateId(),
+    id: blockId,
     type,
     disabled: false,
     conditions: [],
@@ -44,9 +45,26 @@ export function addEventBlock(
     children: [],
   };
 
+  let updatedProject = project;
+
+  if (type === 'variable') {
+    const varId = generateId();
+    newBlock.variable = {
+      id: varId,
+      name: 'Variable' + (project.globalVariables.length + 1),
+      type: 'number',
+      initialValue: 0,
+      comment: ''
+    };
+    updatedProject = {
+      ...project,
+      globalVariables: [...project.globalVariables, newBlock.variable]
+    };
+  }
+
   return {
-    ...project,
-    eventSheets: project.eventSheets.map(es => {
+    ...updatedProject,
+    eventSheets: updatedProject.eventSheets.map(es => {
       if (es.id !== eventSheetId) return es;
       if (!parentBlockId) {
         return { ...es, events: [...es.events, newBlock] };
@@ -91,9 +109,30 @@ export function removeEventBlock(
   eventSheetId: string,
   blockId: string
 ): Project {
+  // Find the block to see if it has a variable
+  const findBlock = (blocks: EventBlock[]): EventBlock | undefined => {
+    for (const b of blocks) {
+      if (b.id === blockId) return b;
+      const found = findBlock(b.children);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
+  const blockToRemove = eventSheet ? findBlock(eventSheet.events) : undefined;
+  
+  let updatedProject = project;
+  if (blockToRemove?.type === 'variable' && blockToRemove.variable) {
+    updatedProject = {
+      ...project,
+      globalVariables: project.globalVariables.filter(v => v.id !== blockToRemove.variable?.id)
+    };
+  }
+
   return {
-    ...project,
-    eventSheets: project.eventSheets.map(es => {
+    ...updatedProject,
+    eventSheets: updatedProject.eventSheets.map(es => {
       if (es.id !== eventSheetId) return es;
       return {
         ...es,
