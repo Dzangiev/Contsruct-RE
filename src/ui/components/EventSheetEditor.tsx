@@ -1,14 +1,14 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
 export const EventSheetEditor: React.FC = () => {
   const { 
     project, editorState, 
-    addEventBlock, updateEventBlock, removeEventBlock, 
+    addEventBlock, updateEventBlock, removeEventBlock, moveEventBlock,
     addCondition, updateCondition, removeCondition, 
     addAction, updateAction, removeAction,
     setSelectedEventBlocks, setSelectedLogicItems
@@ -34,12 +34,17 @@ export const EventSheetEditor: React.FC = () => {
     params: any[]
   } | null>(null);
 
+  const [contextMenu, setContextMenu] = React.useState<{
+    x: number, y: number, blockId: string | null
+  } | null>(null);
+
+  const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
+
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
   const eventSheet = project.eventSheets.find(es => es.id === activeLayout?.eventSheetId) || project.eventSheets[0];
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
       const blockIds = editorState.selectedEventBlockIds;
@@ -48,11 +53,8 @@ export const EventSheetEditor: React.FC = () => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         blockIds.forEach(id => removeEventBlock(eventSheet.id, id));
         setSelectedEventBlocks([]);
-        
         logicIds.forEach(fullId => {
           const [blockId, itemId] = fullId.split(':');
-          // We need to know if it's a condition or an action. 
-          // For now, let's try to remove from both as a simple solution or store type in ID.
           removeCondition(eventSheet.id, blockId, itemId);
           removeAction(eventSheet.id, blockId, itemId);
         });
@@ -61,32 +63,15 @@ export const EventSheetEditor: React.FC = () => {
 
       if (e.key === 'd' || e.key === 'D') {
         blockIds.forEach(id => {
-          const findBlock = (blocks: EventBlock[]): EventBlock | undefined => {
-            for (const b of blocks) {
-              if (b.id === id) return b;
-              const found = findBlock(b.children);
-              if (found) return found;
-            }
-            return undefined;
-          };
-          const block = findBlock(eventSheet.events);
+          const block = findBlockInTree(eventSheet.events, id);
           if (block) updateEventBlock(eventSheet.id, id, { disabled: !block.disabled });
         });
       }
 
       if (e.key === 'i' || e.key === 'I') {
-        // Invert selected conditions
         logicIds.forEach(fullId => {
           const [blockId, itemId] = fullId.split(':');
-          const findBlock = (blocks: EventBlock[]): EventBlock | undefined => {
-            for (const b of blocks) {
-              if (b.id === blockId) return b;
-              const found = findBlock(b.children);
-              if (found) return found;
-            }
-            return undefined;
-          };
-          const block = findBlock(eventSheet.events);
+          const block = findBlockInTree(eventSheet.events, blockId);
           const cond = block?.conditions.find(c => c.id === itemId);
           if (cond) updateCondition(eventSheet.id, blockId, itemId, { inverted: !cond.inverted });
         });
@@ -96,6 +81,15 @@ export const EventSheetEditor: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editorState.selectedEventBlockIds, editorState.selectedLogicItemIds, eventSheet, updateEventBlock, removeEventBlock, updateCondition, removeCondition, removeAction, setSelectedEventBlocks, setSelectedLogicItems]);
+
+  const findBlockInTree = (blocks: EventBlock[], id: string): EventBlock | undefined => {
+    for (const b of blocks) {
+      if (b.id === id) return b;
+      const found = findBlockInTree(b.children, id);
+      if (found) return found;
+    }
+    return undefined;
+  };
 
   if (!eventSheet) {
     return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
@@ -141,11 +135,20 @@ export const EventSheetEditor: React.FC = () => {
     });
   };
 
+  const handleContextMenu = (e: React.MouseEvent, blockId: string | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, blockId });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
+
   const visibleEvents = filterBlocks(eventSheet.events);
 
   return (
     <div className="event-sheet-editor" 
-      onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); }}
+      onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); closeContextMenu(); }}
+      onContextMenu={(e) => handleContextMenu(e, null)}
       style={{
         flex: 1, backgroundColor: '#1e1e1e', color: '#d4d4d4', overflowY: 'auto',
         display: 'flex', flexDirection: 'column', height: '100%'
@@ -188,6 +191,9 @@ export const EventSheetEditor: React.FC = () => {
             index={index + 1} 
             onOpenBrowser={openBrowser}
             onOpenParamEditor={openParamEditor}
+            onContextMenu={handleContextMenu}
+            draggedBlockId={draggedBlockId}
+            setDraggedBlockId={setDraggedBlockId}
           />
         ))}
         {eventSheet.events.length === 0 && (
@@ -204,6 +210,13 @@ export const EventSheetEditor: React.FC = () => {
       {paramEditorState?.isOpen && (
         <ParamEditor project={project} def={paramEditorState.def} initialParams={paramEditorState.params} onSave={handleParamUpdate} onCancel={() => setParamEditorState(null)} />
       )}
+
+      {contextMenu && (
+        <ContextMenu 
+          x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} 
+          eventSheetId={eventSheet.id} onClose={closeContextMenu} 
+        />
+      )}
     </div>
   );
 };
@@ -213,11 +226,14 @@ const EventBlockItem: React.FC<{
   block: EventBlock, 
   index?: number,
   onOpenBrowser: (mode: 'condition' | 'action', blockId: string) => void,
-  onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void
-}> = ({ eventSheetId, block, index, onOpenBrowser, onOpenParamEditor }) => {
+  onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: LogicDefinition, params: any[]) => void,
+  onContextMenu: (e: React.MouseEvent, blockId: string) => void,
+  draggedBlockId: string | null,
+  setDraggedBlockId: (id: string | null) => void
+}> = ({ eventSheetId, block, index, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId }) => {
   const { 
     editorState, setSelectedEventBlocks, setSelectedLogicItems,
-    updateEventBlock, removeEventBlock, addEventBlock
+    updateEventBlock, removeEventBlock, addEventBlock, moveEventBlock
   } = useEditorStore();
 
   const isSelected = editorState.selectedEventBlockIds.includes(block.id);
@@ -235,14 +251,54 @@ const EventBlockItem: React.FC<{
     }
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation();
+    setDraggedBlockId(block.id);
+    e.dataTransfer.effectAllowed = 'move';
+    // Native DND requires some data
+    e.dataTransfer.setData('text/plain', block.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedBlockId || draggedBlockId === block.id) return;
+    
+    // Simple logic: drop on a block moves the dragged block BEFORE it.
+    // If dropping on a group header, we could move it INSIDE.
+    // For now, let's just move it before.
+    moveEventBlock(eventSheetId, draggedBlockId, null, index ? index - 1 : 0);
+    setDraggedBlockId(null);
+  };
+
+  const commonStyle: React.CSSProperties = {
+    cursor: 'grab',
+    userSelect: 'none',
+    border: '1px solid',
+    borderColor: isSelected ? '#007acc' : (draggedBlockId === block.id ? '#555' : '#333'),
+    opacity: draggedBlockId === block.id ? 0.4 : 1,
+    transition: 'border-color 0.1s, opacity 0.1s'
+  };
+
   if (block.type === 'variable' && block.variable) {
     return (
       <div 
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         onClick={handleSelect}
+        onContextMenu={(e) => onContextMenu(e, block.id)}
         style={{
-          backgroundColor: '#252526', border: '1px solid', borderColor: isSelected ? '#007acc' : '#444', 
-          borderLeftWidth: '4px', borderLeftColor: '#3498db', padding: '6px 12px', margin: '4px 0', 
-          borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px'
+          ...commonStyle,
+          backgroundColor: '#252526', borderLeftWidth: '4px', borderLeftColor: '#3498db', 
+          padding: '6px 12px', margin: '4px 0', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px'
         }}
       >
         <div style={{ color: '#3498db', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Global</div>
@@ -262,7 +318,6 @@ const EventBlockItem: React.FC<{
           />
           <span style={{ color: '#666', fontSize: '11px', marginLeft: '10px' }}>({block.variable.type})</span>
         </div>
-        <button onClick={(e) => { e.stopPropagation(); removeEventBlock(eventSheetId, block.id); }} style={iconButtonStyle}><Trash2 size={14} color="#f44336" /></button>
       </div>
     );
   }
@@ -270,10 +325,15 @@ const EventBlockItem: React.FC<{
   if (block.type === 'comment') {
     return (
       <div 
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         onClick={handleSelect}
+        onContextMenu={(e) => onContextMenu(e, block.id)}
         style={{
+          ...commonStyle,
           backgroundColor: '#feffc1', color: '#000', padding: '8px 12px', margin: '4px 0', borderRadius: '2px', 
-          border: '1px solid', borderColor: isSelected ? '#007acc' : 'transparent',
           borderLeft: '4px solid #f1c40f', fontSize: '13px', fontStyle: 'italic', display: 'flex', justifyContent: 'space-between', alignItems: 'start'
         }}
       >
@@ -289,7 +349,6 @@ const EventBlockItem: React.FC<{
             target.style.height = 'auto'; target.style.height = target.scrollHeight + 'px';
           }}
         />
-        <button onClick={(e) => { e.stopPropagation(); removeEventBlock(eventSheetId, block.id); }} style={{ ...iconButtonStyle, color: '#666' }}><Trash2 size={14} /></button>
       </div>
     );
   }
@@ -297,8 +356,13 @@ const EventBlockItem: React.FC<{
   if (block.type === 'group') {
     return (
       <div 
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         onClick={handleSelect}
-        style={{ margin: '8px 0', border: '1px solid', borderColor: isSelected ? '#007acc' : '#444', borderRadius: '4px', overflow: 'hidden' }}
+        onContextMenu={(e) => onContextMenu(e, block.id)}
+        style={{ ...commonStyle, margin: '8px 0', borderRadius: '4px', overflow: 'hidden' }}
       >
         <div style={{ backgroundColor: '#333', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
           <span style={{ fontSize: '12px', transform: block.groupExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>▶</span>
@@ -313,12 +377,11 @@ const EventBlockItem: React.FC<{
             {isDisabled ? <EyeOff size={14} color="#e67e22" /> : <Eye size={14} />}
           </button>
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheetId, block.id, 'event'); }} style={iconButtonStyle}><Plus size={14} color="#4caf50" /></button>
-          <button onClick={(e) => { e.stopPropagation(); removeEventBlock(eventSheetId, block.id); }} style={iconButtonStyle}><Trash2 size={14} color="#f44336" /></button>
         </div>
         {block.groupExpanded && (
           <div style={{ padding: '8px 8px 8px 20px', backgroundColor: '#1e1e1e', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {block.children.map((child) => (
-              <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} />
+            {block.children.map((child, i) => (
+              <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} />
             ))}
             {block.children.length === 0 && <div style={{ padding: '10px', color: '#666', fontSize: '11px', textAlign: 'center' }}>Group is empty.</div>}
           </div>
@@ -329,10 +392,16 @@ const EventBlockItem: React.FC<{
 
   return (
     <div 
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       onClick={handleSelect}
+      onContextMenu={(e) => onContextMenu(e, block.id)}
       style={{
-        display: 'flex', flexDirection: 'column', border: '1px solid', borderColor: isSelected ? '#007acc' : '#333', borderRadius: '2px',
-        backgroundColor: isDisabled ? '#252526' : '#2d2d2d', opacity: isDisabled ? 0.6 : 1, marginBottom: '2px'
+        ...commonStyle,
+        display: 'flex', flexDirection: 'column', borderRadius: '2px',
+        backgroundColor: isDisabled ? '#252526' : '#2d2d2d', opacity: isDisabled ? 0.6 : (draggedBlockId === block.id ? 0.4 : 1), marginBottom: '2px'
       }}
     >
       <div style={{ display: 'flex', minHeight: '60px' }}>
@@ -362,15 +431,14 @@ const EventBlockItem: React.FC<{
           <button onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { disabled: !block.disabled }); }} style={iconButtonStyle}>
             {isDisabled ? <EyeOff size={12} color="#e67e22" /> : <Eye size={12} />}
           </button>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheetId, block.id, 'event'); }} style={iconButtonStyle}><Plus size={12} color="#4caf50" /></button>
-          <button onClick={(e) => { e.stopPropagation(); removeEventBlock(eventSheetId, block.id); }} style={iconButtonStyle}><Trash2 size={12} color="#f44336" /></button>
+          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheetId, block.id, 'event'); }} title="Add sub-event" style={iconButtonStyle}><Plus size={12} color="#4caf50" /></button>
         </div>
       </div>
 
       {block.children.length > 0 && (
         <div style={{ padding: '2px 0 2px 30px', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {block.children.map((child) => (
-            <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} />
+            <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} />
           ))}
         </div>
       )}
@@ -485,6 +553,42 @@ const ActionItem: React.FC<{
   );
 };
 
+const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, eventSheetId: string, onClose: () => void }> = ({ x, y, blockId, eventSheetId, onClose }) => {
+  const { addEventBlock, removeEventBlock, updateEventBlock } = useEditorStore();
+
+  const handleAction = (action: () => void) => {
+    action();
+    onClose();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: y, left: x, backgroundColor: '#2d2d2d', border: '1px solid #444', 
+      borderRadius: '4px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', zIndex: 3000, padding: '4px 0', minWidth: '150px'
+    }}>
+      {blockId ? (
+        <>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, blockId, 'event'))}><Plus size={14} /> Add sub-event</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, blockId, 'group'))}><Plus size={14} /> Add sub-group</div>
+          <div style={contextDividerStyle} />
+          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Copy size={14} /> Copy</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Scissors size={14} /> Cut</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => {})}> <Clipboard size={14} /> Paste</div>
+          <div style={contextDividerStyle} />
+          <div onClick={() => handleAction(() => removeEventBlock(eventSheetId, blockId))} style={{ ...contextItemStyle, color: '#f44336' }}> <Trash2 size={14} /> Delete</div>
+        </>
+      ) : (
+        <>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'event'))}><Plus size={14} /> Add Event</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'group'))}><Plus size={14} /> Add Group</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'comment'))}><Plus size={14} /> Add Comment</div>
+          <div style={contextItemStyle} onClick={() => handleAction(() => addEventBlock(eventSheetId, null, 'variable'))}><Plus size={14} /> Add Variable</div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const ParamEditor: React.FC<{ project: any, def: LogicDefinition, initialParams: any[], onSave: (params: any[]) => void, onCancel: () => void }> = ({ project, def, initialParams, onSave, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
   const updateParam = (index: number, value: any) => { const next = [...params]; next[index] = value; setParams(next); };
@@ -536,3 +640,5 @@ const logicItemStyle: React.CSSProperties = { padding: '4px 6px', borderRadius: 
 const addLinkStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#007acc', fontSize: '12px', cursor: 'pointer', padding: '4px 0', textAlign: 'left' };
 const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px' };
 const inputStyle: React.CSSProperties = { backgroundColor: '#1e1e1e', color: '#fff', border: '1px solid #444', borderRadius: '2px', fontSize: '11px', padding: '2px 4px' };
+const contextItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s' };
+const contextDividerStyle: React.CSSProperties = { height: '1px', backgroundColor: '#444', margin: '4px 0' };

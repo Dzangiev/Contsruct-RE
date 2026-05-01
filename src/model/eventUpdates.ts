@@ -357,3 +357,67 @@ export function addKeyboardMovementTemplate(
 
   return nextProject;
 }
+
+/**
+ * Recursive helper to find a block in the tree.
+ */
+function findInTree(blocks: EventBlock[], id: string): EventBlock | undefined {
+  for (const block of blocks) {
+    if (block.id === id) return block;
+    const found = findInTree(block.children, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Moves an event block to a new position in the tree.
+ */
+export function moveEventBlock(
+  project: Project,
+  eventSheetId: string,
+  blockId: string,
+  targetParentId: string | null,
+  targetIndex: number
+): Project {
+  const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
+  if (!eventSheet) return project;
+
+  const blockToMove = findInTree(eventSheet.events, blockId);
+  if (!blockToMove) return project;
+
+  // 1. Remove from old position
+  const sheetWithoutBlock = {
+    ...eventSheet,
+    events: removeFromTree(eventSheet.events, blockId)
+  };
+
+  // 2. Insert into new position
+  const insert = (blocks: EventBlock[]): EventBlock[] => {
+    if (targetParentId === null) {
+      const next = [...blocks];
+      const safeIndex = Math.min(targetIndex, next.length);
+      next.splice(safeIndex, 0, blockToMove);
+      return next;
+    }
+    return blocks.map(b => {
+      if (b.id === targetParentId) {
+        const nextChildren = [...b.children];
+        const safeIndex = Math.min(targetIndex, nextChildren.length);
+        nextChildren.splice(safeIndex, 0, blockToMove);
+        return { ...b, children: nextChildren };
+      }
+      return { ...b, children: insert(b.children) };
+    });
+  };
+
+  const updatedSheet = {
+    ...sheetWithoutBlock,
+    events: insert(sheetWithoutBlock.events)
+  };
+
+  return {
+    ...project,
+    eventSheets: project.eventSheets.map(es => es.id === eventSheetId ? updatedSheet : es)
+  };
+}

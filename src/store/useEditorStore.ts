@@ -25,6 +25,7 @@ interface EditorStore {
   addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable') => void;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
   removeEventBlock: (eventSheetId: string, blockId: string) => void;
+  moveEventBlock: (eventSheetId: string, blockId: string, targetParentId: string | null, targetIndex: number) => void;
   addCondition: (eventSheetId: string, blockId: string, type: string, params?: any[], targetObjectTypeId?: string) => void;
   updateCondition: (eventSheetId: string, blockId: string, conditionId: string, updates: any) => void;
   removeCondition: (eventSheetId: string, blockId: string, conditionId: string) => void;
@@ -93,6 +94,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
   })),
   removeEventBlock: (eventSheetId, blockId) => set((state) => ({
     project: eventUpdates.removeEventBlock(state.project, eventSheetId, blockId)
+  })),
+  moveEventBlock: (eventSheetId, blockId, targetParentId, targetIndex) => set((state) => ({
+    project: eventUpdates.moveEventBlock(state.project, eventSheetId, blockId, targetParentId, targetIndex)
   })),
   addCondition: (eventSheetId, blockId, type, params, targetObjectTypeId) => set((state) => ({
     project: eventUpdates.addCondition(state.project, eventSheetId, blockId, type, params, targetObjectTypeId)
