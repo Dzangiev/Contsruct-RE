@@ -316,3 +316,37 @@ export function reorderInstance(
   };
 }
 
+/**
+ * Pastes a list of instances into a layout, generating new IDs.
+ */
+export function pasteInstances(
+  project: Project,
+  layoutId: string,
+  layerId: string,
+  instances: Instance[],
+  offsetX: number = 32,
+  offsetY: number = 32
+): { project: Project, newIds: string[] } {
+  const newIds: string[] = [];
+  const newProject = {
+    ...project,
+    layouts: project.layouts.map(l => {
+      if (l.id !== layoutId) return l;
+      
+      const newInstances = instances.map(inst => {
+        const newId = generateId();
+        newIds.push(newId);
+        return {
+          ...inst,
+          id: newId,
+          layerId,
+          x: inst.x + offsetX,
+          y: inst.y + offsetY
+        };
+      });
+      
+      return { ...l, instances: [...l.instances, ...newInstances] };
+    })
+  };
+  return { project: newProject, newIds };
+}

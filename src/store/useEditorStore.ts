@@ -61,12 +61,14 @@ interface EditorStore {
   setPreviewMode: (previewMode: boolean) => void;
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
+  setGridSettings: (gridSize?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
   
   // Clipboard
   copySelected: () => void;
   cutSelected: () => void;
   pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
   pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
+  pasteInstances: () => void;
   
   // History
   commitProject: () => void;
@@ -301,14 +303,22 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedLogicItems: (itemIds) => set((state) => ({
     editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
   })),
+  setGridSettings: (gridSize, snapToGrid, showGrid) => set((state) => ({
+    editorState: editorUpdates.setGridSettings(state.editorState, gridSize, snapToGrid, showGrid)
+  })),
 
   // Clipboard
   copySelected: () => {
     const { editorState, project } = get();
-    const blockIds = editorState.selectedEventBlockIds;
-    const logicIds = editorState.selectedLogicItemIds;
+    const { selectedInstanceIds, activeLayoutId, selectedEventBlockIds: blockIds, selectedLogicItemIds: logicIds } = editorState;
     
-    if (blockIds.length > 0) {
+    if (selectedInstanceIds.length > 0 && activeLayoutId) {
+      const layout = project.layouts.find(l => l.id === activeLayoutId);
+      if (layout) {
+        const instances = layout.instances.filter(i => selectedInstanceIds.includes(i.id));
+        set({ editorState: { ...editorState, clipboard: { type: 'instances', data: JSON.parse(JSON.stringify(instances)) } } });
+      }
+    } else if (blockIds.length > 0) {
       const blocks: EventBlock[] = [];
       project.eventSheets.forEach(es => {
         const findBlocks = (list: EventBlock[]) => {
@@ -345,19 +355,25 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   cutSelected: () => {
     get().copySelected();
     const { editorState, project } = get();
-    const blockIds = editorState.selectedEventBlockIds;
-    const logicIds = editorState.selectedLogicItemIds;
+    const { selectedInstanceIds, activeLayoutId, selectedEventBlockIds: blockIds, selectedLogicItemIds: logicIds } = editorState;
     let nextProject = project;
     
-    project.eventSheets.forEach(es => {
-      blockIds.forEach(id => { nextProject = eventUpdates.removeEventBlock(nextProject, es.id, id); });
-      logicIds.forEach(lId => {
-        const [blockId, itemId] = lId.split(':');
-        nextProject = eventUpdates.removeCondition(nextProject, es.id, blockId, itemId);
-        nextProject = eventUpdates.removeAction(nextProject, es.id, blockId, itemId);
+    if (selectedInstanceIds.length > 0 && activeLayoutId) {
+      selectedInstanceIds.forEach(id => {
+        nextProject = projectUpdates.removeInstance(nextProject, activeLayoutId, id);
       });
-    });
-    set({ project: nextProject, editorState: { ...editorState, selectedEventBlockIds: [], selectedLogicItemIds: [] } });
+      set({ project: nextProject, editorState: { ...editorState, selectedInstanceIds: [] } });
+    } else {
+      project.eventSheets.forEach(es => {
+        blockIds.forEach(id => { nextProject = eventUpdates.removeEventBlock(nextProject, es.id, id); });
+        logicIds.forEach(lId => {
+          const [blockId, itemId] = lId.split(':');
+          nextProject = eventUpdates.removeCondition(nextProject, es.id, blockId, itemId);
+          nextProject = eventUpdates.removeAction(nextProject, es.id, blockId, itemId);
+        });
+      });
+      set({ project: nextProject, editorState: { ...editorState, selectedEventBlockIds: [], selectedLogicItemIds: [] } });
+    }
     get().pushHistory(nextProject);
   },
   pasteSelected: (eventSheetId, targetParentId) => {
@@ -366,6 +382,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     if (cb && cb.type === 'blocks') {
       const next = eventUpdates.pasteEventBlocks(project, eventSheetId, targetParentId, cb.data);
       set({ project: next });
+      get().pushHistory(next);
+    } else if (cb && cb.type === 'instances' && editorState.activeLayoutId && editorState.activeLayerId) {
+      const { project: next, newIds } = projectUpdates.pasteInstances(project, editorState.activeLayoutId, editorState.activeLayerId, cb.data);
+      set({ project: next, editorState: { ...editorState, selectedInstanceIds: newIds } });
       get().pushHistory(next);
     }
   },
@@ -384,6 +404,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       });
       set({ project: nextProject });
       get().pushHistory(nextProject);
+    }
+  },
+  pasteInstances: () => {
+    const { editorState, project } = get();
+    const cb = editorState.clipboard;
+    if (cb && cb.type === 'instances' && editorState.activeLayoutId && editorState.activeLayerId) {
+      const { project: next, newIds } = projectUpdates.pasteInstances(project, editorState.activeLayoutId, editorState.activeLayerId, cb.data);
+      set({ project: next, editorState: { ...editorState, selectedInstanceIds: newIds } });
+      get().pushHistory(next);
     }
   },
 

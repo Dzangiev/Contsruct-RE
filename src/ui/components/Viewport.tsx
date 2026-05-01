@@ -14,7 +14,13 @@ export const Viewport: React.FC = () => {
     removeInstance,
     reorderInstance,
     setTool,
-    setView
+    setView,
+    undo,
+    redo,
+    copySelected,
+    pasteInstances,
+    cutSelected,
+    setGridSettings
   } = useEditorStore();
   
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
@@ -29,11 +35,7 @@ export const Viewport: React.FC = () => {
   const [isSpaceDown, setIsSpaceDown] = React.useState(false);
   const [contextMenu, setContextMenu] = React.useState<{ x: number, y: number, instanceId?: string } | null>(null);
 
-  const { zoom, panX, panY, selectedInstanceIds, tool } = editorState;
-
-  // Grid settings
-  const gridSize = 32;
-  const snapToGrid = true;
+  const { zoom, panX, panY, selectedInstanceIds, tool, gridSize, snapToGrid, showGrid } = editorState;
 
   // Global key handlers
   React.useEffect(() => {
@@ -69,6 +71,46 @@ export const Viewport: React.FC = () => {
           }
         }
       }
+
+      // Clipboard and other shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+        if (e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          copySelected();
+        }
+        if (e.key.toLowerCase() === 'v') {
+          e.preventDefault();
+          pasteInstances();
+        }
+        if (e.key.toLowerCase() === 'x') {
+          e.preventDefault();
+          cutSelected();
+        }
+        if (e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          if (activeLayout && selectedInstanceIds.length > 0) {
+             selectedInstanceIds.forEach(id => cloneInstance(activeLayout.id, id));
+          }
+        }
+        if (e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          if (activeLayout) {
+            setSelectedInstances(activeLayout.instances.map(i => i.id));
+          }
+        }
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redo();
+          else undo();
+        }
+        if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          redo();
+        }
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') setIsSpaceDown(false);
@@ -79,7 +121,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSize, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
@@ -179,7 +221,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSize, snapToGrid]);
+  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSize, snapToGrid, selectedInstanceIds]);
 
   // Panning
   React.useEffect(() => {
@@ -261,7 +303,7 @@ export const Viewport: React.FC = () => {
       const mouseX = (e.clientX - rect.left - panX) / zoom;
       const mouseY = (e.clientY - rect.top - panY) / zoom;
 
-      // Group Rotation (if only 1 object or using center)
+      // Group Rotation (if only 1 object)
       if (handle === 'rotate' && ids.length === 1) {
         const id = ids[0]!;
         const inst = activeLayout.instances.find(i => i.id === id);
@@ -301,23 +343,6 @@ export const Viewport: React.FC = () => {
         const init = initialInstances.get(id);
         if (!init) return;
 
-        // Calculate new size
-        const newW = init.w * scaleX;
-        const newH = init.h * scaleY;
-
-        // Calculate new position relative to stationary point
-        const relX = (init.x - stationaryPoint.x) * (handle.includes('l') ? -1 : 1);
-        const relY = (init.y - stationaryPoint.y) * (handle.includes('t') ? -1 : 1);
-        
-        let newX = stationaryPoint.x + (init.x - stationaryPoint.x) * scaleX;
-        let newY = stationaryPoint.y + (init.y - stationaryPoint.y) * scaleY;
-        
-        // Adjust for handle origin
-        if (handle.includes('l')) newX = stationaryPoint.x - (initialAABB.x + initialAABB.w - init.x) * scaleX;
-        if (handle.includes('t')) newY = stationaryPoint.y - (initialAABB.y + initialAABB.h - init.y) * scaleY;
-        if (handle.includes('r') && handle.includes('l')) {} // No-op
-        
-        // Simpler approach for AABB resizing:
         const offsetX = (init.x - initialAABB.x) / initialAABB.w;
         const offsetY = (init.y - initialAABB.y) / initialAABB.h;
         const offsetW = init.w / initialAABB.w;
@@ -346,8 +371,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, zoom, activeLayout, updateInstanceSilently, commitProject, panX, panY, gridSize, snapToGrid]);
-
+  }, [resizing, zoom, activeLayout, updateInstanceSilently, commitProject, panX, panY]);
 
   if (!activeLayout) return <div style={{ flex: 1, backgroundColor: '#333' }} />;
 
@@ -448,36 +472,22 @@ export const Viewport: React.FC = () => {
     setTool('select');
   };
 
-  // Helper to rotate cursor based on object angle
   const getHandleCursor = (handle: string, angle: number) => {
     if (handle === 'rotate') return 'alias';
-    
     const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
-    const cursorMap: any = {
-      't': 'n', 'tr': 'ne', 'r': 'e', 'br': 'se', 'b': 's', 'bl': 'sw', 'l': 'w', 'tl': 'nw'
-    };
-    
+    const cursorMap: any = { 't': 'n', 'tr': 'ne', 'r': 'e', 'br': 'se', 'b': 's', 'bl': 'sw', 'l': 'w', 'tl': 'nw' };
     const baseDir = cursorMap[handle];
     if (!baseDir) return 'pointer';
-    
     const baseIdx = directions.indexOf(baseDir);
     const rotationSteps = Math.round(angle / 45);
     const newIdx = (baseIdx + rotationSteps + 8) % 8;
     const finalDir = directions[newIdx];
-    
-    const standardCursors: any = {
-      'n': 'ns-resize', 's': 'ns-resize',
-      'e': 'ew-resize', 'w': 'ew-resize',
-      'ne': 'nesw-resize', 'sw': 'nesw-resize',
-      'nw': 'nwse-resize', 'se': 'nwse-resize'
-    };
-    
+    const standardCursors: any = { 'n': 'ns-resize', 's': 'ns-resize', 'e': 'ew-resize', 'w': 'ew-resize', 'ne': 'nesw-resize', 'sw': 'nesw-resize', 'nw': 'nwse-resize', 'se': 'nwse-resize' };
     return standardCursors[finalDir] || 'pointer';
   };
 
   const [mouseLayoutPos, setMouseLayoutPos] = React.useState({ x: 0, y: 0 });
 
-  // Mouse move for coordinates
   const handleMouseMoveGlobal = (e: React.MouseEvent) => {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -486,190 +496,178 @@ export const Viewport: React.FC = () => {
     setMouseLayoutPos({ x, y });
   };
 
-  // Styles
   const contextMenuItemStyle: React.CSSProperties = {
-    padding: '8px 12px',
-    fontSize: '13px',
-    color: '#ddd',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    transition: 'background-color 0.1s',
-    userSelect: 'none'
+    padding: '8px 12px', fontSize: '13px', color: '#ddd', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background-color 0.1s', userSelect: 'none'
   };
 
   return (
     <div 
       className="viewport" ref={viewportRef}
-      style={{ flex: 1, backgroundColor: '#1a1a1a', position: 'relative', overflow: 'hidden', cursor: (tool === 'pan' || isSpaceDown) ? 'grab' : (dragStart || resizing) ? 'grabbing' : 'default', outline: 'none' }}
-      tabIndex={0} 
-      onMouseDown={handleMouseDown} 
-      onContextMenu={handleContextMenu} 
-      onClick={handleViewportClick}
-      onMouseMove={handleMouseMoveGlobal}
+      style={{ 
+        flex: 1, backgroundColor: '#0a0a0a', position: 'relative', overflow: 'hidden', 
+        cursor: (tool === 'pan' || isSpaceDown) ? 'grab' : (dragStart || resizing) ? 'grabbing' : 'default', 
+        outline: 'none', display: 'flex', flexDirection: 'column'
+      }}
+      tabIndex={0} onMouseDown={handleMouseDown} onContextMenu={handleContextMenu} onClick={handleViewportClick} onMouseMove={handleMouseMoveGlobal}
     >
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
         .context-menu-item:hover { background-color: rgba(255,255,255,0.05); color: #fff !important; }
       `}</style>
-      <svg width="100%" height="100%" style={{ display: 'block' }}>
-        <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
-          <rect x={0} y={0} width={width} height={height} fill="#2a2a2a" />
-          <defs>
-            <pattern id="grid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
-              <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} fill="none" stroke="#333" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
-            </pattern>
-            <pattern id="grid-large" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
-              <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid)" />
-              <path d={`M ${gridSize * 4} 0 L 0 0 0 ${gridSize * 4}`} fill="none" stroke="#444" strokeWidth={2 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
-            </pattern>
-          </defs>
-          <rect width={width} height={height} fill="url(#grid-large)" pointerEvents="none" />
-          {layers.map(layer => {
-            if (!layer.visible) return null;
-            return (
-              <g key={layer.id} opacity={layer.opacity} style={{ pointerEvents: layer.locked ? 'none' : 'auto' }}>
-                {instances.filter(inst => inst.layerId === layer.id).map(inst => {
-                  const isSelected = selectedInstanceIds.includes(inst.id);
-                  const objectType = project.objectTypes.find(ot => ot.id === inst.objectTypeId);
-                  return (
-                    <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} opacity={inst.opacity}>
-                      <rect width={inst.width} height={inst.height} fill="#4a4a4a" stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
-                      {isSelected && <rect width={inst.width} height={inst.height} fill="none" stroke="#0099ff" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
-                      <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="#aaa" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Instance'}</text>
-                      {isSelected && (
-                        <g>
-                          <rect width={inst.width} height={inst.height} fill="rgba(0, 153, 255, 0.1)" pointerEvents="none" />
-                          {selectedInstanceIds.length === 1 && (
-                            <g>
-                              {[
-                                { h: 'tl', x: 0, y: 0 }, { h: 't', x: inst.width / 2, y: 0 }, { h: 'tr', x: inst.width, y: 0 },
-                                { h: 'r', x: inst.width, y: inst.height / 2 }, { h: 'br', x: inst.width, y: inst.height },
-                                { h: 'b', x: inst.width / 2, y: inst.height }, { h: 'bl', x: 0, y: inst.height }, { h: 'l', x: 0, y: inst.height / 2 },
-                              ].map(handle => (
-                                <rect key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, inst.angle), vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], handle.h)} />
-                              ))}
-                              <line x1={inst.width / 2} y1={0} x2={inst.width / 2} y2={-20 / zoom} stroke="#0099ff" strokeWidth={1 / zoom} />
-                              <circle cx={inst.width / 2} cy={-20 / zoom} r={5 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], 'rotate')} />
-                            </g>
-                          )}
-                        </g>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })}
-          {marqueeStart && marqueeEnd && <rect x={Math.min(marqueeStart.x, marqueeEnd.x)} y={Math.min(marqueeStart.y, marqueeEnd.y)} width={Math.abs(marqueeEnd.x - marqueeStart.x)} height={Math.abs(marqueeEnd.y - marqueeStart.y)} fill="rgba(0, 153, 255, 0.05)" stroke="#0099ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${2/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
-
-          {/* Selection Bounding Box for Multi-select */}
-          {selectedInstanceIds.length > 1 && (() => {
-            const selectedInstances = instances.filter(i => selectedInstanceIds.includes(i.id));
-            if (selectedInstances.length === 0) return null;
+      
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <svg width="100%" height="100%" style={{ display: 'block' }}>
+          <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
+            {/* Workspace Background */}
+            <rect x={-10000} y={-10000} width={20000} height={20000} fill="#111" />
             
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            selectedInstances.forEach(inst => {
-              minX = Math.min(minX, inst.x);
-              minY = Math.min(minY, inst.y);
-              maxX = Math.max(maxX, inst.x + inst.width);
-              maxY = Math.max(maxY, inst.y + inst.height);
-            });
+            {/* Layout Canvas with shadow/distinct border */}
+            <rect x={0} y={0} width={width} height={height} fill="#1e1e1e" stroke="#000" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+            
+            {showGrid && (
+              <>
+                <defs>
+                  <pattern id="grid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+                    <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
+                  </pattern>
+                  <pattern id="grid-large" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
+                    <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid)" />
+                    <path d={`M ${gridSize * 4} 0 L 0 0 0 ${gridSize * 4}`} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={1.5 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
+                  </pattern>
+                </defs>
+                <rect width={width} height={height} fill="url(#grid-large)" pointerEvents="none" />
+              </>
+            )}
+            
+            {/* Viewport Window Boundary (Project Settings) - CLEARER VISUAL */}
+            <rect 
+              x={0} y={0} width={project.settings.viewportWidth} height={project.settings.viewportHeight} 
+              fill="none" stroke="#555" strokeWidth={2 / zoom} strokeDasharray={`${10/zoom} ${5/zoom}`}
+              style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" 
+            />
+            
+            {layers.map(layer => {
+              if (!layer.visible) return null;
+              return (
+                <g key={layer.id} opacity={layer.opacity} style={{ pointerEvents: layer.locked ? 'none' : 'auto' }}>
+                  {instances.filter(inst => inst.layerId === layer.id).map(inst => {
+                    const isSelected = selectedInstanceIds.includes(inst.id);
+                    const objectType = project.objectTypes.find(ot => ot.id === inst.objectTypeId);
+                    return (
+                      <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} opacity={inst.opacity}>
+                        <rect width={inst.width} height={inst.height} fill="#4a4a4a" stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
+                        {isSelected && <rect width={inst.width} height={inst.height} fill="none" stroke="#0099ff" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
+                        <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="#aaa" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Instance'}</text>
+                        {isSelected && (
+                          <g>
+                            <rect width={inst.width} height={inst.height} fill="rgba(0, 153, 255, 0.1)" pointerEvents="none" />
+                            {selectedInstanceIds.length === 1 && (
+                              <g>
+                                {[
+                                  { h: 'tl', x: 0, y: 0 }, { h: 't', x: inst.width / 2, y: 0 }, { h: 'tr', x: inst.width, y: 0 },
+                                  { h: 'r', x: inst.width, y: inst.height / 2 }, { h: 'br', x: inst.width, y: inst.height },
+                                  { h: 'b', x: inst.width / 2, y: inst.height }, { h: 'bl', x: 0, y: inst.height }, { h: 'l', x: 0, y: inst.height / 2 },
+                                ].map(handle => (
+                                  <rect key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, inst.angle), vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], handle.h)} />
+                                ))}
+                                <line x1={inst.width / 2} y1={0} x2={inst.width / 2} y2={-20 / zoom} stroke="#0099ff" strokeWidth={1 / zoom} />
+                                <circle cx={inst.width / 2} cy={-20 / zoom} r={5 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], 'rotate')} />
+                              </g>
+                            )}
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+            {marqueeStart && marqueeEnd && <rect x={Math.min(marqueeStart.x, marqueeEnd.x)} y={Math.min(marqueeStart.y, marqueeEnd.y)} width={Math.abs(marqueeEnd.x - marqueeStart.x)} height={Math.abs(marqueeEnd.y - marqueeStart.y)} fill="rgba(0, 153, 255, 0.05)" stroke="#0099ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${2/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
 
-            return (
-              <g>
-                <rect 
-                  x={minX} y={minY} width={maxX - minX} height={maxY - minY} 
-                  fill="none" stroke="#0099ff" strokeWidth={1 / zoom} 
-                  strokeDasharray={`${4/zoom} ${4/zoom}`}
-                  style={{ vectorEffect: 'non-scaling-stroke' }}
-                />
-                {[
-                  { h: 'tl', x: minX, y: minY }, { h: 'tr', x: maxX, y: minY },
-                  { h: 'bl', x: minX, y: maxY }, { h: 'br', x: maxX, y: maxY }
-                ].map(handle => (
-                  <rect 
-                    key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} 
-                    width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" 
-                    strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, 0), vectorEffect: 'non-scaling-stroke' }} 
-                    onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, handle.h)}
-                  />
-                ))}
-              </g>
-            );
-          })()}
+            {selectedInstanceIds.length > 1 && (() => {
+              const selectedInstances = instances.filter(i => selectedInstanceIds.includes(i.id));
+              if (selectedInstances.length === 0) return null;
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              selectedInstances.forEach(inst => {
+                minX = Math.min(minX, inst.x); minY = Math.min(minY, inst.y);
+                maxX = Math.max(maxX, inst.x + inst.width); maxY = Math.max(maxY, inst.y + inst.height);
+              });
+              return (
+                <g>
+                  <rect x={minX} y={minY} width={maxX - minX} height={maxY - minY} fill="none" stroke="#0099ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${4/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                  {[
+                    { h: 'tl', x: minX, y: minY }, { h: 't', x: minX + (maxX - minX) / 2, y: minY }, { h: 'tr', x: maxX, y: minY },
+                    { h: 'r', x: maxX, y: minY + (maxY - minY) / 2 }, { h: 'br', x: maxX, y: maxY },
+                    { h: 'b', x: minX + (maxX - minX) / 2, y: maxY }, { h: 'bl', x: minX, y: maxY }, { h: 'l', x: minX, y: minY + (maxY - minY) / 2 }
+                  ].map(handle => (
+                    <rect key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, 0), vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, handle.h)} />
+                  ))}
+                  <line x1={minX + (maxX - minX) / 2} y1={minY} x2={minX + (maxX - minX) / 2} y2={minY - 20 / zoom} stroke="#0099ff" strokeWidth={1 / zoom} />
+                  <circle cx={minX + (maxX - minX) / 2} cy={minY - 20 / zoom} r={5 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, 'rotate')} />
+                </g>
+              );
+            })()}
 
-          <rect x={0} y={0} width={width} height={height} fill="none" stroke="#666" strokeWidth={2 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />
-          
-          {/* Snap Lines (Smart Guides) */}
-          {snapLines.map((line, i) => (
-            <React.Fragment key={i}>
-              {line.x !== undefined && (
-                <line 
-                  x1={line.x} y1={-10000} x2={line.x} y2={10000} 
-                  stroke="#ff00ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${4/zoom}`}
-                  style={{ vectorEffect: 'non-scaling-stroke' }}
-                />
-              )}
-              {line.y !== undefined && (
-                <line 
-                  x1={-10000} y1={line.y} x2={10000} y2={line.y} 
-                  stroke="#ff00ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${4/zoom}`}
-                  style={{ vectorEffect: 'non-scaling-stroke' }}
-                />
-              )}
-            </React.Fragment>
-          ))}
-        </g>
-      </svg>
+            {/* Layout Boundary Outline */}
+            <rect x={0} y={0} width={width} height={height} fill="none" stroke="#444" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />
+            
+            {snapLines.map((line, i) => (
+              <React.Fragment key={i}>
+                {line.x !== undefined && <line x1={line.x} y1={-10000} x2={line.x} y2={10000} stroke="#ff00ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${4/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />}
+                {line.y !== undefined && <line x1={-10000} y1={line.y} x2={10000} y2={line.y} stroke="#ff00ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${4/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />}
+              </React.Fragment>
+            ))}
+          </g>
+        </svg>
 
-      {contextMenu && (
-        <div 
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          style={{ 
-            position: 'absolute', top: contextMenu.y, left: contextMenu.x, 
-            backgroundColor: 'rgba(30, 30, 30, 0.95)', border: '1px solid rgba(255, 255, 255, 0.1)', 
-            borderRadius: '8px', padding: '6px 0', zIndex: 1000, minWidth: '180px', 
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)',
-            animation: 'fadeIn 0.1s ease-out'
-          }}
-        >
-           {contextMenu.instanceId ? (
-             <>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { removeInstance(activeLayout.id, contextMenu.instanceId!); setSelectedInstances([]); setContextMenu(null); }}>
-                 <span style={{ flex: 1 }}>Delete</span>
-                 <span style={{ color: '#666', fontSize: '10px' }}>Del</span>
-               </div>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
-                 <span style={{ flex: 1 }}>Clone</span>
-                 <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
-               </div>
-               
-               <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-               <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDER</div>
-               
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>Bring to Front</div>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'back'); setContextMenu(null); }}>Send to Back</div>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'forward'); setContextMenu(null); }}>Move Forward</div>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'backward'); setContextMenu(null); }}>Move Backward</div>
-             </>
-           ) : (
-             <>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances(activeLayout.instances.map(i => i.id)); setContextMenu(null); }}>Select All</div>
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances([]); setContextMenu(null); }}>Deselect All</div>
-               <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-               <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { /* Toggle Grid logic if we had a state for it */ setContextMenu(null); }}>Toggle Grid</div>
-             </>
-           )}
-        </div>
-      )}
+        {contextMenu && (
+          <div 
+            onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
+            style={{ 
+              position: 'absolute', top: contextMenu.y, left: contextMenu.x, 
+              backgroundColor: 'rgba(30, 30, 30, 0.95)', border: '1px solid rgba(255, 255, 255, 0.1)', 
+              borderRadius: '8px', padding: '6px 0', zIndex: 1000, minWidth: '180px', 
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)', animation: 'fadeIn 0.1s ease-out'
+            }}
+          >
+             {contextMenu.instanceId ? (
+               <>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { removeInstance(activeLayout.id, contextMenu.instanceId!); setSelectedInstances([]); setContextMenu(null); }}>
+                   <span style={{ flex: 1 }}>Delete</span> <span style={{ color: '#666', fontSize: '10px' }}>Del</span>
+                 </div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
+                   <span style={{ flex: 1 }}>Clone</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
+                 </div>
+                 <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                 <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDER</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>Bring to Front</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'back'); setContextMenu(null); }}>Send to Back</div>
+               </>
+             ) : (
+               <>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances(activeLayout.instances.map(i => i.id)); setContextMenu(null); }}>Select All</div>
+                 <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                 <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>GRID</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, !showGrid); setContextMenu(null); }}>
+                   <span style={{ flex: 1 }}>Show Grid</span> <span style={{ color: showGrid ? '#4caf50' : '#666' }}>{showGrid ? 'ON' : 'OFF'}</span>
+                 </div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, !snapToGrid, undefined); setContextMenu(null); }}>
+                   <span style={{ flex: 1 }}>Snap to Grid</span> <span style={{ color: snapToGrid ? '#4caf50' : '#666' }}>{snapToGrid ? 'ON' : 'OFF'}</span>
+                 </div>
+                 <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(16); setContextMenu(null); }}>Grid Size: 16</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(32); setContextMenu(null); }}>Grid Size: 32</div>
+               </>
+             )}
+          </div>
+        )}
+      </div>
 
-      <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(20,20,20,0.8)', color: '#ccc', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', pointerEvents: 'none', display: 'flex', gap: '15px', border: '1px solid #444', backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+      <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(20,20,20,0.8)', color: '#ccc', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', pointerEvents: 'none', display: 'flex', gap: '15px', border: '1px solid #444', backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', zIndex: 100 }}>
         <span>X: {mouseLayoutPos.x}, Y: {mouseLayoutPos.y}</span>
         <span>Zoom: {Math.round(zoom * 100)}%</span>
-        <span>Layout: {width} × {height}</span>
-        <span>Tool: {tool.toUpperCase()}</span>
+        <span>{selectedInstanceIds.length} objects selected</span>
+        <span>Grid: {gridSize}px ({snapToGrid ? 'Snap' : 'Free'})</span>
       </div>
     </div>
   );

@@ -422,18 +422,23 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         alignItems: 'center', 
         justifyContent: 'center', 
         overflow: 'hidden',
-        padding: '40px'
+        padding: '20px',
+        backgroundColor: '#1a1a1a'
       }}>
         <div style={{
           boxShadow: '0 0 50px rgba(0,0,0,0.8)',
           backgroundColor: '#111',
-          lineHeight: 0
+          lineHeight: 0,
+          width: project.settings.viewportWidth,
+          height: project.settings.viewportHeight,
+          overflow: 'hidden',
+          position: 'relative'
         }}>
           <svg 
             ref={svgRef}
-            width={layout.width} 
-            height={layout.height} 
-            viewBox={`0 0 ${layout.width} ${layout.height}`}
+            width={project.settings.viewportWidth} 
+            height={project.settings.viewportHeight} 
+            viewBox={`0 0 ${project.settings.viewportWidth} ${project.settings.viewportHeight}`}
             style={{ display: 'block' }}
           >
             <style>{`
@@ -443,7 +448,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 100% { opacity: 0.5; }
               }
             `}</style>
-            {/* We render layers in order, same as editor but without selection/grid logic */}
+            
+            {/* Background for the layout */}
+            <rect width={layout.width} height={layout.height} fill="#1e1e1e" />
+
+            {/* We render layers in order */}
             {layout.layers.map(layer => {
               if (!layer.visible) return null;
               

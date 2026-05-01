@@ -3,7 +3,7 @@ import { Project } from '../model/project';
 export type ToolType = 'select' | 'place' | 'pan';
 
 export interface ClipboardData {
-  type: 'blocks' | 'logicItems';
+  type: 'blocks' | 'logicItems' | 'instances';
   data: any[];
 }
 
@@ -22,6 +22,11 @@ export interface EditorState {
   selectedEventBlockIds: string[];
   selectedLogicItemIds: string[]; // for conditions or actions
   clipboard: ClipboardData | null;
+  
+  // Grid settings
+  gridSize: number;
+  snapToGrid: boolean;
+  showGrid: boolean;
 }
 
 /**
@@ -46,6 +51,9 @@ export function createInitialEditorState(project: Project): EditorState {
     selectedEventBlockIds: [],
     selectedLogicItemIds: [],
     clipboard: null,
+    gridSize: 32,
+    snapToGrid: true,
+    showGrid: true,
   };
 }
 
@@ -161,5 +169,22 @@ export function setSelectedLogicItems(state: EditorState, itemIds: string[]): Ed
     ...state,
     selectedLogicItemIds: itemIds,
     selectedEventBlockIds: [],
+  };
+}
+
+/**
+ * Updates grid settings.
+ */
+export function setGridSettings(
+  state: EditorState, 
+  gridSize?: number, 
+  snapToGrid?: boolean, 
+  showGrid?: boolean
+): EditorState {
+  return {
+    ...state,
+    gridSize: gridSize !== undefined ? gridSize : state.gridSize,
+    snapToGrid: snapToGrid !== undefined ? snapToGrid : state.snapToGrid,
+    showGrid: showGrid !== undefined ? showGrid : state.showGrid,
   };
 }
