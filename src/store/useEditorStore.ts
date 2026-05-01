@@ -27,6 +27,8 @@ interface EditorStore {
   addInstance: (layoutId: string, objectTypeId: string, layerId: string, x: number, y: number, id?: string) => void;
   updateInstance: (layoutId: string, instanceId: string, updates: any) => void;
   removeInstance: (layoutId: string, instanceId: string) => void;
+  addInstanceVariable: (objectTypeId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
+  removeInstanceVariable: (objectTypeId: string, variableId: string) => void;
 
   // Event Sheet Actions
   addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable') => void;
@@ -145,6 +147,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
+  addInstanceVariable: (objectTypeId, name, type, initialValue) => {
+    const next = projectUpdates.addInstanceVariable(get().project, objectTypeId, name, type, initialValue);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeInstanceVariable: (objectTypeId, variableId) => {
+    const next = projectUpdates.removeInstanceVariable(get().project, objectTypeId, variableId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
 
   // Event Sheet Actions
   addEventBlock: (eventSheetId, parentBlockId, type) => {
@@ -250,7 +262,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { editorState, project } = get();
     const blockIds = editorState.selectedEventBlockIds;
     if (blockIds.length > 0) {
-      // Find blocks in any event sheet
       const blocks: EventBlock[] = [];
       project.eventSheets.forEach(es => {
         const findBlocks = (list: EventBlock[]) => {

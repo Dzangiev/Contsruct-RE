@@ -52,6 +52,13 @@ export enum ObjectTypeKind {
   Plugin = 'plugin',
 }
 
+export interface InstanceVariable {
+  id: string;
+  name: string;
+  type: 'number' | 'string' | 'boolean';
+  initialValue: any;
+}
+
 export interface ObjectType {
   id: string;
   name: string;
@@ -61,6 +68,7 @@ export interface ObjectType {
   defaultHeight: number;
   assetId?: string;
   properties: Record<string, any>;
+  instanceVariables: InstanceVariable[];
 }
 
 export interface Condition {

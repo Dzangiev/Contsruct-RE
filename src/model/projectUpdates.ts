@@ -105,10 +105,56 @@ export function addObjectType(project: Project, name: string, kind: ObjectTypeKi
     defaultWidth: 64,
     defaultHeight: 64,
     properties: {},
+    instanceVariables: [],
   };
   return {
     ...project,
     objectTypes: [...project.objectTypes, newObjectType],
+  };
+}
+
+/**
+ * Adds an instance variable to an object type.
+ */
+export function addInstanceVariable(
+  project: Project,
+  objectTypeId: string,
+  name: string,
+  type: 'number' | 'string' | 'boolean',
+  initialValue: any
+): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return {
+        ...ot,
+        instanceVariables: [
+          ...ot.instanceVariables,
+          { id: generateId(), name, type, initialValue }
+        ]
+      };
+    })
+  };
+}
+
+/**
+ * Removes an instance variable from an object type.
+ */
+export function removeInstanceVariable(
+  project: Project,
+  objectTypeId: string,
+  variableId: string
+): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return {
+        ...ot,
+        instanceVariables: ot.instanceVariables.filter(v => v.id !== variableId)
+      };
+    })
   };
 }
 

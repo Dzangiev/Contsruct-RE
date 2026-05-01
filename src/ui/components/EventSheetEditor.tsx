@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { EventBlock, Project } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle } from 'lucide-react';
+import { EventBlock, Project, ObjectType, InstanceVariable } from '../../model/project';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
@@ -117,7 +117,7 @@ export const EventSheetEditor: React.FC = () => {
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
             <div style={objectItemStyle}><Terminal size={14} color="#3498db" /> <span>System</span></div>
             {project.objectTypes.map(ot => (
-              <div key={ot.id} draggable onDragStart={(e) => { e.dataTransfer.setData('objectTypeId', ot.id); e.dataTransfer.effectAllowed = 'copy'; }} style={objectItemStyle}><Code size={14} color="#2ecc71" /> <span>{ot.name}</span></div>
+              <div key={ot.id} draggable onDragStart={(e) => { e.dataTransfer.setData('objectTypeId', ot.id); e.dataTransfer.effectAllowed = 'copy'; }} style={objectItemStyle} onClick={() => useEditorStore.getState().setSelectedObjectType(ot.id)}><Code size={14} color="#2ecc71" /> <span>{ot.name}</span></div>
             ))}
           </div>
         </div>
@@ -138,7 +138,7 @@ export const EventSheetEditor: React.FC = () => {
       </div>
 
       <div style={{ padding: '4px 16px', backgroundColor: '#007acc', color: '#fff', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '12px' }}><span>{project.globalVariables.length} Variables</span><span>{countTotalEvents(eventSheet.events)} Blocks</span></div>
+        <div style={{ display: 'flex', gap: '12px' }}><span>{project.globalVariables.length} Global</span><span>{countTotalEvents(eventSheet.events)} Events</span></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Info size={12} /> C3 Mode Active</div>
       </div>
 
@@ -189,10 +189,14 @@ const EventBlockItem: React.FC<{
   };
 
   if (block.type === 'variable' && block.variable) {
+    const isLocal = depth > 0;
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid #3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.5 : 1 }}>
-        <div style={{ color: '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>Global</div>
-        <div style={{ flex: 1, fontWeight: 'bold' }}><HighlightText text={block.variable.name} highlight={searchTerm} /> = {block.variable.initialValue}</div>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid', borderLeftColor: isLocal ? '#e67e22' : '#3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.5 : 1 }}>
+        <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px' }}>{isLocal ? 'Local' : 'Global'}</div>
+        <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Variable size={14} color={isLocal ? '#e67e22' : '#3498db'} />
+          <HighlightText text={block.variable.name} highlight={searchTerm} /> = {block.variable.initialValue}
+        </div>
       </div>
     );
   }
@@ -245,7 +249,7 @@ const EventBlockItem: React.FC<{
 };
 
 const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, condition: any, index: number, onOpenParamEditor: any, searchTerm: string, setDraggedLogicItem: any }> = ({ project, eventSheetId, blockId, condition, index, onOpenParamEditor, searchTerm, setDraggedLogicItem }) => {
-  const { editorState, setSelectedLogicItems, removeCondition } = useEditorStore();
+  const { editorState, setSelectedLogicItems } = useEditorStore();
   const def = findConditionDefinition(condition.type);
   const targetObject = project.objectTypes.find((ot: any) => ot.id === condition.targetObjectTypeId);
   const selectionId = `${blockId}:${condition.id}`;
@@ -269,7 +273,7 @@ const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId:
 };
 
 const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, action: any, index: number, onOpenParamEditor: any, searchTerm: string, setDraggedLogicItem: any }> = ({ project, eventSheetId, blockId, action, index, onOpenParamEditor, searchTerm, setDraggedLogicItem }) => {
-  const { editorState, setSelectedLogicItems, removeAction } = useEditorStore();
+  const { editorState, setSelectedLogicItems } = useEditorStore();
   const def = findActionDefinition(action.type);
   const targetObject = project.objectTypes.find((ot: any) => ot.id === action.targetObjectTypeId);
   const selectionId = `${blockId}:${action.id}`;
@@ -311,11 +315,19 @@ const ContextMenu: React.FC<{ x: number, y: number, blockId: string | null, even
 const ParamEditor: React.FC<{ project: Project, def: LogicDefinition, initialParams: any[], onSave: (p: any[]) => void, onCancel: () => void }> = ({ project, def, initialParams, onSave, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
-  const assistantItems = [...project.globalVariables.map((v: any) => ({ name: v.name, type: 'variable' })), ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object' })), { name: 'dt', type: 'function' }, { name: 'time', type: 'function' }];
+  
+  // Collect all relevant variables
+  const assistantItems = [
+    ...project.globalVariables.map((v: any) => ({ name: v.name, type: 'variable', category: 'Global' })),
+    ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object', category: 'Object' })),
+    ...project.objectTypes.flatMap((ot: any) => ot.instanceVariables.map((v: any) => ({ name: `${ot.name}.${v.name}`, type: 'instance-variable', category: 'Instance' }))),
+    { name: 'dt', type: 'function', category: 'System' },
+    { name: 'time', type: 'function', category: 'System' }
+  ];
 
   return (
     <div style={overlayStyle} onClick={(e) => e.stopPropagation()}>
-      <div style={{ ...modalStyle, width: '700px', flexDirection: 'row' }}>
+      <div style={{ ...modalStyle, width: '800px', flexDirection: 'row' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={modalHeaderStyle}><h3 style={{ margin: 0, fontSize: '14px' }}>Parameters: {def.name}</h3></div>
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '15px', flex: 1 }}>
@@ -329,10 +341,17 @@ const ParamEditor: React.FC<{ project: Project, def: LogicDefinition, initialPar
           </div>
           <div style={modalFooterStyle}><button onClick={() => onSave(params)} style={saveButtonStyle}>Done</button><button onClick={onCancel} style={cancelButtonStyle}>Cancel</button></div>
         </div>
-        <div style={{ width: '250px', backgroundColor: '#252526', borderLeft: '1px solid #444', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '300px', backgroundColor: '#252526', borderLeft: '1px solid #444', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px', fontSize: '11px', fontWeight: 'bold', color: '#888', borderBottom: '1px solid #444', display: 'flex', alignItems: 'center', gap: '8px' }}><AlertCircle size={14} /> EXPRESSION ASSISTANT</div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {assistantItems.map((item, idx) => <div key={idx} onClick={() => { const cur = String(params[activeParamIndex]); const n = [...params]; n[activeParamIndex] = cur + (cur ? ' ' : '') + item.name; setParams(n); }} style={assistantItemStyle}><span>{item.name}</span> <span style={{ fontSize: '9px', opacity: 0.5 }}>{item.type}</span></div>)}
+            {assistantItems.map((item, idx) => (
+              <div key={idx} onClick={() => { const cur = String(params[activeParamIndex]); const n = [...params]; n[activeParamIndex] = cur + (cur ? ' ' : '') + item.name; setParams(n); }} style={assistantItemStyle}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: 'bold' }}>{item.name}</span>
+                  <span style={{ fontSize: '9px', opacity: 0.5 }}>{item.category} • {item.type}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -353,5 +372,5 @@ const addLinkStyle: React.CSSProperties = { background: 'none', border: 'none', 
 const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px' };
 const contextItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s' };
 const contextDividerStyle: React.CSSProperties = { height: '1px', backgroundColor: '#444', margin: '4px 0' };
-const assistantItemStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s', borderBottom: '1px solid #333' };
+const assistantItemStyle: React.CSSProperties = { padding: '8px 12px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', transition: 'background 0.1s', borderBottom: '1px solid #333' };
 const objectItemStyle: React.CSSProperties = { padding: '8px 12px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc', borderRadius: '4px', transition: 'background-color 0.1s', marginBottom: '2px' };
