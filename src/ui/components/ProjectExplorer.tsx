@@ -36,26 +36,27 @@ export const ProjectExplorer: React.FC = () => {
   return (
     <div className="project-explorer" style={{
       flex: 1,
-      backgroundColor: '#1e1e1e',
-      color: '#d4d4d4',
+      backgroundColor: '#2d2d2d',
+      color: '#aaa',
       display: 'flex',
       flexDirection: 'column',
       fontSize: '13px',
       userSelect: 'none',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      borderRight: '1px solid #1a1a1a'
     }}>
-      <div style={{ padding: '10px', borderBottom: '1px solid #333', fontWeight: 'bold', color: '#fff' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a', fontWeight: 800, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         Project Explorer
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {/* Layouts Section */}
         <section style={{ padding: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-            <span style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', color: '#888' }}>Layouts</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '0 5px' }}>
+            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Layouts</span>
             <button 
               onClick={() => addLayout(`Layout ${(project.layouts?.length || 0) + 1}`)}
-              style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px' }}
+              style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
               title="Add Layout"
             >
               <Plus size={14} />
@@ -67,17 +68,19 @@ export const ProjectExplorer: React.FC = () => {
                 key={layout.id}
                 onClick={() => setActiveLayout(layout.id, layout.layers?.[0]?.id)}
                 style={{
-                  padding: '4px 8px',
-                  borderRadius: '3px',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
-                  backgroundColor: editorState.activeLayoutId === layout.id ? '#37373d' : 'transparent',
-                  color: editorState.activeLayoutId === layout.id ? '#fff' : '#d4d4d4',
+                  backgroundColor: editorState.activeLayoutId === layout.id ? '#3e3e42' : 'transparent',
+                  color: editorState.activeLayoutId === layout.id ? '#fff' : '#aaa',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '8px',
+                  fontSize: '12px',
+                  transition: 'background-color 0.1s'
                 }}
               >
-                <LayoutIcon size={14} />
+                <LayoutIcon size={14} color={editorState.activeLayoutId === layout.id ? '#007acc' : '#666'} />
                 {layout.name}
               </div>
             ))}
@@ -86,12 +89,12 @@ export const ProjectExplorer: React.FC = () => {
 
 
         {/* Object Types Section */}
-        <section style={{ padding: '10px', borderTop: '1px solid #333' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-            <span style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', color: '#888' }}>Object Types</span>
+        <section style={{ padding: '10px', borderTop: '1px solid #1a1a1a' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '0 5px' }}>
+            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Object Types</span>
             <button 
               onClick={() => addObjectType(`Sprite ${(project.objectTypes?.length || 0) + 1}`, ObjectTypeKind.Sprite)}
-              style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px' }}
+              style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
               title="Add Object Type"
             >
               <Plus size={14} />
@@ -108,17 +111,19 @@ export const ProjectExplorer: React.FC = () => {
                 }}
                 onClick={() => setSelectedObjectType(ot.id)}
                 style={{
-                  padding: '4px 8px',
-                  borderRadius: '3px',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   cursor: 'grab',
-                  backgroundColor: editorState.selectedObjectTypeId === ot.id ? '#37373d' : 'transparent',
-                  color: editorState.selectedObjectTypeId === ot.id ? '#fff' : '#d4d4d4'
+                  backgroundColor: editorState.selectedObjectTypeId === ot.id ? '#3e3e42' : 'transparent',
+                  color: editorState.selectedObjectTypeId === ot.id ? '#fff' : '#aaa',
+                  fontSize: '12px',
+                  transition: 'background-color 0.1s'
                 }}
               >
-                <Package size={14} />
+                <Package size={14} color={editorState.selectedObjectTypeId === ot.id ? '#007acc' : '#666'} />
                 <span style={{ flex: 1 }}>{ot.name}</span>
                 <button 
                   onClick={(e) => { e.stopPropagation(); setTool('place', ot.id); }}
@@ -130,7 +135,8 @@ export const ProjectExplorer: React.FC = () => {
                     cursor: 'pointer',
                     padding: '2px 8px',
                     borderRadius: '3px',
-                    fontSize: '10px'
+                    fontSize: '10px',
+                    fontWeight: 600
                   }}
                 >
                   {editorState.placementObjectTypeId === ot.id ? 'Placing...' : 'Place'}
@@ -138,7 +144,7 @@ export const ProjectExplorer: React.FC = () => {
               </div>
             ))}
             {(project.objectTypes?.length === 0 || !project.objectTypes) && (
-              <div style={{ padding: '4px 8px', color: '#666', fontStyle: 'italic' }}>No objects</div>
+              <div style={{ padding: '8px 10px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>No objects</div>
             )}
           </div>
         </section>

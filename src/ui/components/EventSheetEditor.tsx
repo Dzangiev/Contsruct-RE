@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock, Project, ObjectType, InstanceVariable, Condition, Action } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable, Palette, FilePlus, Zap, Bookmark, BookmarkPlus, Ghost, MousePointer, MoreVertical, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable, Palette, FilePlus, Zap, Bookmark, BookmarkPlus, Ghost, MousePointer, MoreVertical, Edit2, Monitor, FileText } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 
@@ -154,16 +154,16 @@ export const EventSheetEditor: React.FC = () => {
   findBookmarks(eventSheet.events);
 
   return (
-    <div className="event-sheet-editor" style={{ flex: 1, backgroundColor: '#1e1e1e', color: '#d4d4d4', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      <div style={{ display: 'flex', backgroundColor: '#252526', borderBottom: '1px solid #333' }}>
+    <div className="event-sheet-editor" style={{ flex: 1, backgroundColor: '#333333', color: '#aaa', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      <div style={{ display: 'flex', backgroundColor: '#333333', borderBottom: '1px solid #1a1a1a' }}>
         {project.eventSheets.map(es => (
-          <div key={es.id} onClick={(e) => { e.stopPropagation(); const l = project.layouts.find(layout => layout.eventSheetId === es.id); if (l) setActiveLayout(l.id); }} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', backgroundColor: es.id === activeEventSheetId ? '#1e1e1e' : 'transparent', color: es.id === activeEventSheetId ? '#fff' : '#888', borderTop: '2px solid', borderTopColor: es.id === activeEventSheetId ? '#007acc' : 'transparent', borderRight: '1px solid #333', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div key={es.id} onClick={(e) => { e.stopPropagation(); const l = project.layouts.find(layout => layout.eventSheetId === es.id); if (l) setActiveLayout(l.id); }} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', backgroundColor: es.id === activeEventSheetId ? '#2d2d2d' : 'transparent', color: es.id === activeEventSheetId ? '#fff' : '#888', borderTop: '2px solid', borderTopColor: es.id === activeEventSheetId ? '#007acc' : 'transparent', borderRight: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <List size={14} /> {es.name}
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#2d2d2d', borderBottom: '1px solid #333', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#333333', borderBottom: '1px solid #1a1a1a', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', gap: '2px', marginRight: '10px', borderRight: '1px solid #444', paddingRight: '10px' }}>
             <button onClick={(e) => { e.stopPropagation(); undo(); }} style={iconButtonStyle} title="Undo (Ctrl+Z)"><Undo size={14} /></button>
@@ -189,22 +189,72 @@ export const EventSheetEditor: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ width: '220px', backgroundColor: '#252526', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 15px', fontSize: '11px', fontWeight: 'bold', color: '#888', borderBottom: '1px solid #333', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}><Box size={14} /> Objects</div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-            <div style={objectItemStyle}><Terminal size={14} color="#3498db" /> <span>System</span></div>
+        <div style={{ width: '220px', backgroundColor: '#2d2d2d', borderRight: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 15px', fontSize: '10px', fontWeight: 800, color: '#888', borderBottom: '1px solid #1a1a1a', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Box size={12} /> PROJECT OBJECTS
+          </div>
+          
+          <div style={{ padding: '8px', borderBottom: '1px solid #1a1a1a', backgroundColor: '#2d2d2d' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Search size={12} style={{ position: 'absolute', left: '8px', color: '#555' }} />
+              <input 
+                placeholder="Filter objects..." 
+                style={{ 
+                  width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', 
+                  padding: '4px 8px 4px 24px', fontSize: '11px', color: '#ccc', outline: 'none' 
+                }} 
+              />
+            </div>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
+            <div style={{ padding: '8px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase' }}>System</div>
+            <div style={objectItemStyle} onClick={() => setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: activeEventSheetId!, blockId: 'NEW', targetObjectTypeId: undefined })}>
+              <Monitor size={14} color="#3498db" /> 
+              <span style={{ fontWeight: 500 }}>System</span>
+            </div>
+
+            <div style={{ padding: '8px 12px 4px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase', marginTop: '8px' }}>Object Types</div>
             {project.objectTypes.map(ot => (
-              <div key={ot.id} draggable onDragStart={(e) => { e.dataTransfer.setData('objectTypeId', ot.id); e.dataTransfer.effectAllowed = 'copy'; }} style={objectItemStyle} onClick={() => useEditorStore.getState().setSelectedObjectType(ot.id)}><Code size={14} color="#2ecc71" /> <span>{ot.name}</span></div>
+              <div 
+                key={ot.id} 
+                draggable 
+                onDragStart={(e) => { e.dataTransfer.setData('objectTypeId', ot.id); e.dataTransfer.effectAllowed = 'copy'; }} 
+                style={objectItemStyle} 
+                onClick={() => {
+                  setSelectedEventBlocks([]);
+                  setSelectedLogicItems([]);
+                  useEditorStore.getState().setSelectedObjectType(ot.id);
+                }}
+              >
+                <Box size={14} color="#2ecc71" /> 
+                <span style={{ fontWeight: 500 }}>{ot.name}</span>
+              </div>
             ))}
           </div>
+
           {bookmarks.length > 0 && (
-            <div style={{ padding: '10px', borderTop: '1px solid #333', backgroundColor: '#1e1e1e' }}>
-              <div style={{ fontSize: '10px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>Bookmarks <Bookmark size={10} /></div>
-              {bookmarks.map((b: any) => (
-                <div key={b.id} onClick={() => { setSelectedEventBlocks([b.id]); const el = document.querySelector(`[data-block-id="${b.id}"]`); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} style={{ fontSize: '11px', color: editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#aaa', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: editorState.selectedEventBlockIds.includes(b.id) ? '#007acc' : 'transparent', borderRadius: '4px', marginBottom: '2px' }}>
-                  <Bookmark size={10} fill={editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#f1c40f'} color={editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#f1c40f'} /> {b.groupName || b.functionName || b.commentText || 'Event'}
-                </div>
-              ))}
+            <div style={{ borderTop: '1px solid #111', backgroundColor: '#1e1e1e' }}>
+              <div style={{ padding: '8px 15px', fontSize: '10px', color: '#444', fontWeight: 800, textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+                Bookmarks <Bookmark size={10} />
+              </div>
+              <div style={{ padding: '4px', maxHeight: '150px', overflowY: 'auto' }}>
+                {bookmarks.map((b: any) => (
+                  <div 
+                    key={b.id} 
+                    onClick={() => { setSelectedEventBlocks([b.id]); const el = document.querySelector(`[data-block-id="${b.id}"]`); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} 
+                    style={{ 
+                      fontSize: '11px', color: editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#888', 
+                      padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', 
+                      backgroundColor: editorState.selectedEventBlockIds.includes(b.id) ? '#007acc' : 'transparent', 
+                      borderRadius: '3px', marginBottom: '1px' 
+                    }}
+                  >
+                    <Bookmark size={10} fill={editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#f1c40f'} color={editorState.selectedEventBlockIds.includes(b.id) ? '#fff' : '#f1c40f'} /> 
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.groupName || b.functionName || b.commentText || 'Event'}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -352,7 +402,7 @@ const EventBlockItem: React.FC<{
   }
 
   return (
-    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '2px', backgroundColor: (isSelected ? '#004b7e' : '#2d2d2d'), border: isSelected ? '1px solid #007acc' : '1px solid #333', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '2px' }}>
+    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '4px', backgroundColor: (isSelected ? '#004b7e' : '#3e3e42'), border: isSelected ? '1px solid #007acc' : '1px solid #1a1a1a', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '2px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', minHeight: '60px', position: 'relative' }}>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
         {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}

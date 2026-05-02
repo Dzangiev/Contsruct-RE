@@ -18,13 +18,13 @@ export const Rulers: React.FC<RulersProps> = ({
   zoom, panX, panY, layoutWidth, layoutHeight, viewportWidth, viewportHeight, mouseX, mouseY, containerWidth, containerHeight 
 }) => {
   const rulerSize = 22;
-  const tickColor = '#333';
-  const majorTickColor = '#555';
-  const textColor = '#888';
-  const bgColor = '#1a1a1a';
+  const tickColor = '#555';
+  const majorTickColor = '#888';
+  const textColor = '#aaa';
+  const bgColor = '#333333';
   const highlightColor = 'rgba(0, 153, 255, 0.15)';
   const mouseLineColor = '#0099ff';
-  const viewportLineColor = 'rgba(255, 255, 255, 0.3)';
+  const viewportLineColor = 'rgba(255, 255, 255, 0.2)';
 
   // Mouse indicator position in ruler space
   const mouseRulerX = mouseX * zoom + panX;
@@ -166,8 +166,8 @@ export const Rulers: React.FC<RulersProps> = ({
       {/* Corner Box */}
       <div style={{ 
         position: 'absolute', top: 0, left: 0, width: rulerSize, height: rulerSize, 
-        backgroundColor: '#252526', borderRight: '1px solid #333', borderBottom: '1px solid #333',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace', zIndex: 101
+        backgroundColor: '#333333', borderRight: '1px solid #1a1a1a', borderBottom: '1px solid #1a1a1a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace', zIndex: 101
       }}>
         PX
       </div>

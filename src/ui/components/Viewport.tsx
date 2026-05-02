@@ -145,10 +145,10 @@ export const Viewport: React.FC = () => {
         const factor = delta > 0 ? 1.1 : 0.9;
         const newZoom = Math.min(Math.max(zoom * factor, 0.1), 10);
         const rect = el.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const newPanX = mouseX - (mouseX - panX) * (newZoom / zoom);
-        const newPanY = mouseY - (mouseY - panY) * (newZoom / zoom);
+        const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+        const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+        const newPanX = mx - (mx - panX) * (newZoom / zoom);
+        const newPanY = my - (my - panY) * (newZoom / zoom);
         setView(newZoom, newPanX, newPanY);
       } else if (e.shiftKey) {
         e.preventDefault();
@@ -327,8 +327,10 @@ export const Viewport: React.FC = () => {
       const rect = viewportRef.current?.getBoundingClientRect();
       if (!rect) return;
       
-      const mouseX = (e.clientX - rect.left - panX) / zoom;
-      const mouseY = (e.clientY - rect.top - panY) / zoom;
+      const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+      const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+      const mouseX = (mx - panX) / zoom;
+      const mouseY = (my - panY) / zoom;
 
       // Group Rotation
       if (handle === 'rotate') {
@@ -470,8 +472,10 @@ export const Viewport: React.FC = () => {
     if (tool === 'select') {
       const rect = viewportRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const x = (e.clientX - rect.left - panX) / zoom;
-      const y = (e.clientY - rect.top - panY) / zoom;
+      const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+      const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+      const x = (mx - panX) / zoom;
+      const y = (my - panY) / zoom;
       setMarqueeStart({ x, y });
       setMarqueeEnd({ x, y });
       if (!e.shiftKey) setSelectedInstances([]);
@@ -482,12 +486,12 @@ export const Viewport: React.FC = () => {
     e.preventDefault();
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const worldX = (localX - panX) / zoom;
-    const worldY = (localY - panY) / zoom;
+    const rawX = e.clientX - rect.left;
+    const rawY = e.clientY - rect.top;
+    const worldX = (rawX - (showRulers ? 22 : 0) - panX) / zoom;
+    const worldY = (rawY - (showRulers ? 22 : 0) - panY) / zoom;
     const inst = instances.find(i => worldX >= i.x && worldX <= i.x + i.width && worldY >= i.y && worldY <= i.y + i.height);
-    setContextMenu({ x: localX, y: localY, instanceId: inst?.id });
+    setContextMenu({ x: rawX, y: rawY, instanceId: inst?.id });
   };
 
   const [selectionIndex, setSelectionIndex] = React.useState(0);
@@ -499,8 +503,10 @@ export const Viewport: React.FC = () => {
     // Selection Cycling logic
     const rect = viewportRef.current?.getBoundingClientRect();
     if (rect) {
-      const x = (e.clientX - rect.left - panX) / zoom;
-      const y = (e.clientY - rect.top - panY) / zoom;
+      const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+      const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+      const x = (mx - panX) / zoom;
+      const y = (my - panY) / zoom;
       
       const objectsAtPoint = instances.filter(inst => {
         const layer = layers.find(l => l.id === inst.layerId);
@@ -580,8 +586,10 @@ export const Viewport: React.FC = () => {
     if (!activeLayer.visible || activeLayer.locked) return;
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    let x = (e.clientX - rect.left - panX) / zoom;
-    let y = (e.clientY - rect.top - panY) / zoom;
+    const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+    const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+    let x = (mx - panX) / zoom;
+    let y = (my - panY) / zoom;
     if (snapToGrid) { x = Math.round(x / gridSize) * gridSize; y = Math.round(y / gridSize) * gridSize; }
     const newId = generateId();
     addInstance(activeLayout.id, editorState.placementObjectTypeId, activeLayer.id, Math.round(x), Math.round(y), newId);
@@ -598,8 +606,10 @@ export const Viewport: React.FC = () => {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    let x = (e.clientX - rect.left - panX) / zoom;
-    let y = (e.clientY - rect.top - panY) / zoom;
+    const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+    const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+    let x = (mx - panX) / zoom;
+    let y = (my - panY) / zoom;
     
     if (snapToGrid) {
       x = Math.round(x / gridSize) * gridSize;
@@ -660,10 +670,12 @@ export const Viewport: React.FC = () => {
   const handleMouseMoveGlobal = (e: React.MouseEvent) => {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = Math.round((e.clientX - rect.left - panX) / zoom);
-    const y = Math.round((e.clientY - rect.top - panY) / zoom);
-    setMouseLayoutPos({ x, y });
-    useEditorStore.getState().setMousePosition(x, y);
+    const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+    const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+    const lx = (mx - panX) / zoom;
+    const ly = (my - panY) / zoom;
+    setMouseLayoutPos({ x: Math.round(lx), y: Math.round(ly) });
+    useEditorStore.getState().setMousePosition(Math.round(lx), Math.round(ly));
   };
 
   const contextMenuItemStyle: React.CSSProperties = {
@@ -674,7 +686,7 @@ export const Viewport: React.FC = () => {
     <div 
       className="viewport" ref={viewportRef}
       style={{ 
-        flex: 1, backgroundColor: '#0a0a0a', position: 'relative', overflow: 'hidden', 
+        flex: 1, height: '100%', width: '100%', backgroundColor: '#2b2b2b', position: 'relative', overflow: 'hidden', 
         cursor: (tool === 'pan' || isSpaceDown) ? 'grab' : (dragStart || resizing) ? 'grabbing' : 'default', 
         outline: 'none', display: 'flex', flexDirection: 'column'
       }}
@@ -685,8 +697,10 @@ export const Viewport: React.FC = () => {
         if (e.button !== 0) return;
         const rect = viewportRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const x = (e.clientX - rect.left - panX) / zoom;
-        const y = (e.clientY - rect.top - panY) / zoom;
+        const mx = e.clientX - rect.left - (showRulers ? 22 : 0);
+        const my = e.clientY - rect.top - (showRulers ? 22 : 0);
+        const x = (mx - panX) / zoom;
+        const y = (my - panY) / zoom;
         setInsertDialogPos({ x, y });
       }}
     >
@@ -724,30 +738,18 @@ export const Viewport: React.FC = () => {
         .context-menu-item:hover { background-color: rgba(255,255,255,0.05); color: #fff !important; }
       `}</style>
       
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <svg width="100%" height="100%" style={{ display: 'block' }}>
-          <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
-            {/* Workspace Background */}
-            <rect x={-10000} y={-10000} width={20000} height={20000} fill="#050505" />
-            
-            {/* Layout Canvas with shadow/distinct border */}
-            <rect x={0} y={0} width={width} height={height} fill="#1e1e1e" stroke="#000" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
-            
-            {showGrid && (
-              <>
-                <defs>
-                  <pattern id="grid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
-                    <circle cx={1 / zoom} cy={1 / zoom} r={1 / zoom} fill="rgba(255,255,255,0.1)" />
-                  </pattern>
-                  <pattern id="grid-large" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
-                    <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid)" />
-                    <circle cx={2 / zoom} cy={2 / zoom} r={1.5 / zoom} fill="rgba(255,255,255,0.4)" />
-                  </pattern>
-                </defs>
-                <rect width={width} height={height} fill="url(#grid-large)" pointerEvents="none" />
-              </>
-            )}
-
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#161617' }}>
+        <svg 
+          width="100%" height="100%" 
+          style={{ display: 'block', minWidth: '100%', minHeight: '100%' }}
+        >
+          <defs>
+            <pattern id="workspace-dots" width="100" height="100" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.02)" />
+            </pattern>
+            <filter id="canvasShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="12" floodOpacity="0.5"/>
+            </filter>
             <filter id="handleShadow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="1" />
               <feOffset dx="0" dy="1" result="offsetblur" />
@@ -760,10 +762,42 @@ export const Viewport: React.FC = () => {
               </feMerge>
             </filter>
             
-            {/* Viewport Window Boundary (Project Settings) - CLEARER VISUAL */}
+            {showGrid && (
+              <>
+                <pattern id="grid-dots" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+                  <circle cx={1} cy={1} r={0.5} fill="rgba(255,255,255,0.15)" />
+                </pattern>
+                <pattern id="grid-main" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
+                  <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid-dots)" />
+                  <path d={`M ${gridSize * 4} 0 L 0 0 0 ${gridSize * 4}`} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                </pattern>
+              </>
+            )}
+          </defs>
+
+          <g transform={`translate(${(showRulers ? 22 : 0) + panX}, ${(showRulers ? 22 : 0) + panY}) scale(${zoom})`}>
+            {/* Workspace Background (Infinite) */}
+            <rect x={-20000} y={-20000} width={40000} height={40000} fill="#1c1c1e" />
+            <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#workspace-dots)" />
+            
+            {/* Layout Canvas with shadow/distinct border */}
+            <rect 
+              x={0} y={0} width={width} height={height} 
+              fill="#3a3a3c" 
+              stroke="#555" strokeWidth={2 / zoom} 
+              filter="url(#canvasShadow)"
+              style={{ vectorEffect: 'non-scaling-stroke' }} 
+            />
+            
+            {showGrid && (
+              <rect width={width} height={height} fill="url(#grid-main)" pointerEvents="none" />
+            )}
+
+            {/* Viewport Window Boundary (Project Settings) */}
             <rect 
               x={0} y={0} width={project.settings.viewportWidth} height={project.settings.viewportHeight} 
-              fill="none" stroke="#555" strokeWidth={2 / zoom} strokeDasharray={`${10/zoom} ${5/zoom}`}
+              fill="none" stroke="#007acc" strokeWidth={2 / zoom} strokeDasharray={`${8/zoom} ${4/zoom}`}
+              opacity={0.5}
               style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" 
             />
             
@@ -973,11 +1007,11 @@ export const Viewport: React.FC = () => {
         )}
       </div>
 
-      <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(20,20,20,0.8)', color: '#ccc', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', pointerEvents: 'none', display: 'flex', gap: '15px', border: '1px solid #444', backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', zIndex: 100 }}>
-        <span>X: {mouseLayoutPos.x}, Y: {mouseLayoutPos.y}</span>
-        <span>Zoom: {Math.round(zoom * 100)}%</span>
-        <span>{selectedInstanceIds.length} objects selected</span>
-        <span>Grid: {gridSize}px ({snapToGrid ? 'Snap' : 'Free'})</span>
+      <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(20,20,20,0.85)', color: '#eee', padding: '8px 16px', borderRadius: '8px', fontSize: '11px', pointerEvents: 'none', display: 'flex', gap: '20px', border: '1px solid #444', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0,0,0,0.6)', zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>POS</span> {mouseLayoutPos.x}, {mouseLayoutPos.y}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>SIZE</span> {width} × {height}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>ZOOM</span> {Math.round(zoom * 100)}%</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>GRID</span> {gridSize}px</div>
       </div>
     </div>
   );

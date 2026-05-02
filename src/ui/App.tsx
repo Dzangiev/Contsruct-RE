@@ -5,7 +5,7 @@ import { Viewport } from './components/Viewport';
 import { Inspector } from './components/Inspector';
 import { EventSheetEditor } from './components/EventSheetEditor';
 import { Runtime } from '../runtime/Runtime';
-import { Play } from 'lucide-react';
+import { Play, Monitor, FileText } from 'lucide-react';
 import { StatusBar } from './components/StatusBar';
 
 import { LayersPanel } from './components/LayersPanel';
@@ -39,8 +39,8 @@ const App: React.FC = () => {
       position: 'relative',
       flexDirection: 'column'
     }}>
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ width: '250px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ width: '250px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1a1a1a', backgroundColor: '#2d2d2d' }}>
           <ErrorBoundary name="ProjectExplorer">
             <ProjectExplorer />
           </ErrorBoundary>
@@ -49,25 +49,28 @@ const App: React.FC = () => {
           </ErrorBoundary>
         </div>
         
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#333', overflow: 'hidden' }}>
           <header style={{ 
-            height: '40px', 
-            backgroundColor: '#252526', 
-            borderBottom: '1px solid #333',
+            height: '35px', 
+            backgroundColor: '#2d2d2d', 
+            borderBottom: '1px solid #1a1a1a',
             display: 'flex',
             alignItems: 'center',
-            padding: '0 20px',
+            padding: '0 12px',
             justifyContent: 'space-between',
             color: '#ccc',
-            fontSize: '12px'
+            fontSize: '11px',
+            userSelect: 'none'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', height: '100%' }}>
-              <div style={{ fontWeight: 'bold', color: '#fff' }}>CRE Editor</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ padding: '0 12px', fontWeight: 800, color: '#555', letterSpacing: '1px', fontSize: '10px' }}>CRE ENGINE</div>
+              <div style={{ width: '1px', height: '16px', backgroundColor: '#3d3d3d', margin: '0 8px' }} />
               
-              <nav style={{ display: 'flex', gap: '2px', height: '100%' }}>
+              <nav style={{ display: 'flex', height: '35px' }}>
                 <TabButton 
                   active={currentTab === 'layout'} 
                   onClick={() => setTab('layout')}
+                  icon={<Monitor size={14} />}
                   label={project.layouts?.find(l => l.id === editorState.activeLayoutId)?.name || 'Layout'} 
                 />
                 {(() => {
@@ -77,6 +80,7 @@ const App: React.FC = () => {
                     <TabButton 
                       active={currentTab === 'eventSheet'} 
                       onClick={() => setTab('eventSheet')}
+                      icon={<FileText size={14} />}
                       label={eventSheet?.name || 'Event Sheet'} 
                     />
                   );
@@ -84,29 +88,33 @@ const App: React.FC = () => {
               </nav>
             </div>
 
-            <button 
-              onClick={() => setPreviewMode(true)}
-              style={{
-                backgroundColor: '#22a043',
-                color: '#fff',
-                border: 'none',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '11px',
-                fontWeight: 'bold'
-              }}
-            >
-              <Play size={12} fill="currentColor" /> Preview
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button 
+                onClick={() => setPreviewMode(true)}
+                style={{
+                  backgroundColor: '#2ea44f',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '4px 14px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 700
+                }}
+              >
+                <Play size={12} fill="currentColor" /> PREVIEW
+              </button>
+            </div>
           </header>
           
-          <ErrorBoundary name="MainContent">
-            {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
-          </ErrorBoundary>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
+            <ErrorBoundary name="MainContent">
+              {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
+            </ErrorBoundary>
+          </div>
         </main>
 
         <ErrorBoundary name="Inspector">
@@ -130,24 +138,31 @@ const App: React.FC = () => {
   );
 };
 
-const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string }> = ({ active, onClick, label }) => (
+const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string, icon: React.ReactNode }> = ({ active, onClick, label, icon }) => (
   <button 
     onClick={onClick}
     style={{
       height: '100%',
-      padding: '0 15px',
-      backgroundColor: active ? '#1e1e1e' : 'transparent',
+      padding: '0 16px',
+      backgroundColor: active ? '#2d2d2d' : 'transparent',
       border: 'none',
-      borderBottom: active ? '2px solid #007acc' : 'none',
-      color: active ? '#fff' : '#888',
+      borderTop: active ? '2px solid #007acc' : '2px solid transparent',
+      borderRight: '1px solid #222',
+      color: active ? '#fff' : '#aaa',
       cursor: 'pointer',
       fontSize: '12px',
       display: 'flex',
       alignItems: 'center',
-      transition: 'background-color 0.2s'
+      gap: '8px',
+      transition: 'all 0.2s',
+      fontWeight: active ? 600 : 400,
+      minWidth: '120px',
+      position: 'relative'
     }}
   >
-    {label}
+    <span style={{ opacity: active ? 1 : 0.5, display: 'flex', alignItems: 'center' }}>{icon}</span>
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+    {active && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: '1px', backgroundColor: '#1e1e1e' }} />}
   </button>
 );
 

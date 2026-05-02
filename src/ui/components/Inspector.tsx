@@ -129,16 +129,17 @@ export const Inspector: React.FC = () => {
             action={<button onClick={() => { const name = prompt('Variable name?'); if (name) addInstanceVariable(objectType.id, name, 'number', 0); }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {objectType.instanceVariables?.map(v => (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '2px 8px', gap: '8px', minHeight: '26px' }}>
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
                 <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#555' }}><Type size={12}/></div>
                 <div 
                   style={{ 
                     width: '80px', 
-                    fontSize: '12px', 
-                    color: '#bbb', 
+                    fontSize: '11px', 
+                    color: '#aaa', 
                     overflow: 'hidden', 
                     textOverflow: 'ellipsis', 
-                    whiteSpace: 'nowrap' 
+                    whiteSpace: 'nowrap',
+                    fontWeight: 500
                   }} 
                   title={v.name}
                 >
@@ -152,7 +153,17 @@ export const Inspector: React.FC = () => {
                     const next = (objectType.instanceVariables || []).map(iv => iv.id === v.id ? { ...iv, initialValue: val } : iv);
                     updateObjectType(objectType.id, { instanceVariables: next });
                   }}
-                  style={{ ...inputStyle, height: '20px' }}
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = '#007acc';
+                    e.currentTarget.style.backgroundColor = '#161617';
+                    e.currentTarget.style.boxShadow = '0 0 4px rgba(0, 122, 204, 0.4)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = '#444';
+                    e.currentTarget.style.backgroundColor = '#262627';
+                    e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.4)';
+                  }}
+                  style={{ ...inputStyle, height: '22px' }}
                 />
                 <button 
                   onClick={() => removeInstanceVariable(objectType.id, v.id)} 
@@ -187,6 +198,11 @@ export const Inspector: React.FC = () => {
   
   return (
     <div className="inspector" style={inspectorStyle}>
+      <style>{`
+        .property-row-hover:hover { background-color: rgba(255,255,255,0.03); }
+        .inspector select:hover, .inspector input:hover { border-color: #555; }
+        .inspector select:focus, .inspector input:focus { border-color: #007acc; }
+      `}</style>
       <div style={panelHeaderStyle}>Properties: {activeLayout?.name || 'Project'}</div>
       
       {layer && (
@@ -214,7 +230,7 @@ export const Inspector: React.FC = () => {
         <PropertyRow label="Viewport Height" value={project.settings.viewportHeight} onChange={v => updateProjectSettings({ viewportHeight: Number(v) })} type="number" icon={<Hash size={12}/>} />
       </Category>
 
-      <div style={{ padding: '20px', fontSize: '11px', color: '#666', textAlign: 'center', borderTop: '1px solid #2d2d2d', marginTop: 'auto' }}>
+      <div style={{ padding: '20px', fontSize: '11px', color: '#444', textAlign: 'center', borderTop: '1px solid #111', marginTop: 'auto', backgroundColor: '#1e1e1e' }}>
         v{project.settings.version}
       </div>
     </div>
@@ -224,115 +240,160 @@ export const Inspector: React.FC = () => {
 const Category: React.FC<{ label: string, children: React.ReactNode, action?: React.ReactNode }> = ({ label, children, action }) => {
   const [expanded, setExpanded] = React.useState(true);
   return (
-    <div style={{ borderBottom: '1px solid #2d2d2d' }}>
+    <div style={{ borderBottom: '1px solid #111' }}>
       <div 
-        style={{ 
-          display: 'flex', alignItems: 'center', padding: '6px 8px', backgroundColor: '#252526', cursor: 'pointer',
-          fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#aaa'
-        }}
         onClick={() => setExpanded(!expanded)}
+        style={{ 
+          padding: '6px 10px', 
+          backgroundColor: '#383839', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          userSelect: 'none'
+        }}
       >
-        {expanded ? <ChevronDown size={12} style={{ marginRight: '6px' }} /> : <ChevronRight size={12} style={{ marginRight: '6px' }} />}
-        <span style={{ flex: 1 }}>{label}</span>
-        {action && <div onClick={e => e.stopPropagation()}>{action}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {expanded ? <ChevronDown size={14} color="#888" /> : <ChevronRight size={14} color="#888" />}
+          <span style={{ fontSize: '10px', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+        </div>
+        {action}
       </div>
-      {expanded && <div style={{ padding: '4px 0' }}>{children}</div>}
+      {expanded && <div style={{ backgroundColor: '#1a1a1b', padding: '4px 0' }}>{children}</div>}
     </div>
   );
 };
 
 const PropertyRow: React.FC<{ 
-  label: string, value: any, onChange?: (v: any) => void, type?: string, step?: number, readOnly?: boolean, options?: string[], icon?: React.ReactNode 
-}> = ({ label, value, onChange, type = 'text', step, readOnly, options, icon }) => {
-  const [isFocused, setIsFocused] = React.useState(false);
-
+  label: string, 
+  value: any, 
+  onChange?: (val: any) => void, 
+  readOnly?: boolean, 
+  type?: 'text' | 'number' | 'select' | 'color',
+  options?: string[],
+  step?: number,
+  icon?: React.ReactNode
+}> = ({ label, value, onChange, readOnly, type = 'text', options = [], step = 1, icon }) => {
   return (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      padding: '1px 8px', 
-      gap: '8px', 
-      minHeight: '24px',
-      backgroundColor: isFocused ? '#2a2d2e' : 'transparent',
-      transition: 'background-color 0.1s'
-    }}>
-      <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: isFocused ? '#007acc' : '#555' }}>{icon}</div>
+    <div 
+      style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        padding: '4px 10px', 
+        gap: '8px', 
+        minHeight: '28px',
+        transition: 'background-color 0.1s',
+        borderBottom: '1px solid #222'
+      }}
+      className="property-row-hover"
+    >
+      <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#666' }}>{icon}</div>
       <label 
         style={{ 
-          width: '100px', 
-          color: '#bbb', 
-          fontSize: '12px', 
+          width: '90px', 
+          color: '#aaa', 
+          fontSize: '11px', 
           overflow: 'hidden', 
           textOverflow: 'ellipsis', 
           whiteSpace: 'nowrap',
-          cursor: 'default'
+          cursor: 'default',
+          fontWeight: 500
         }} 
         title={label}
       >
         {label}
       </label>
-      {readOnly ? (
-        <div style={{ flex: 1, fontSize: '11px', color: '#777', padding: '2px 4px', userSelect: 'text' }}>{value}</div>
-      ) : type === 'select' && options ? (
-        <select 
-          value={value} 
-          onChange={e => onChange?.(e.target.value)} 
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          style={{ ...inputStyle, border: isFocused ? '1px solid #007acc' : '1px solid transparent', appearance: 'none' }}
-        >
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input 
-          type={type === 'number' ? 'number' : 'text'} 
-          value={value ?? ''} 
-          step={step}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          onChange={e => {
-            const val = e.target.value;
-            onChange?.(type === 'number' ? Number(val) : val);
-          }} 
-          style={{ 
-            ...inputStyle, 
-            border: isFocused ? '1px solid #007acc' : '1px solid transparent',
-            backgroundColor: isFocused ? '#1e1e1e' : '#2d2d2d'
-          }} 
-        />
-      )}
+
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+        {readOnly ? (
+          <div style={{ fontSize: '11px', color: '#666', padding: '2px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+        ) : type === 'select' ? (
+          <select 
+            value={value} 
+            onChange={e => onChange?.(e.target.value)} 
+            style={{ ...inputStyle, padding: '1px 4px' }}
+          >
+            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        ) : type === 'color' ? (
+          <div style={{ display: 'flex', gap: '4px', width: '100%' }}>
+            <input 
+              type="color" 
+              value={value || '#ffffff'} 
+              onChange={e => onChange?.(e.target.value)} 
+              style={{ width: '20px', height: '18px', padding: 0, border: '1px solid #333', background: 'none', cursor: 'pointer', borderRadius: '2px' }}
+            />
+            <input 
+              type="text" 
+              value={value || ''} 
+              onChange={e => onChange?.(e.target.value)} 
+              style={inputStyle}
+            />
+          </div>
+        ) : (
+          <input 
+            type={type === 'number' ? 'number' : 'text'} 
+            value={value ?? ''} 
+            step={step}
+            onChange={e => onChange?.(type === 'number' ? Number(e.target.value) : e.target.value)} 
+            onFocus={e => {
+              e.currentTarget.style.borderColor = '#007acc';
+              e.currentTarget.style.backgroundColor = '#161617';
+              e.currentTarget.style.boxShadow = '0 0 4px rgba(0, 122, 204, 0.4)';
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = '#444';
+              e.currentTarget.style.backgroundColor = '#262627';
+              e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.4)';
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 };
 
-const inspectorStyle: React.CSSProperties = { 
-  width: '280px', height: '100%', backgroundColor: '#1e1e1e', borderLeft: '1px solid #333', 
-  display: 'flex', flexDirection: 'column', color: '#d4d4d4', overflowY: 'auto', userSelect: 'none' 
+const inspectorStyle: React.CSSProperties = {
+  width: '280px',
+  backgroundColor: '#2d2d2d',
+  borderLeft: '1px solid #1a1a1a',
+  display: 'flex',
+  flexDirection: 'column',
+  overflowY: 'auto',
+  color: '#aaa',
+  userSelect: 'none',
+  boxShadow: '-5px 0 15px rgba(0,0,0,0.1)'
 };
 
-const panelHeaderStyle: React.CSSProperties = { 
-  padding: '8px 12px', borderBottom: '1px solid #333', fontSize: '11px', fontWeight: 'bold', 
-  backgroundColor: '#252526', color: '#ccc', textTransform: 'uppercase', letterSpacing: '0.5px'
+const panelHeaderStyle: React.CSSProperties = {
+  padding: '10px 16px',
+  backgroundColor: '#383839',
+  fontSize: '11px',
+  fontWeight: 800,
+  color: '#eee',
+  borderBottom: '1px solid #1a1a1a',
+  textTransform: 'uppercase',
+  letterSpacing: '1px'
 };
 
-const inputStyle: React.CSSProperties = { 
-  flex: 1, backgroundColor: '#2d2d2d', border: '1px solid transparent', color: '#fff', 
-  fontSize: '12px', padding: '2px 6px', borderRadius: '2px', outline: 'none',
-  transition: 'all 0.1s ease'
+const inputStyle: React.CSSProperties = {
+  backgroundColor: '#262627',
+  border: '1px solid #444',
+  borderRadius: '3px',
+  color: '#eee',
+  padding: '3px 8px',
+  fontSize: '11px',
+  width: '100%',
+  outline: 'none',
+  transition: 'all 0.1s ease',
+  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
+  margin: '1px 0'
 };
 
-const miniButtonStyle: React.CSSProperties = { 
-  backgroundColor: 'transparent', color: '#888', border: 'none', padding: '2px', 
-  borderRadius: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' 
+const miniButtonStyle: React.CSSProperties = {
+  background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', transition: 'color 0.2s'
 };
 
 const linkButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#007acc',
-  fontSize: '11px',
-  cursor: 'pointer',
-  padding: 0,
-  textDecoration: 'underline',
-  textAlign: 'left'
+  width: '100%', backgroundColor: '#333', border: '1px solid #444', color: '#ccc', padding: '6px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', transition: 'all 0.2s'
 };

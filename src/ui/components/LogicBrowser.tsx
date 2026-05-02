@@ -1,7 +1,7 @@
 import React from 'react';
 import { Project, ObjectType } from '../../model/project';
 import { LogicDefinition, CONDITIONS, ACTIONS } from '../../model/definitions';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Info, Settings, Box, Terminal, Code, Cpu, MousePointer2, Zap, Layout, Monitor } from 'lucide-react';
 
 interface LogicBrowserProps {
   project: Project;
@@ -17,17 +17,23 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   const [step, setStep] = React.useState<'object' | 'logic'>(initialObjectTypeId !== undefined ? 'logic' : 'object');
   const [selectedObjectType, setSelectedObjectType] = React.useState<ObjectType | undefined>(initialOT);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>('All');
+  const [hoveredItem, setHoveredItem] = React.useState<LogicDefinition | null>(null);
 
   const items = mode === 'condition' ? CONDITIONS : ACTIONS;
   const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
+    (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedCategoryId === 'All' || item.category === selectedCategoryId)
   );
+
+  const categories = ['All', ...Array.from(new Set(items.map(i => i.category)))];
 
   const handleObjectSelect = (ot: ObjectType | undefined) => {
     setSelectedObjectType(ot);
     setStep('logic');
     setSearchTerm('');
+    setSelectedCategoryId('All');
   };
 
   const handleLogicSelect = (def: LogicDefinition) => {
@@ -39,126 +45,180 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div style={headerStyle}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>
-            {step === 'object' ? 'Add Condition/Action' : `${selectedObjectType?.name || 'System'}: Select ${mode === 'condition' ? 'Condition' : 'Action'}`}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ backgroundColor: '#007acc', padding: '6px', borderRadius: '4px' }}>
+              {mode === 'condition' ? <Zap size={16} color="#fff" /> : <Settings size={16} color="#fff" />}
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+                {step === 'object' ? `Add ${mode === 'condition' ? 'Condition' : 'Action'}` : `${selectedObjectType?.name || 'System'}`}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888' }}>
+                {step === 'object' ? 'Select target object first' : `Select ${mode === 'condition' ? 'a condition' : 'an action'}`}
+              </div>
+            </div>
+          </div>
           <button onClick={onClose} style={closeButtonStyle}>×</button>
         </div>
 
+        {/* Search Bar */}
         <div style={searchContainerStyle}>
-          <Search size={14} style={{ position: 'absolute', left: '26px', color: '#666' }} />
+          <Search size={14} style={{ position: 'absolute', left: '24px', color: '#666' }} />
           <input 
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={step === 'object' ? "Search objects..." : "Search conditions..."}
+            placeholder={step === 'object' ? "Search objects..." : `Search ${mode}s...`}
             style={inputStyle}
           />
         </div>
 
-        <div style={contentStyle}>
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {step === 'object' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px', padding: '10px 0' }}>
-              <div 
-                style={{ ...objectChipStyle, borderColor: !selectedObjectType ? '#007acc' : '#444' }} 
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+              <ObjectCard 
+                name="System" 
+                icon={<Monitor size={24} color="#3498db" />} 
                 onClick={() => handleObjectSelect(undefined)}
-              >
-                <div style={{ ...iconPlaceholder, backgroundColor: '#2980b9' }}>S</div>
-                <span style={{ fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>System</span>
-              </div>
+                selected={!selectedObjectType}
+              />
               {project.objectTypes.filter(ot => ot.name.toLowerCase().includes(searchTerm.toLowerCase())).map(ot => (
-                <div 
-                  key={ot.id} 
-                  style={{ ...objectChipStyle, borderColor: selectedObjectType?.id === ot.id ? '#007acc' : '#444' }} 
+                <ObjectCard 
+                  key={ot.id}
+                  name={ot.name} 
+                  icon={<Box size={24} color="#2ecc71" />} 
                   onClick={() => handleObjectSelect(ot)}
-                >
-                  <div style={{ ...iconPlaceholder, backgroundColor: '#27ae60' }}>{ot.name[0]}</div>
-                  <span style={{ fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>{ot.name}</span>
-                </div>
+                  selected={selectedObjectType?.id === ot.id}
+                />
               ))}
             </div>
           ) : (
-            <div style={listStyle}>
-              {Array.from(new Set(filteredItems.map(i => i.category))).map(cat => (
-                <div key={cat} style={{ marginBottom: '12px' }}>
-                  <div style={categoryHeaderStyle}>{cat}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                    {filteredItems.filter(i => i.category === cat).map(def => (
-                      <div 
-                        key={def.type} 
-                        style={itemStyle} 
-                        onClick={() => handleLogicSelect(def)}
-                        title={def.description}
-                      >
-                        <ChevronRight size={12} style={{ opacity: 0.3 }} />
-                        <span style={{ fontWeight: 500 }}>{def.name}</span>
-                      </div>
-                    ))}
+            <>
+              {/* Sidebar Categories */}
+              <div style={sidebarStyle}>
+                {categories.map(cat => (
+                  <div 
+                    key={cat} 
+                    onClick={() => setSelectedCategoryId(cat)}
+                    style={{
+                      ...categoryItemStyle,
+                      backgroundColor: selectedCategoryId === cat ? '#37373d' : 'transparent',
+                      color: selectedCategoryId === cat ? '#fff' : '#aaa'
+                    }}
+                  >
+                    {cat}
                   </div>
+                ))}
+              </div>
+
+              {/* Main List Grid */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}>
+                  {filteredItems.map(def => (
+                    <div 
+                      key={def.type} 
+                      style={logicItemStyle} 
+                      onClick={() => handleLogicSelect(def)}
+                      onMouseEnter={() => setHoveredItem(def)}
+                    >
+                      <ChevronRight size={14} style={{ opacity: 0.2 }} />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px' }}>{def.name}</span>
+                        <span style={{ fontSize: '11px', color: '#666' }}>{def.category}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {filteredItems.length === 0 && (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No results found.</div>
-              )}
-            </div>
+                {filteredItems.length === 0 && (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#666', fontSize: '12px' }}>
+                    No matching {mode}s found.
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
+        {/* Footer Detail Panel */}
         <div style={footerStyle}>
-          <div style={{ flex: 1, fontSize: '11px', color: '#666' }}>
-            {step === 'logic' && selectedObjectType && <span>Object: <b>{selectedObjectType.name}</b></span>}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {hoveredItem ? (
+              <>
+                <Info size={14} color="#007acc" />
+                <span style={{ fontSize: '12px', color: '#aaa' }}>{hoveredItem.description || hoveredItem.name}</span>
+              </>
+            ) : (
+              <span style={{ fontSize: '11px', color: '#555' }}>Hover an item for description</span>
+            )}
           </div>
-          {step === 'logic' && (
-            <button onClick={() => setStep('object')} style={backButtonStyle}>Back</button>
-          )}
-          <button onClick={onClose} style={cancelButtonStyle}>Cancel</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {step === 'logic' && (
+              <button onClick={() => setStep('object')} style={secondaryButtonStyle}>Back to Objects</button>
+            )}
+            <button onClick={onClose} style={secondaryButtonStyle}>Cancel</button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const objectChipStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-  padding: '12px',
-  backgroundColor: '#333',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  border: '1px solid #444',
-  transition: 'all 0.1s ease',
-  userSelect: 'none'
-};
+const ObjectCard: React.FC<{ name: string, icon: React.ReactNode, onClick: () => void, selected: boolean }> = ({ name, icon, onClick, selected }) => (
+  <div 
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '12px',
+      padding: '20px 12px',
+      backgroundColor: selected ? '#37373d' : '#252526',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      border: '1px solid',
+      borderColor: selected ? '#007acc' : '#333',
+      transition: 'all 0.15s ease',
+      userSelect: 'none'
+    }}
+    onMouseEnter={e => e.currentTarget.style.borderColor = '#007acc'}
+    onMouseLeave={e => e.currentTarget.style.borderColor = selected ? '#007acc' : '#333'}
+  >
+    <div style={{ transform: 'scale(1.2)' }}>{icon}</div>
+    <span style={{ fontSize: '12px', fontWeight: 600, color: selected ? '#fff' : '#ccc' }}>{name}</span>
+  </div>
+);
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.7)',
+  backgroundColor: 'rgba(0,0,0,0.85)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 2000
+  zIndex: 3000,
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {
-  width: '500px',
-  maxHeight: '80vh',
-  backgroundColor: '#2d2d2d',
-  borderRadius: '8px',
+  width: '650px',
+  height: '550px',
+  backgroundColor: '#252526',
+  borderRadius: '12px',
   display: 'flex',
   flexDirection: 'column',
-  boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-  border: '1px solid #444',
-  color: '#d4d4d4'
+  boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
+  border: '1px solid #333',
+  color: '#d4d4d4',
+  overflow: 'hidden'
 };
 
 const headerStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  borderBottom: '1px solid #444',
+  padding: '16px 20px',
+  backgroundColor: '#323233',
+  borderBottom: '1px solid #111',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center'
@@ -168,95 +228,79 @@ const closeButtonStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
   color: '#888',
-  fontSize: '20px',
-  cursor: 'pointer'
+  fontSize: '24px',
+  cursor: 'pointer',
+  padding: '0 8px'
 };
 
 const searchContainerStyle: React.CSSProperties = {
   padding: '12px 16px',
   position: 'relative',
   display: 'flex',
-  alignItems: 'center'
+  alignItems: 'center',
+  backgroundColor: '#2d2d2d',
+  borderBottom: '1px solid #111'
 };
 
 const inputStyle: React.CSSProperties = {
   flex: 1,
   backgroundColor: '#1e1e1e',
   border: '1px solid #444',
-  borderRadius: '4px',
-  padding: '6px 12px 6px 30px',
+  borderRadius: '6px',
+  padding: '8px 12px 8px 34px',
   color: '#fff',
   fontSize: '13px',
-  outline: 'none'
+  outline: 'none',
+  transition: 'border-color 0.2s'
 };
 
-const contentStyle: React.CSSProperties = {
-  flex: 1,
+const sidebarStyle: React.CSSProperties = {
+  width: '160px',
+  backgroundColor: '#252526',
+  borderRight: '1px solid #111',
   overflowY: 'auto',
-  padding: '0 16px'
+  padding: '8px'
 };
 
-const listStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column'
-};
-
-const itemStyle: React.CSSProperties = {
+const categoryItemStyle: React.CSSProperties = {
   padding: '8px 12px',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
+  fontSize: '12px',
   cursor: 'pointer',
   borderRadius: '4px',
-  fontSize: '13px',
-  transition: 'background-color 0.1s'
+  marginBottom: '2px',
+  transition: 'all 0.1s ease'
 };
 
-const iconPlaceholder: React.CSSProperties = {
-  width: '24px',
-  height: '24px',
-  backgroundColor: '#444',
-  borderRadius: '4px',
+const logicItemStyle: React.CSSProperties = {
+  padding: '10px 12px',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '12px',
-  fontWeight: 'bold'
-};
-
-const categoryHeaderStyle: React.CSSProperties = {
-  padding: '15px 0 5px 0',
-  fontSize: '10px',
-  fontWeight: 'bold',
-  color: '#666',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px'
+  gap: '12px',
+  cursor: 'pointer',
+  borderRadius: '4px',
+  transition: 'background-color 0.1s',
+  userSelect: 'none',
+  borderBottom: '1px solid #252526'
 };
 
 const footerStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  borderTop: '1px solid #444',
+  padding: '12px 20px',
+  backgroundColor: '#1e1e1e',
+  borderTop: '1px solid #333',
   display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '10px'
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  height: '50px'
 };
 
-const backButtonStyle: React.CSSProperties = {
-  backgroundColor: '#444',
-  color: '#fff',
+const secondaryButtonStyle: React.CSSProperties = {
+  backgroundColor: '#37373d',
+  color: '#ccc',
   border: 'none',
   padding: '6px 16px',
   borderRadius: '4px',
   cursor: 'pointer',
-  fontSize: '13px'
-};
-
-const cancelButtonStyle: React.CSSProperties = {
-  backgroundColor: 'transparent',
-  color: '#aaa',
-  border: '1px solid #444',
-  padding: '6px 16px',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '13px'
+  fontSize: '12px',
+  fontWeight: 600,
+  transition: 'background-color 0.2s'
 };
