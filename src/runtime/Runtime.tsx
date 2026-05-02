@@ -18,6 +18,12 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     layout ? JSON.parse(JSON.stringify(layout.instances)) : []
   );
 
+  const [fps, setFps] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [showStats, setShowStats] = React.useState(true);
+  const frameCountRef = React.useRef(0);
+  const lastFpsUpdateRef = React.useRef(performance.now());
+
   const lastTimeRef = React.useRef<number>(performance.now());
   const keysDownRef = React.useRef<Set<string>>(new Set());
   const keysPressedRef = React.useRef<Set<string>>(new Set());
@@ -336,9 +342,22 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     };
 
     const tick = () => {
+      if (isPaused) {
+        animationFrameId = requestAnimationFrame(tick);
+        return;
+      }
+
       const now = performance.now();
       const dt = (now - lastTimeRef.current) / 1000;
       lastTimeRef.current = now;
+
+      // Update FPS
+      frameCountRef.current++;
+      if (now - lastFpsUpdateRef.current > 1000) {
+        setFps(Math.round((frameCountRef.current * 1000) / (now - lastFpsUpdateRef.current)));
+        frameCountRef.current = 0;
+        lastFpsUpdateRef.current = now;
+      }
 
       setRuntimeInstances(prev => {
         let nextInstances = [...prev];
@@ -358,7 +377,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [layout, eventSheet]);
+  }, [layout, eventSheet, isPaused]);
 
   if (!layout) {
     return (
@@ -368,6 +387,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       </div>
     );
   }
+
+  const restartGame = () => {
+    setRuntimeInstances(JSON.parse(JSON.stringify(layout.instances)));
+    lastTimeRef.current = performance.now();
+  };
 
   return (
     <div className="runtime-preview" style={{
@@ -380,23 +404,33 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'sans-serif'
+      fontFamily: 'sans-serif',
+      color: '#fff'
     }}>
       {/* Runtime Toolbar */}
       <div style={{
-        height: '40px',
-        backgroundColor: '#252526',
+        height: '45px',
+        backgroundColor: '#1e1e1e',
         borderBottom: '1px solid #333',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 20px',
+        padding: '0 15px',
         justifyContent: 'space-between',
-        color: '#ccc',
-        fontSize: '12px'
+        boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4caf50', animation: 'pulse 2s infinite' }}></div>
-          <span>Previewing: {layout.name} (Running)</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: isPaused ? '#f1c40f' : '#4caf50', boxShadow: isPaused ? 'none' : '0 0 10px #4caf50' }}></div>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>{layout.name} {isPaused ? '(Paused)' : ''}</span>
+          </div>
+          <div style={{ height: '20px', width: '1px', backgroundColor: '#444' }}></div>
+          <button onClick={() => setIsPaused(!isPaused)} style={toolbarButtonStyle}>
+            {isPaused ? 'Resume' : 'Pause'}
+          </button>
+          <button onClick={restartGame} style={toolbarButtonStyle}>Restart</button>
+          <button onClick={() => setShowStats(!showStats)} style={toolbarButtonStyle}>
+            {showStats ? 'Hide Stats' : 'Show Stats'}
+          </button>
         </div>
         <button 
           onClick={onStop}
@@ -404,81 +438,135 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             backgroundColor: '#c42b1c',
             color: '#fff',
             border: 'none',
-            padding: '4px 12px',
+            padding: '6px 16px',
             borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '11px',
-            fontWeight: 'bold'
+            fontSize: '12px',
+            fontWeight: 'bold',
+            transition: 'background-color 0.2s'
           }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e81123'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#c42b1c'}
         >
-          Stop Preview
+          Close Preview
         </button>
       </div>
 
-      {/* Game Viewport */}
+      {/* Game Viewport Container */}
       <div style={{ 
         flex: 1, 
+        position: 'relative',
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
         overflow: 'hidden',
-        padding: '20px',
-        backgroundColor: '#1a1a1a'
+        backgroundColor: '#0a0a0a',
+        padding: '40px'
       }}>
+        {/* Letterbox Scaling Wrapper */}
         <div style={{
-          boxShadow: '0 0 50px rgba(0,0,0,0.8)',
-          backgroundColor: '#111',
-          lineHeight: 0,
-          width: project.settings.viewportWidth,
-          height: project.settings.viewportHeight,
-          overflow: 'hidden',
-          position: 'relative'
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          <svg 
-            ref={svgRef}
-            width={project.settings.viewportWidth} 
-            height={project.settings.viewportHeight} 
-            viewBox={`0 0 ${project.settings.viewportWidth} ${project.settings.viewportHeight}`}
-            style={{ display: 'block' }}
-          >
-            <style>{`
-              @keyframes pulse {
-                0% { opacity: 0.5; }
-                50% { opacity: 1; }
-                100% { opacity: 0.5; }
-              }
-            `}</style>
-            
-            {/* Background for the layout */}
-            <rect width={layout.width} height={layout.height} fill="#1e1e1e" />
-
-            {/* We render layers in order */}
-            {layout.layers.map(layer => {
-              if (!layer.visible) return null;
+          <div style={{
+            boxShadow: '0 20px 80px rgba(0,0,0,0.9)',
+            backgroundColor: '#111',
+            lineHeight: 0,
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: project.settings.viewportWidth,
+            height: project.settings.viewportHeight,
+            aspectRatio: `${project.settings.viewportWidth} / ${project.settings.viewportHeight}`,
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <svg 
+              ref={svgRef}
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${project.settings.viewportWidth} ${project.settings.viewportHeight}`}
+              style={{ display: 'block', width: '100%', height: '100%' }}
+            >
+              <style>{`
+                @keyframes pulse {
+                  0% { opacity: 0.5; }
+                  50% { opacity: 1; }
+                  100% { opacity: 0.5; }
+                }
+              `}</style>
               
-              const layerInstances = runtimeInstances.filter(inst => inst.layerId === layer.id);
+              {/* Background for the layout */}
+              <rect width={layout.width} height={layout.height} fill="#1e1e1e" />
 
-              return (
-                <g key={layer.id} opacity={layer.opacity}>
-                  {layerInstances.map(inst => (
-                    <g 
-                      key={inst.id} 
-                      transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle}, ${inst.width/2}, ${inst.height/2})`}
-                    >
-                      <rect 
-                        width={inst.width} 
-                        height={inst.height} 
-                        fill="#4a4a4a" 
-                        style={{ display: inst.visible ? 'block' : 'none' }}
-                      />
-                    </g>
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
+              {/* We render layers in order */}
+              {layout.layers.map(layer => {
+                if (!layer.visible) return null;
+                
+                const layerInstances = runtimeInstances.filter(inst => inst.layerId === layer.id);
+
+                return (
+                  <g key={layer.id} opacity={layer.opacity}>
+                    {layerInstances.map(inst => (
+                      <g 
+                        key={inst.id} 
+                        transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle}, ${inst.width/2}, ${inst.height/2})`}
+                      >
+                        <rect 
+                          width={inst.width} 
+                          height={inst.height} 
+                          fill="#4a4a4a" 
+                          style={{ display: inst.visible ? 'block' : 'none' }}
+                        />
+                      </g>
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
         </div>
+
+        {/* Stats Overlay */}
+        {showStats && (
+          <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: '10px 15px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            color: '#0f0',
+            fontFamily: 'monospace',
+            border: '1px solid #333',
+            backdropFilter: 'blur(4px)',
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
+            <div style={{ color: fps > 50 ? '#0f0' : fps > 30 ? '#ff0' : '#f00', fontWeight: 'bold' }}>FPS: {fps}</div>
+            <div>INSTANCES: {runtimeInstances.length}</div>
+            <div>VIEWPORT: {project.settings.viewportWidth}x{project.settings.viewportHeight}</div>
+          </div>
+        )}
       </div>
     </div>
   );
+};
+
+const toolbarButtonStyle: React.CSSProperties = {
+  backgroundColor: '#333',
+  color: '#ccc',
+  border: '1px solid #444',
+  padding: '4px 12px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '11px',
+  fontWeight: 'bold',
+  transition: 'all 0.1s'
 };

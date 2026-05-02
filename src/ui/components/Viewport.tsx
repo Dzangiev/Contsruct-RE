@@ -111,6 +111,10 @@ export const Viewport: React.FC = () => {
           e.preventDefault();
           redo();
         }
+        if (e.key === '0') {
+          e.preventDefault();
+          setView(1, 50, 50);
+        }
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -426,10 +430,34 @@ export const Viewport: React.FC = () => {
     setContextMenu({ x: localX, y: localY, instanceId: inst?.id });
   };
 
+  const [selectionIndex, setSelectionIndex] = React.useState(0);
+
   const handleInstanceMouseDown = (e: React.MouseEvent, instanceId: string) => {
     if (tool !== 'select' || isSpaceDown || e.button !== 0) return;
     e.stopPropagation();
     
+    // Selection Cycling logic
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (rect) {
+      const x = (e.clientX - rect.left - panX) / zoom;
+      const y = (e.clientY - rect.top - panY) / zoom;
+      
+      const objectsAtPoint = instances.filter(inst => {
+        const layer = layers.find(l => l.id === inst.layerId);
+        if (!layer || !layer.visible || layer.locked) return false;
+        return x >= inst.x && x <= inst.x + inst.width && y >= inst.y && y <= inst.y + inst.height;
+      }).reverse(); // Topmost first
+
+      if (objectsAtPoint.length > 1 && selectedInstanceIds.includes(instanceId)) {
+        const nextIdx = (selectionIndex + 1) % objectsAtPoint.length;
+        setSelectionIndex(nextIdx);
+        setSelectedInstances([objectsAtPoint[nextIdx].id]);
+        return;
+      } else {
+        setSelectionIndex(0);
+      }
+    }
+
     let currentSelection = [...selectedInstanceIds];
     
     if (e.altKey) {
@@ -439,7 +467,6 @@ export const Viewport: React.FC = () => {
         setSelectedInstances(currentSelection);
       }
       currentSelection.forEach(id => cloneInstance(activeLayout.id, id));
-      // Selection will be updated by cloneInstance calls
     } else {
       if (e.shiftKey) {
         if (currentSelection.includes(instanceId)) currentSelection = currentSelection.filter(id => id !== instanceId);
@@ -502,7 +529,59 @@ export const Viewport: React.FC = () => {
     setTool('select');
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const objectTypeId = e.dataTransfer.getData('objectTypeId');
+    if (!objectTypeId || !activeLayer || !activeLayout) return;
+    if (!activeLayer.visible || activeLayer.locked) return;
+
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    let x = (e.clientX - rect.left - panX) / zoom;
+    let y = (e.clientY - rect.top - panY) / zoom;
+    
+    if (snapToGrid) {
+      x = Math.round(x / gridSize) * gridSize;
+      y = Math.round(y / gridSize) * gridSize;
+    }
+
+    const newId = generateId();
+    addInstance(activeLayout.id, objectTypeId, activeLayer.id, Math.round(x), Math.round(y), newId);
+    setSelectedInstances([newId]);
+  };
+
+  const alignSelection = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+    if (selectedInstanceIds.length < 2) return;
+    const selectedInstances = instances.filter(i => selectedInstanceIds.includes(i.id));
+    
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    selectedInstances.forEach(inst => {
+      minX = Math.min(minX, inst.x);
+      minY = Math.min(minY, inst.y);
+      maxX = Math.max(maxX, inst.x + inst.width);
+      maxY = Math.max(maxY, inst.y + inst.height);
+    });
+
+    selectedInstances.forEach(inst => {
+      let newX = inst.x;
+      let newY = inst.y;
+      switch (type) {
+        case 'left': newX = minX; break;
+        case 'center': newX = minX + (maxX - minX) / 2 - inst.width / 2; break;
+        case 'right': newX = maxX - inst.width; break;
+        case 'top': newY = minY; break;
+        case 'middle': newY = minY + (maxY - minY) / 2 - inst.height / 2; break;
+        case 'bottom': newY = maxY - inst.height; break;
+      }
+      updateInstanceSilently(activeLayout.id, inst.id, { x: Math.round(newX), y: Math.round(newY) });
+    });
+    commitProject();
+    setContextMenu(null);
+  };
+
   const getHandleCursor = (handle: string, angle: number) => {
+// ... (rest of getHandleCursor remains same)
     if (handle === 'rotate') return 'alias';
     const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
     const cursorMap: any = { 't': 'n', 'tr': 'ne', 'r': 'e', 'br': 'se', 'b': 's', 'bl': 'sw', 'l': 'w', 'tl': 'nw' };
@@ -539,6 +618,8 @@ export const Viewport: React.FC = () => {
         outline: 'none', display: 'flex', flexDirection: 'column'
       }}
       tabIndex={0} onMouseDown={handleMouseDown} onContextMenu={handleContextMenu} onClick={handleViewportClick} onMouseMove={handleMouseMoveGlobal}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+      onDrop={handleDrop}
     >
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
@@ -549,7 +630,7 @@ export const Viewport: React.FC = () => {
         <svg width="100%" height="100%" style={{ display: 'block' }}>
           <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
             {/* Workspace Background */}
-            <rect x={-10000} y={-10000} width={20000} height={20000} fill="#111" />
+            <rect x={-10000} y={-10000} width={20000} height={20000} fill="#050505" />
             
             {/* Layout Canvas with shadow/distinct border */}
             <rect x={0} y={0} width={width} height={height} fill="#1e1e1e" stroke="#000" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
@@ -562,7 +643,7 @@ export const Viewport: React.FC = () => {
                   </pattern>
                   <pattern id="grid-large" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
                     <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid)" />
-                    <circle cx={2 / zoom} cy={2 / zoom} r={1.5 / zoom} fill="rgba(255,255,255,0.2)" />
+                    <circle cx={2 / zoom} cy={2 / zoom} r={1.5 / zoom} fill="rgba(255,255,255,0.4)" />
                   </pattern>
                 </defs>
                 <rect width={width} height={height} fill="url(#grid-large)" pointerEvents="none" />
@@ -636,6 +717,7 @@ export const Viewport: React.FC = () => {
                 </g>
               );
             })}
+
             {marqueeStart && marqueeEnd && <rect x={Math.min(marqueeStart.x, marqueeEnd.x)} y={Math.min(marqueeStart.y, marqueeEnd.y)} width={Math.abs(marqueeEnd.x - marqueeStart.x)} height={Math.abs(marqueeEnd.y - marqueeStart.y)} fill="rgba(0, 153, 255, 0.05)" stroke="#0099ff" strokeWidth={1 / zoom} strokeDasharray={`${4/zoom} ${2/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
 
             {selectedInstanceIds.length > 1 && (() => {
@@ -686,6 +768,14 @@ export const Viewport: React.FC = () => {
           </g>
         </svg>
 
+        {/* Visual Scrollbars (Mimic Construct 3's overlay scrollbars) */}
+        <div className="scrollbar" style={{ position: 'absolute', right: '4px', top: '10%', bottom: '10%', width: '4px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px', opacity: 0.3, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
+           <div style={{ position: 'absolute', top: `${Math.max(0, Math.min(90, -panY / 40))}%`, height: '10%', width: '100%', backgroundColor: '#666', borderRadius: '2px' }} />
+        </div>
+        <div className="scrollbar" style={{ position: 'absolute', bottom: '4px', left: '10%', right: '10%', height: '4px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px', opacity: 0.3, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
+           <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(90, -panX / 40))}%`, width: '10%', height: '100%', backgroundColor: '#666', borderRadius: '2px' }} />
+        </div>
+
         {currentRotation !== null && (
           <div style={{
             position: 'absolute',
@@ -722,6 +812,22 @@ export const Viewport: React.FC = () => {
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
                    <span style={{ flex: 1 }}>Clone</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
                  </div>
+                 
+                 {selectedInstanceIds.length > 1 && (
+                   <>
+                     <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                     <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ALIGN</div>
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '0 8px' }}>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('left')} title="Align Left">L</div>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('center')} title="Align Center">C</div>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('right')} title="Align Right">R</div>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('top')} title="Align Top">T</div>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('middle')} title="Align Middle">M</div>
+                       <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '4px', justifyContent: 'center' }} onClick={() => alignSelection('bottom')} title="Align Bottom">B</div>
+                     </div>
+                   </>
+                 )}
+
                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>TRANSFORM</div>
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { 
@@ -775,3 +881,4 @@ export const Viewport: React.FC = () => {
     </div>
   );
 };
+

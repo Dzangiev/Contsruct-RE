@@ -183,6 +183,11 @@ export const ProjectExplorer: React.FC = () => {
             {project.objectTypes.map(ot => (
               <div 
                 key={ot.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('objectTypeId', ot.id);
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
                 onClick={() => setSelectedObjectType(ot.id)}
                 style={{
                   padding: '4px 8px',
@@ -190,7 +195,7 @@ export const ProjectExplorer: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  cursor: 'pointer',
+                  cursor: 'grab',
                   backgroundColor: editorState.selectedObjectTypeId === ot.id ? '#37373d' : 'transparent',
                   color: editorState.selectedObjectTypeId === ot.id ? '#fff' : '#d4d4d4'
                 }}
@@ -198,7 +203,7 @@ export const ProjectExplorer: React.FC = () => {
                 <Package size={14} />
                 <span style={{ flex: 1 }}>{ot.name}</span>
                 <button 
-                  onClick={() => setTool('place', ot.id)}
+                  onClick={(e) => { e.stopPropagation(); setTool('place', ot.id); }}
                   style={{
                     marginLeft: 'auto',
                     background: editorState.placementObjectTypeId === ot.id ? '#007acc' : '#333',
