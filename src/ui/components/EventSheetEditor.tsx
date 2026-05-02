@@ -154,7 +154,15 @@ export const EventSheetEditor: React.FC = () => {
   findBookmarks(eventSheet.events);
 
   return (
-    <div className="event-sheet-editor" style={{ flex: 1, backgroundColor: '#333333', color: '#aaa', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <div className="event-sheet-editor" style={{ 
+      flex: 1, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      backgroundColor: '#1e1e1e', 
+      color: '#ccc',
+      overflow: 'hidden',
+      position: 'relative'
+    }}>
       <div style={{ display: 'flex', backgroundColor: '#333333', borderBottom: '1px solid #1a1a1a' }}>
         {project.eventSheets.map(es => (
           <div key={es.id} onClick={(e) => { e.stopPropagation(); const l = project.layouts.find(layout => layout.eventSheetId === es.id); if (l) setActiveLayout(l.id); }} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', backgroundColor: es.id === activeEventSheetId ? '#2d2d2d' : 'transparent', color: es.id === activeEventSheetId ? '#fff' : '#888', borderTop: '2px solid', borderTopColor: es.id === activeEventSheetId ? '#007acc' : 'transparent', borderRight: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -194,14 +202,14 @@ export const EventSheetEditor: React.FC = () => {
             <Box size={12} /> PROJECT OBJECTS
           </div>
           
-          <div style={{ padding: '8px', borderBottom: '1px solid #1a1a1a', backgroundColor: '#2d2d2d' }}>
+          <div style={{ padding: '6px', borderBottom: '1px solid #1a1a1a', backgroundColor: '#252526' }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Search size={12} style={{ position: 'absolute', left: '8px', color: '#555' }} />
               <input 
                 placeholder="Filter objects..." 
                 style={{ 
-                  width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', 
-                  padding: '4px 8px 4px 24px', fontSize: '11px', color: '#ccc', outline: 'none' 
+                  width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #333', borderRadius: '4px', 
+                  padding: '3px 8px 3px 24px', fontSize: '11px', color: '#ccc', outline: 'none' 
                 }} 
               />
             </div>
@@ -385,7 +393,7 @@ const EventBlockItem: React.FC<{
     const isExpanded = searchTerm ? true : block.groupExpanded;
     return (
       <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'hidden', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
-        <div style={{ backgroundColor: isSelected ? '#004b7e' : '#333', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
+        <div style={{ backgroundColor: isSelected ? '#094771' : '#252526', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderBottom: '1px solid #1a1a1a' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
           <span style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>▶</span>
           <div style={{ fontWeight: 'bold', flex: 1 }}>
             <input value={block.groupName} onChange={(e) => updateEventBlock(eventSheetId, block.id, { groupName: e.target.value })} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'transparent', border: 'none', color: '#fff', fontWeight: 'bold', outline: 'none', width: '100%' }} />
@@ -493,17 +501,16 @@ const LogicItemContent: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '28px', fontSize: '12px', width: '100%', borderBottom: '1px solid #282828' }}>
+    <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '22px', fontSize: '11px', width: '100%', borderBottom: '1px solid #1e1e1e' }}>
       {/* Object Column */}
       <div style={{ 
-        width: '110px', 
+        height: '35px', 
+        backgroundColor: '#252526', 
+        borderBottom: '1px solid #1a1a1a', 
         display: 'flex', 
         alignItems: 'center', 
-        gap: '6px', 
-        padding: '0 8px',
-        borderRight: '1px solid #333',
-        backgroundColor: 'rgba(0,0,0,0.15)',
-        flexShrink: 0
+        padding: '0 12px', 
+        gap: '15px' 
       }}>
         {ot ? (
           <>

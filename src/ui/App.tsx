@@ -144,7 +144,7 @@ const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string,
     style={{
       height: '100%',
       padding: '0 16px',
-      backgroundColor: active ? '#2d2d2d' : 'transparent',
+      backgroundColor: active ? '#333' : 'transparent',
       border: 'none',
       borderTop: active ? '2px solid #007acc' : '2px solid transparent',
       borderRight: '1px solid #222',

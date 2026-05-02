@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { MousePointer2, Layers, Search, FileJson, Cpu } from 'lucide-react';
+import { MousePointer2, Layers, Search, Cpu, FileJson } from 'lucide-react';
 
 export const StatusBar: React.FC = () => {
   const { project, editorState } = useEditorStore();
@@ -12,7 +12,7 @@ export const StatusBar: React.FC = () => {
   return (
     <div style={statusBarStyle}>
       <div style={sectionStyle}>
-        <FileJson size={14} style={{ color: '#007acc' }} />
+        <FileJson size={14} style={{ color: '#fff', opacity: 0.8 }} />
         <span>{project.settings.name}</span>
       </div>
 

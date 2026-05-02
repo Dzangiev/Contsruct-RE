@@ -18,10 +18,11 @@ export const Rulers: React.FC<RulersProps> = ({
   zoom, panX, panY, layoutWidth, layoutHeight, viewportWidth, viewportHeight, mouseX, mouseY, containerWidth, containerHeight 
 }) => {
   const rulerSize = 22;
-  const tickColor = '#555';
-  const majorTickColor = '#888';
-  const textColor = '#aaa';
-  const bgColor = '#333333';
+  const bgColor = '#252526';
+  const tickColor = '#444';
+  const majorTickColor = '#666';
+  const textColor = '#888';
+  const font = '10px "Segoe UI", sans-serif';
   const highlightColor = 'rgba(0, 153, 255, 0.15)';
   const mouseLineColor = '#0099ff';
   const viewportLineColor = 'rgba(255, 255, 255, 0.2)';

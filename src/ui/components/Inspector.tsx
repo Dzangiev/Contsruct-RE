@@ -259,7 +259,7 @@ const Category: React.FC<{ label: string, children: React.ReactNode, action?: Re
         </div>
         {action}
       </div>
-      {expanded && <div style={{ backgroundColor: '#1a1a1b', padding: '4px 0' }}>{children}</div>}
+      {expanded && <div style={{ backgroundColor: '#1a1a1b', padding: '2px 0' }}>{children}</div>}
     </div>
   );
 };
@@ -279,11 +279,11 @@ const PropertyRow: React.FC<{
       style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        padding: '4px 10px', 
+        padding: '2px 10px', 
         gap: '8px', 
-        minHeight: '28px',
+        minHeight: '22px',
         transition: 'background-color 0.1s',
-        borderBottom: '1px solid #222'
+        borderBottom: '1px solid #1e1e1e'
       }}
       className="property-row-hover"
     >
@@ -342,10 +342,11 @@ const PropertyRow: React.FC<{
               e.currentTarget.style.boxShadow = '0 0 4px rgba(0, 122, 204, 0.4)';
             }}
             onBlur={e => {
-              e.currentTarget.style.borderColor = '#444';
-              e.currentTarget.style.backgroundColor = '#262627';
-              e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.4)';
+              e.currentTarget.style.borderColor = '#2b2b2b';
+              e.currentTarget.style.backgroundColor = '#3c3c3c';
+              e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.2)';
             }}
+            style={{ ...inputStyle, height: '18px' }}
           />
         )}
       </div>
@@ -377,16 +378,16 @@ const panelHeaderStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  backgroundColor: '#262627',
-  border: '1px solid #444',
+  backgroundColor: '#3c3c3c',
+  border: '1px solid #2b2b2b',
   borderRadius: '3px',
-  color: '#eee',
+  color: '#ccc',
   padding: '3px 8px',
   fontSize: '11px',
   width: '100%',
   outline: 'none',
   transition: 'all 0.1s ease',
-  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
+  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
   margin: '1px 0'
 };
 

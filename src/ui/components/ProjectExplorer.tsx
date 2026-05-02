@@ -4,14 +4,7 @@ import { ObjectTypeKind } from '../../model/project';
 import { 
   Plus, 
   Layout as LayoutIcon, 
-  Layers, 
-  Package, 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Unlock, 
-  ChevronUp, 
-  ChevronDown 
+  Package
 } from 'lucide-react';
 
 export const ProjectExplorer: React.FC = () => {
@@ -19,33 +12,15 @@ export const ProjectExplorer: React.FC = () => {
     project, 
     editorState, 
     setActiveLayout, 
-    setActiveLayer, 
     addLayout, 
-    addLayer, 
     addObjectType,
     setTool,
-    setSelectedObjectType,
-    updateLayer,
-    moveLayer
+    setSelectedObjectType
   } = useEditorStore();
 
-  const activeLayout = project.layouts?.find(l => l.id === editorState.activeLayoutId);
-  const activeLayer = activeLayout?.layers?.find(layer => layer.id === editorState.activeLayerId);
-  const isActiveLayerRestricted = activeLayer && (!activeLayer.visible || activeLayer.locked);
-
   return (
-    <div className="project-explorer" style={{
-      flex: 1,
-      backgroundColor: '#2d2d2d',
-      color: '#aaa',
-      display: 'flex',
-      flexDirection: 'column',
-      fontSize: '13px',
-      userSelect: 'none',
-      overflow: 'hidden',
-      borderRight: '1px solid #1a1a1a'
-    }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a', fontWeight: 800, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+    <div className="project-explorer" style={explorerStyle}>
+      <div style={{ padding: '12px 16px 8px 16px', fontWeight: 800, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         Project Explorer
       </div>
 
@@ -67,18 +42,7 @@ export const ProjectExplorer: React.FC = () => {
               <div 
                 key={layout.id}
                 onClick={() => setActiveLayout(layout.id, layout.layers?.[0]?.id)}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  backgroundColor: editorState.activeLayoutId === layout.id ? '#3e3e42' : 'transparent',
-                  color: editorState.activeLayoutId === layout.id ? '#fff' : '#aaa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '12px',
-                  transition: 'background-color 0.1s'
-                }}
+                style={itemStyle(editorState.activeLayoutId === layout.id)}
               >
                 <LayoutIcon size={14} color={editorState.activeLayoutId === layout.id ? '#007acc' : '#666'} />
                 {layout.name}
@@ -86,7 +50,6 @@ export const ProjectExplorer: React.FC = () => {
             ))}
           </div>
         </section>
-
 
         {/* Object Types Section */}
         <section style={{ padding: '10px', borderTop: '1px solid #1a1a1a' }}>
@@ -110,18 +73,7 @@ export const ProjectExplorer: React.FC = () => {
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
                 onClick={() => setSelectedObjectType(ot.id)}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'grab',
-                  backgroundColor: editorState.selectedObjectTypeId === ot.id ? '#3e3e42' : 'transparent',
-                  color: editorState.selectedObjectTypeId === ot.id ? '#fff' : '#aaa',
-                  fontSize: '12px',
-                  transition: 'background-color 0.1s'
-                }}
+                style={itemStyle(editorState.selectedObjectTypeId === ot.id)}
               >
                 <Package size={14} color={editorState.selectedObjectTypeId === ot.id ? '#007acc' : '#666'} />
                 <span style={{ flex: 1 }}>{ot.name}</span>
@@ -153,14 +105,25 @@ export const ProjectExplorer: React.FC = () => {
   );
 };
 
-const iconButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#888',
+const explorerStyle: React.CSSProperties = {
+  flex: 1,
+  backgroundColor: '#2d2d2d',
+  color: '#ccc',
+  display: 'flex',
+  flexDirection: 'column',
+  overflowY: 'auto',
+  userSelect: 'none',
+  paddingTop: '8px'
+};
+
+const itemStyle = (active: boolean, depth: number = 0): React.CSSProperties => ({
+  padding: `6px 12px 6px ${12 + depth * 12}px`,
+  backgroundColor: active ? '#3e3e42' : 'transparent',
   cursor: 'pointer',
-  padding: '2px',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: '2px'
-};
+  gap: '8px',
+  fontSize: '11px',
+  color: active ? '#fff' : '#ccc',
+  transition: 'background-color 0.1s'
+});

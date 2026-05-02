@@ -777,14 +777,14 @@ export const Viewport: React.FC = () => {
 
           <g transform={`translate(${(showRulers ? 22 : 0) + panX}, ${(showRulers ? 22 : 0) + panY}) scale(${zoom})`}>
             {/* Workspace Background (Infinite) */}
-            <rect x={-20000} y={-20000} width={40000} height={40000} fill="#1c1c1e" />
+            <rect x={-20000} y={-20000} width={40000} height={40000} fill="#161617" />
             <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#workspace-dots)" />
             
             {/* Layout Canvas with shadow/distinct border */}
             <rect 
               x={0} y={0} width={width} height={height} 
-              fill="#3a3a3c" 
-              stroke="#555" strokeWidth={2 / zoom} 
+              fill="#252526" 
+              stroke="#111" strokeWidth={1 / zoom} 
               filter="url(#canvasShadow)"
               style={{ vectorEffect: 'non-scaling-stroke' }} 
             />
