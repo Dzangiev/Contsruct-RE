@@ -54,6 +54,7 @@ interface EditorStore {
   moveAction: (eventSheetId: string, sourceBlockId: string, actionId: string, targetBlockId: string, targetIndex: number) => void;
   addKeyboardMovementTemplate: (eventSheetId: string, objectTypeId: string) => void;
   toggleConditionInverted: (eventSheetId: string, blockId: string, conditionId: string) => void;
+  toggleOrBlock: (eventSheetId: string, blockId: string) => void;
 
   // Editor Actions
   setActiveLayout: (layoutId: string, layerId?: string) => void;
@@ -299,6 +300,23 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const cond = es ? findCond(es.events) : null;
     if (cond) {
       const next = eventUpdates.updateCondition(project, eventSheetId, blockId, conditionId, { inverted: !cond.inverted });
+      set({ project: next });
+      get().pushHistory(next);
+    }
+  },
+  toggleOrBlock: (eventSheetId, blockId) => {
+    const { project } = get();
+    const es = project.eventSheets.find(s => s.id === eventSheetId);
+    const findBlock = (blocks: EventBlock[]): EventBlock | undefined => {
+      for (const b of blocks) {
+        if (b.id === blockId) return b;
+        const f = findBlock(b.children);
+        if (f) return f;
+      }
+    };
+    const block = es ? findBlock(es.events) : null;
+    if (block) {
+      const next = eventUpdates.updateEventBlock(project, eventSheetId, blockId, { isOrBlock: !block.isOrBlock });
       set({ project: next });
       get().pushHistory(next);
     }

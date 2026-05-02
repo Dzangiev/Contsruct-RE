@@ -1,6 +1,6 @@
 export interface ParamDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum';
+  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable';
   options?: string[]; // For enum type
   defaultValue?: any;
 }
@@ -119,6 +119,24 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'System'
   },
   {
+    type: 'onStartOfLayout',
+    name: 'On start of layout',
+    description: 'Runs once when the layout starts.',
+    params: [],
+    category: 'System'
+  },
+  {
+    type: 'compareGlobalVariable',
+    name: 'Compare variable',
+    description: 'Compare the value of a global variable.',
+    params: [
+      { name: 'Variable', type: 'string', defaultValue: 'Score' },
+      { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
+      { name: 'Value', type: 'number', defaultValue: 0 }
+    ],
+    category: 'System'
+  },
+  {
     type: 'else',
     name: 'Else',
     description: 'Runs if the preceding event was false.',
@@ -199,6 +217,17 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True if the object is overlapping another instance of a specific type.',
     params: [{ name: 'Object Type', type: 'objectType' }],
     category: 'Collisions'
+  },
+  {
+    type: 'compareInstanceVariable',
+    name: 'Compare instance variable',
+    description: 'Compare the value of an instance variable.',
+    params: [
+      { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
+      { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
+      { name: 'Value', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Instance Variables'
   }
 ];
 
@@ -259,6 +288,66 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Param 2', type: 'string', defaultValue: '' }
     ],
     category: 'Functions'
+  },
+  {
+    type: 'setVariable',
+    name: 'Set variable',
+    description: 'Set the value of a global variable.',
+    params: [
+      { name: 'Variable', type: 'globalVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 0 }
+    ],
+    category: 'System'
+  },
+  {
+    type: 'addVariable',
+    name: 'Add to variable',
+    description: 'Add a value to a global variable.',
+    params: [
+      { name: 'Variable', type: 'globalVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 1 }
+    ],
+    category: 'System'
+  },
+  {
+    type: 'setInstanceVariable',
+    name: 'Set instance variable',
+    description: 'Set the value of an instance variable.',
+    params: [
+      { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 100 }
+    ],
+    category: 'Instance Variables'
+  },
+  {
+    type: 'addInstanceVariable',
+    name: 'Add to instance variable',
+    description: 'Add a value to an instance variable.',
+    params: [
+      { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 1 }
+    ],
+    category: 'Instance Variables'
+  },
+  {
+    type: 'subtractInstanceVariable',
+    name: 'Subtract from instance variable',
+    description: 'Subtract a value from an instance variable.',
+    params: [
+      { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 1 }
+    ],
+    category: 'Instance Variables'
+  },
+  {
+    type: 'log',
+    name: 'Log to console',
+    description: 'Output a message to the runtime debug console.',
+    params: [
+      { name: 'Message', type: 'string', defaultValue: '"Hello World"' },
+      { name: 'Type', type: 'enum', options: ['info', 'warn', 'error'], defaultValue: 'info' }
+    ],
+    category: 'System'
   }
 ];
 

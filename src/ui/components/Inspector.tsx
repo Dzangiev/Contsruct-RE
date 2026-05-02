@@ -129,17 +129,39 @@ export const Inspector: React.FC = () => {
             action={<button onClick={() => { const name = prompt('Variable name?'); if (name) addInstanceVariable(objectType.id, name, 'number', 0); }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {objectType.instanceVariables?.map(v => (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                <PropertyRow 
-                  label={v.name} 
-                  value={v.initialValue} 
-                  onChange={val => {
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '2px 8px', gap: '8px', minHeight: '26px' }}>
+                <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#555' }}><Type size={12}/></div>
+                <div 
+                  style={{ 
+                    width: '80px', 
+                    fontSize: '12px', 
+                    color: '#bbb', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    whiteSpace: 'nowrap' 
+                  }} 
+                  title={v.name}
+                >
+                  {v.name}
+                </div>
+                <input 
+                  type="text" 
+                  value={v.initialValue ?? ''} 
+                  onChange={e => {
+                    const val = Number(e.target.value) || 0;
                     const next = (objectType.instanceVariables || []).map(iv => iv.id === v.id ? { ...iv, initialValue: val } : iv);
                     updateObjectType(objectType.id, { instanceVariables: next });
-                  }} 
-                  icon={<Type size={12}/>}
+                  }}
+                  style={{ ...inputStyle, height: '20px' }}
                 />
-                <button onClick={() => removeInstanceVariable(objectType.id, v.id)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '0 4px' }}><Trash2 size={12} /></button>
+                <button 
+                  onClick={() => removeInstanceVariable(objectType.id, v.id)} 
+                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#ff4444'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#444'}
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
             ))}
             {(objectType.instanceVariables?.length === 0 || !objectType.instanceVariables) && (
@@ -221,49 +243,82 @@ const Category: React.FC<{ label: string, children: React.ReactNode, action?: Re
 
 const PropertyRow: React.FC<{ 
   label: string, value: any, onChange?: (v: any) => void, type?: string, step?: number, readOnly?: boolean, options?: string[], icon?: React.ReactNode 
-}> = ({ label, value, onChange, type = 'text', step, readOnly, options, icon }) => (
-  <div style={{ display: 'flex', alignItems: 'center', padding: '2px 10px', gap: '8px', minHeight: '24px' }}>
-    <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#555' }}>{icon}</div>
-    <label style={{ width: '90px', color: '#888', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</label>
-    {readOnly ? (
-      <div style={{ flex: 1, fontSize: '12px', color: '#666', padding: '2px 4px' }}>{value}</div>
-    ) : type === 'select' && options ? (
-      <select 
-        value={value} 
-        onChange={e => onChange?.(e.target.value)} 
-        style={{ ...inputStyle, appearance: 'none' }}
-      >
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    ) : (
-      <input 
-        type={type === 'number' ? 'number' : 'text'} 
-        value={value ?? ''} 
-        step={step}
-        onChange={e => {
-          const val = e.target.value;
-          onChange?.(type === 'number' ? Number(val) : val);
+}> = ({ label, value, onChange, type = 'text', step, readOnly, options, icon }) => {
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  return (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      padding: '1px 8px', 
+      gap: '8px', 
+      minHeight: '24px',
+      backgroundColor: isFocused ? '#2a2d2e' : 'transparent',
+      transition: 'background-color 0.1s'
+    }}>
+      <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: isFocused ? '#007acc' : '#555' }}>{icon}</div>
+      <label 
+        style={{ 
+          width: '100px', 
+          color: '#bbb', 
+          fontSize: '12px', 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis', 
+          whiteSpace: 'nowrap',
+          cursor: 'default'
         }} 
-        style={inputStyle} 
-      />
-    )}
-  </div>
-);
+        title={label}
+      >
+        {label}
+      </label>
+      {readOnly ? (
+        <div style={{ flex: 1, fontSize: '11px', color: '#777', padding: '2px 4px', userSelect: 'text' }}>{value}</div>
+      ) : type === 'select' && options ? (
+        <select 
+          value={value} 
+          onChange={e => onChange?.(e.target.value)} 
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          style={{ ...inputStyle, border: isFocused ? '1px solid #007acc' : '1px solid transparent', appearance: 'none' }}
+        >
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input 
+          type={type === 'number' ? 'number' : 'text'} 
+          value={value ?? ''} 
+          step={step}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={e => {
+            const val = e.target.value;
+            onChange?.(type === 'number' ? Number(val) : val);
+          }} 
+          style={{ 
+            ...inputStyle, 
+            border: isFocused ? '1px solid #007acc' : '1px solid transparent',
+            backgroundColor: isFocused ? '#1e1e1e' : '#2d2d2d'
+          }} 
+        />
+      )}
+    </div>
+  );
+};
 
 const inspectorStyle: React.CSSProperties = { 
-  width: '260px', height: '100%', backgroundColor: '#1e1e1e', borderLeft: '1px solid #333', 
+  width: '280px', height: '100%', backgroundColor: '#1e1e1e', borderLeft: '1px solid #333', 
   display: 'flex', flexDirection: 'column', color: '#d4d4d4', overflowY: 'auto', userSelect: 'none' 
 };
 
 const panelHeaderStyle: React.CSSProperties = { 
-  padding: '10px 12px', borderBottom: '1px solid #333', fontSize: '12px', fontWeight: 'bold', 
-  backgroundColor: '#252526', color: '#fff' 
+  padding: '8px 12px', borderBottom: '1px solid #333', fontSize: '11px', fontWeight: 'bold', 
+  backgroundColor: '#252526', color: '#ccc', textTransform: 'uppercase', letterSpacing: '0.5px'
 };
 
 const inputStyle: React.CSSProperties = { 
   flex: 1, backgroundColor: '#2d2d2d', border: '1px solid transparent', color: '#fff', 
-  fontSize: '12px', padding: '2px 6px', borderRadius: '3px', outline: 'none',
-  transition: 'border-color 0.2s'
+  fontSize: '12px', padding: '2px 6px', borderRadius: '2px', outline: 'none',
+  transition: 'all 0.1s ease'
 };
 
 const miniButtonStyle: React.CSSProperties = { 

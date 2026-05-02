@@ -2,6 +2,7 @@ import React from 'react';
 import { Project, Instance, EventBlock } from '../model/project';
 import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
+import { evaluateExpression, EvaluationContext } from './expressionEvaluator';
 
 interface RuntimeProps {
   project: Project;
@@ -19,9 +20,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const layout = project.layouts.find(l => l.id === layoutId) || project.layouts[0];
   const eventSheet = project.eventSheets.find(es => es.id === layout?.eventSheetId) || project.eventSheets[0];
 
-  const [runtimeInstances, setRuntimeInstances] = React.useState<Instance[]>(() => 
-    layout ? JSON.parse(JSON.stringify(layout.instances)) : []
-  );
+  const [runtimeInstances, setRuntimeInstances] = React.useState<Instance[]>([]);
+  const runtimeInstancesRef = React.useRef<Instance[]>([]);
+
+  // Initialize instances on mount
+  React.useEffect(() => {
+    if (!layout) return;
+    const initial = layout.instances.map(inst => {
+      const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+      const ivs: Record<string, any> = {};
+      ot?.instanceVariables.forEach(v => { ivs[v.name] = v.initialValue; });
+      return { ...inst, properties: { ...ivs, ...inst.properties } };
+    });
+    runtimeInstancesRef.current = initial;
+    setRuntimeInstances(initial);
+  }, [layout, project.objectTypes]);
 
   const [fps, setFps] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
@@ -36,6 +49,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const [logs, setLogs] = React.useState<{ msg: string, time: string, type: 'info' | 'warn' | 'error' }[]>([]);
   const [showLogs, setShowLogs] = React.useState(false);
   const [fpsHistory, setFpsHistory] = React.useState<number[]>(new Array(60).fill(0));
+  const runtimeVariablesRef = React.useRef<Record<string, any>>({});
+  
+  React.useEffect(() => {
+    const vars: Record<string, any> = {};
+    project.globalVariables.forEach(v => { vars[v.name] = v.initialValue; });
+    runtimeVariablesRef.current = vars;
+  }, [project.globalVariables]);
+
+  const hasStartedRef = React.useRef(false);
 
   const addLog = (msg: string, type: 'info' | 'warn' | 'error' = 'info') => {
     setLogs(prev => [{ msg, time: new Date().toLocaleTimeString(), type }, ...prev].slice(0, 50));
@@ -82,9 +104,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         y: (e.clientY - rect.top) * scaleY
       };
     };
-    const onPointerDown = () => {
+    const onPointerDown = (e: PointerEvent) => {
       pointerDownRef.current = true;
       pointerPressedRef.current = true;
+      if (svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+        const scaleX = project.settings.viewportWidth / rect.width;
+        const scaleY = project.settings.viewportHeight / rect.height;
+        pointerPosRef.current = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+      }
     };
     const onPointerUp = () => {
       pointerDownRef.current = false;
@@ -111,39 +139,28 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     let animationFrameId: number;
 
-    type PickedSets = Record<string, string[]>; // objectTypeId -> instanceIds
+    const getEvaluationContext = (dt: number, currentInstances: Instance[], inst?: Instance): EvaluationContext => {
+      const objects: Record<string, any> = {};
+      currentInstances.forEach(i => {
+        const ot = project.objectTypes.find(o => o.id === i.objectTypeId);
+        if (ot) objects[ot.name] = { ...i, instanceVariables: i.properties }; 
+      });
 
-    const evaluateExpression = (expr: any, context: Record<string, any>): any => {
-      if (typeof expr !== 'string') return expr;
-      
-      const trimmed = expr.trim();
-      if (trimmed === 'true') return true;
-      if (trimmed === 'false') return false;
-      if (!isNaN(Number(trimmed))) return Number(trimmed);
-      
-      if (trimmed in context) return context[trimmed];
-
-      const match = trimmed.match(/^([a-zA-Z0-9\._]+)\s*([\+\-\*\/])\s*([a-zA-Z0-9\._]+)$/);
-      if (match) {
-        const [_, left, op, right] = match;
-        const getVal = (token: string) => {
-          if (token in context) return context[token];
-          const n = Number(token);
-          return isNaN(n) ? 0 : n;
-        };
-        const v1 = getVal(left);
-        const v2 = getVal(right);
-        switch (op) {
-          case '+': return v1 + v2;
-          case '-': return v1 - v2;
-          case '*': return v1 * v2;
-          case '/': return v1 !== 0 ? v1 / v2 : 0;
+      return {
+        variables: runtimeVariablesRef.current,
+        objects,
+        system: {
+          dt,
+          time: (performance.now() - lastFpsUpdateRef.current) / 1000, 
+          pointerX: pointerPosRef.current.x,
+          pointerY: pointerPosRef.current.y
         }
-      }
-      return expr;
+      };
     };
 
-    const filterInstances = (condition: any, currentPicked: Instance[], allInstances: Instance[]): Instance[] => {
+    type PickedSets = Record<string, string[]>; // objectTypeId -> instanceIds
+
+    const filterInstances = (condition: any, currentPicked: Instance[], allInstances: Instance[], dt: number): Instance[] => {
       const px = pointerPosRef.current.x;
       const py = pointerPosRef.current.y;
 
@@ -186,6 +203,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                      i.y + i.height > o.y;
             });
           }
+          case 'compareInstanceVariable': {
+            const varName = condition.params[0];
+            const operator = condition.params[1];
+            const context = getEvaluationContext(dt, [i], i);
+            const compareValue = evaluateExpression(condition.params[2], context);
+            const val = i.properties[varName];
+            switch (operator) {
+              case '<': return val < compareValue;
+              case '<=': return val <= compareValue;
+              case '==': return val == compareValue;
+              case '>=': return val >= compareValue;
+              case '>': return val > compareValue;
+              default: return false;
+            }
+          }
           default: return true;
         }
       };
@@ -195,8 +227,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         : currentPicked.filter(i => checkInstance(i));
     };
 
-    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number): Instance[] => {
-      if (block.disabled) return instances;
+    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean): { instances: Instance[], result: boolean } => {
+      if (block.disabled) return { instances, result: false };
 
       let currentPickedSets: PickedSets = { ...parentPickedSets };
       let allPass = true;
@@ -205,8 +237,26 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         const otid = condition.targetObjectTypeId;
         if (!otid) {
           let result = true;
+          const context = getEvaluationContext(dt, instances);
           switch (condition.type) {
             case 'always': result = true; break;
+            case 'onStartOfLayout': result = !hasStartedRef.current; break;
+            case 'else': result = !lastEventResult; break;
+            case 'compareGlobalVariable': {
+              const varName = condition.params[0];
+              const operator = condition.params[1];
+              const compareValue = evaluateExpression(condition.params[2], context);
+              const val = runtimeVariablesRef.current[varName];
+              switch (operator) {
+                case '<': result = val < compareValue; break;
+                case '<=': result = val <= compareValue; break;
+                case '==': result = val == compareValue; break;
+                case '>=': result = val >= compareValue; break;
+                case '>': result = val > compareValue; break;
+                default: result = false;
+              }
+              break;
+            }
             case 'keyDown': result = keysDownRef.current.has(condition.params[0]); break;
             case 'keyPressed': result = keysPressedRef.current.has(condition.params[0]); break;
             case 'pointerDown': result = pointerDownRef.current; break;
@@ -223,7 +273,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         const pickedInstances = instances.filter(i => currentPickedSets[otid].includes(i.id));
-        const filtered = filterInstances(condition, pickedInstances, instances);
+        const filtered = filterInstances(condition, pickedInstances, instances, dt);
 
         if (filtered.length === 0) {
           allPass = false;
@@ -232,20 +282,34 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         currentPickedSets[otid] = filtered.map(i => i.id);
       }
       
-      if (!allPass) return instances;
+      if (!allPass) return { instances, result: false };
 
       let nextInstances = [...instances];
 
       block.actions.forEach(action => {
         const otid = action.targetObjectTypeId;
-        if (!otid) return;
+        
+        const context = getEvaluationContext(dt, nextInstances);
+        const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
-        let pickedIds = currentPickedSets[otid];
+        if (!otid && action.type !== 'log') return;
+
+        if (action.type === 'log') {
+          const msg = String(evalParam(0));
+          const type = (action.params[1] || 'info') as any;
+          addLog(msg, type);
+          return;
+        }
+
+        let pickedIds = currentPickedSets[otid!];
         if (!pickedIds) pickedIds = nextInstances.filter(i => i.objectTypeId === otid).map(i => i.id);
 
         if (action.type === 'destroy') {
+          const count = pickedIds.length;
+          const initialCount = nextInstances.length;
           nextInstances = nextInstances.filter(inst => !pickedIds.includes(inst.id));
-          currentPickedSets[otid] = [];
+          addLog(`ACTION: Destroy. ObjectTypeId: ${otid}. Picked: ${count}. Total before: ${initialCount}. Total after: ${nextInstances.length}. IDs: ${pickedIds.join(',')}`, 'info');
+          currentPickedSets[otid!] = [];
           return;
         }
 
@@ -255,9 +319,10 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           if (!objectType) return;
           const targetLayerId = action.params[3] || layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id;
 
-          const spawn = (ctx: Record<string, any>) => {
-            const spawnX = Number(evaluateExpression(action.params[1], ctx) ?? 0);
-            const spawnY = Number(evaluateExpression(action.params[2], ctx) ?? 0);
+          const spawn = (instForContext?: Instance) => {
+            const context = getEvaluationContext(dt, nextInstances, instForContext);
+            const spawnX = Number(evaluateExpression(action.params[1], context) ?? 0);
+            const spawnY = Number(evaluateExpression(action.params[2], context) ?? 0);
             const newInst: Instance = {
               id: `rt-${Date.now()}-${Math.random()}`,
               objectTypeId: spawnTypeId,
@@ -269,38 +334,65 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             nextInstances.push(newInst);
           };
 
-          const globalContext = { dt, pointerX: pointerPosRef.current.x, pointerY: pointerPosRef.current.y };
           if (otid && currentPickedSets[otid] && currentPickedSets[otid].length > 0) {
             currentPickedSets[otid].forEach(id => {
               const inst = nextInstances.find(i => i.id === id);
-              if (inst) spawn({ ...globalContext, x: inst.x, y: inst.y, width: inst.width, height: inst.height, rotation: inst.angle });
+              if (inst) spawn(inst);
             });
-          } else spawn(globalContext);
+          } else spawn();
           return;
         }
 
         nextInstances = nextInstances.map(inst => {
           if (!pickedIds.includes(inst.id)) return inst;
-          const context = {
-            x: inst.x, y: inst.y, width: inst.width, height: inst.height, rotation: inst.angle,
-            dt, pointerX: pointerPosRef.current.x, pointerY: pointerPosRef.current.y
-          };
+          const context = getEvaluationContext(dt, nextInstances, inst);
           const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
           switch (action.type) {
             case 'setPosition': return { ...inst, x: Number(evalParam(0) ?? inst.x), y: Number(evalParam(1) ?? inst.y) };
             case 'moveBy': return { ...inst, x: inst.x + Number(evalParam(0) ?? 0), y: inst.y + Number(evalParam(1) ?? 0) };
             case 'setVisible': return { ...inst, visible: !!evalParam(0) };
+            case 'setInstanceVariable': {
+              const varName = action.params[0];
+              const val = evalParam(1);
+              return { ...inst, properties: { ...inst.properties, [varName]: val } };
+            }
+            case 'addInstanceVariable': {
+              const varName = action.params[0];
+              const val = evalParam(1);
+              return { ...inst, properties: { ...inst.properties, [varName]: (Number(inst.properties[varName]) || 0) + Number(val) } };
+            }
+            case 'subtractInstanceVariable': {
+              const varName = action.params[0];
+              const val = evalParam(1);
+              return { ...inst, properties: { ...inst.properties, [varName]: (Number(inst.properties[varName]) || 0) - Number(val) } };
+            }
+            case 'setVariable': {
+              const varName = action.params[0];
+              const val = evaluateExpression(action.params[1], context);
+              runtimeVariablesRef.current[varName] = val;
+              return inst;
+            }
+            case 'addVariable': {
+              const varName = action.params[0];
+              const val = evaluateExpression(action.params[1], context);
+              runtimeVariablesRef.current[varName] = (runtimeVariablesRef.current[varName] || 0) + Number(val);
+              return inst;
+            }
             default: return inst;
           }
         });
       });
 
+      let currentResult = allPass;
       block.children.forEach(child => {
-        nextInstances = processBlock(child, nextInstances, currentPickedSets, dt);
+        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult);
+        nextInstances = childRes.instances;
+        // Sub-events don't necessarily update the 'result' of the parent for the next sibling, 
+        // but they might in some cases. In C3, 'else' applies to the previous sibling at the same level.
       });
 
-      return nextInstances;
+      return { instances: nextInstances, result: allPass };
     };
 
     const tick = () => {
@@ -323,123 +415,101 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         lastFpsUpdateRef.current = now;
       }
 
-      setRuntimeInstances(prev => {
-        let nextInstances = [...prev];
-        
-        // 1. Process Behaviors
-        nextInstances = nextInstances.map(inst => {
-          const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
-          if (!ot || !ot.behaviors) return inst;
+      let nextInstances = [...runtimeInstancesRef.current];
 
-          let updatedInst = { ...inst };
+      // 1. Process Behaviors
+      nextInstances = nextInstances.map(inst => {
+        const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+        if (!ot || !ot.behaviors) return inst;
 
-          ot.behaviors.forEach(behavior => {
-            if (behavior.disabled) return;
+        let updatedInst = { ...inst };
+        ot.behaviors.forEach(behavior => {
+          if (behavior.disabled) return;
+          if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
+          if (!behaviorsStateRef.current[inst.id][behavior.id]) {
+            behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+          }
+          const state = behaviorsStateRef.current[inst.id][behavior.id];
+          const props = behavior.properties;
 
-            if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
-            if (!behaviorsStateRef.current[inst.id][behavior.id]) {
-              behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+          switch (behavior.type) {
+            case 'bullet': {
+              const speed = Number(props.speed ?? 400);
+              const angleRad = updatedInst.angle * (Math.PI / 180);
+              updatedInst.x += Math.cos(angleRad) * speed * dt;
+              updatedInst.y += Math.sin(angleRad) * speed * dt;
+              break;
             }
-
-            const state = behaviorsStateRef.current[inst.id][behavior.id];
-            const props = behavior.properties;
-
-            switch (behavior.type) {
-              case 'bullet': {
-                const speed = Number(props.speed ?? 400);
-                const angleRad = updatedInst.angle * (Math.PI / 180);
-                updatedInst.x += Math.cos(angleRad) * speed * dt;
-                updatedInst.y += Math.sin(angleRad) * speed * dt;
-                break;
+            case 'eight-direction': {
+              const maxSpeed = Number(props.maxSpeed ?? 200);
+              let dx = 0, dy = 0;
+              if (keysDownRef.current.has('ArrowLeft')) dx -= 1;
+              if (keysDownRef.current.has('ArrowRight')) dx += 1;
+              if (keysDownRef.current.has('ArrowUp')) dy -= 1;
+              if (keysDownRef.current.has('ArrowDown')) dy += 1;
+              if (dx !== 0 || dy !== 0) {
+                const mag = Math.sqrt(dx * dx + dy * dy);
+                updatedInst.x += (dx / mag) * maxSpeed * dt;
+                updatedInst.y += (dy / mag) * maxSpeed * dt;
+                if (props.directions === '8-way') updatedInst.angle = Math.atan2(dy, dx) * (180 / Math.PI);
               }
-              case 'eight-direction': {
-                const maxSpeed = Number(props.maxSpeed ?? 200);
-                let dx = 0;
-                let dy = 0;
-                if (keysDownRef.current.has('ArrowLeft')) dx -= 1;
-                if (keysDownRef.current.has('ArrowRight')) dx += 1;
-                if (keysDownRef.current.has('ArrowUp')) dy -= 1;
-                if (keysDownRef.current.has('ArrowDown')) dy += 1;
-
-                if (dx !== 0 || dy !== 0) {
-                  const mag = Math.sqrt(dx * dx + dy * dy);
-                  updatedInst.x += (dx / mag) * maxSpeed * dt;
-                  updatedInst.y += (dy / mag) * maxSpeed * dt;
-                  
-                  if (props.directions === '8-way') {
-                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                    updatedInst.angle = angle;
+              break;
+            }
+            case 'platform': {
+              const maxSpeed = Number(props.maxSpeed ?? 330);
+              const gravity = Number(props.gravity ?? 1500);
+              const jumpStrength = Number(props.jumpStrength ?? 650);
+              if (state.vx === undefined) { state.vx = 0; state.vy = 0; state.onFloor = false; }
+              let moveDir = 0;
+              if (keysDownRef.current.has('ArrowLeft')) moveDir -= 1;
+              if (keysDownRef.current.has('ArrowRight')) moveDir += 1;
+              state.vx = moveDir * maxSpeed;
+              state.vy += gravity * dt;
+              if (keysPressedRef.current.has('ArrowUp') && state.onFloor) {
+                state.vy = -jumpStrength;
+                state.onFloor = false;
+              }
+              let nextX = updatedInst.x + state.vx * dt;
+              let nextY = updatedInst.y + state.vy * dt;
+              const solids = nextInstances.filter(o => {
+                const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
+                return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
+              });
+              let onFloor = false;
+              solids.forEach(s => {
+                if (nextX < s.x + s.width && nextX + updatedInst.width > s.x) {
+                  if (updatedInst.y + updatedInst.height <= s.y && nextY + updatedInst.height > s.y) {
+                    nextY = s.y - updatedInst.height;
+                    state.vy = 0;
+                    onFloor = true;
                   }
                 }
-                break;
-              }
-              case 'platform': {
-                const maxSpeed = Number(props.maxSpeed ?? 330);
-                const gravity = Number(props.gravity ?? 1500);
-                const jumpStrength = Number(props.jumpStrength ?? 650);
-                
-                if (state.vx === undefined) { state.vx = 0; state.vy = 0; state.onFloor = false; }
-
-                // Horizontal movement
-                let moveDir = 0;
-                if (keysDownRef.current.has('ArrowLeft')) moveDir -= 1;
-                if (keysDownRef.current.has('ArrowRight')) moveDir += 1;
-                
-                state.vx = moveDir * maxSpeed;
-
-                // Gravity
-                state.vy += gravity * dt;
-
-                // Jump
-                if (keysPressedRef.current.has('ArrowUp') && state.onFloor) {
-                  state.vy = -jumpStrength;
-                  state.onFloor = false;
-                }
-
-                // Apply velocities
-                let nextX = updatedInst.x + state.vx * dt;
-                let nextY = updatedInst.y + state.vy * dt;
-
-                // Simple Solid Collision (very basic)
-                const solids = nextInstances.filter(o => {
-                  const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
-                  return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
-                });
-
-                let onFloor = false;
-                solids.forEach(s => {
-                  // Check Y collision
-                  if (nextX < s.x + s.width && nextX + updatedInst.width > s.x) {
-                    if (updatedInst.y + updatedInst.height <= s.y && nextY + updatedInst.height > s.y) {
-                      nextY = s.y - updatedInst.height;
-                      state.vy = 0;
-                      onFloor = true;
-                    }
-                  }
-                });
-
-                updatedInst.x = nextX;
-                updatedInst.y = nextY;
-                state.onFloor = onFloor;
-                break;
-              }
-              case 'scroll-to': {
-                // Handled in rendering/camera phase
-                break;
-              }
+              });
+              updatedInst.x = nextX;
+              updatedInst.y = nextY;
+              state.onFloor = onFloor;
+              break;
             }
-          });
-
-          return updatedInst;
+          }
         });
-
-        // 2. Process Event Sheet
-        eventSheet.events.forEach(block => {
-          nextInstances = processBlock(block, nextInstances, {}, dt);
-        });
-        
-        return nextInstances;
+        return updatedInst;
       });
+
+      // 2. Process Event Sheet
+      let lastRes = true;
+      eventSheet.events.forEach(block => {
+        const blockRes = processBlock(block, nextInstances, {}, dt, lastRes);
+        nextInstances = blockRes.instances;
+        lastRes = blockRes.result;
+      });
+
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true;
+        addLog(`First frame processed. Final instances: ${nextInstances.length}`, 'info');
+      }
+
+      runtimeInstancesRef.current = nextInstances;
+      setRuntimeInstances(nextInstances);
 
       keysPressedRef.current.clear();
       pointerPressedRef.current = false;
@@ -453,7 +523,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   }, [layout, eventSheet, isPaused, timeScale]);
 
   const restartGame = () => {
-    setRuntimeInstances(JSON.parse(JSON.stringify(layout.instances)));
+    const initial = layout.instances.map(inst => {
+      const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+      const ivs: Record<string, any> = {};
+      ot?.instanceVariables.forEach(v => { ivs[v.name] = v.initialValue; });
+      return { ...inst, properties: { ...ivs, ...inst.properties } };
+    });
+    runtimeInstancesRef.current = initial;
+    setRuntimeInstances(initial);
+    hasStartedRef.current = false;
     lastTimeRef.current = performance.now();
   };
 

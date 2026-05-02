@@ -37,75 +37,78 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h3 style={{ margin: 0, fontSize: '14px' }}>
-            {step === 'object' ? 'Select Object' : `Select ${mode === 'condition' ? 'Condition' : 'Action'} for ${selectedObjectType?.name || 'System'}`}
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>
+            {step === 'object' ? 'Add Condition/Action' : `${selectedObjectType?.name || 'System'}: Select ${mode === 'condition' ? 'Condition' : 'Action'}`}
           </h3>
           <button onClick={onClose} style={closeButtonStyle}>×</button>
         </div>
 
         <div style={searchContainerStyle}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', color: '#666' }} />
+          <Search size={14} style={{ position: 'absolute', left: '26px', color: '#666' }} />
           <input 
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search..."
+            placeholder={step === 'object' ? "Search objects..." : "Search conditions..."}
             style={inputStyle}
           />
         </div>
 
         <div style={contentStyle}>
           {step === 'object' ? (
-            <div style={listStyle}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px', padding: '10px 0' }}>
               <div 
-                style={itemStyle} 
+                style={{ ...objectChipStyle, borderColor: !selectedObjectType ? '#007acc' : '#444' }} 
                 onClick={() => handleObjectSelect(undefined)}
               >
-                <div style={iconPlaceholder}>S</div>
-                <span>System</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#555' }} />
+                <div style={{ ...iconPlaceholder, backgroundColor: '#2980b9' }}>S</div>
+                <span style={{ fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>System</span>
               </div>
               {project.objectTypes.filter(ot => ot.name.toLowerCase().includes(searchTerm.toLowerCase())).map(ot => (
                 <div 
                   key={ot.id} 
-                  style={itemStyle} 
+                  style={{ ...objectChipStyle, borderColor: selectedObjectType?.id === ot.id ? '#007acc' : '#444' }} 
                   onClick={() => handleObjectSelect(ot)}
                 >
-                  <div style={iconPlaceholder}>{ot.name[0]}</div>
-                  <span>{ot.name}</span>
-                  <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#555' }} />
+                  <div style={{ ...iconPlaceholder, backgroundColor: '#27ae60' }}>{ot.name[0]}</div>
+                  <span style={{ fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>{ot.name}</span>
                 </div>
               ))}
             </div>
           ) : (
             <div style={listStyle}>
-              {/* Group by category */}
               {Array.from(new Set(filteredItems.map(i => i.category))).map(cat => (
-                <div key={cat}>
+                <div key={cat} style={{ marginBottom: '12px' }}>
                   <div style={categoryHeaderStyle}>{cat}</div>
-                  {filteredItems.filter(i => i.category === cat).map(def => (
-                    <div 
-                      key={def.type} 
-                      style={itemStyle} 
-                      onClick={() => handleLogicSelect(def)}
-                      title={def.description}
-                    >
-                      <span>{def.name}</span>
-                    </div>
-                  ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                    {filteredItems.filter(i => i.category === cat).map(def => (
+                      <div 
+                        key={def.type} 
+                        style={itemStyle} 
+                        onClick={() => handleLogicSelect(def)}
+                        title={def.description}
+                      >
+                        <ChevronRight size={12} style={{ opacity: 0.3 }} />
+                        <span style={{ fontWeight: 500 }}>{def.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
               {filteredItems.length === 0 && (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No results found.</div>
+                <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No results found.</div>
               )}
             </div>
           )}
         </div>
 
         <div style={footerStyle}>
+          <div style={{ flex: 1, fontSize: '11px', color: '#666' }}>
+            {step === 'logic' && selectedObjectType && <span>Object: <b>{selectedObjectType.name}</b></span>}
+          </div>
           {step === 'logic' && (
             <button onClick={() => setStep('object')} style={backButtonStyle}>Back</button>
           )}
@@ -114,6 +117,21 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
       </div>
     </div>
   );
+};
+
+const objectChipStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  padding: '12px',
+  backgroundColor: '#333',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  border: '1px solid #444',
+  transition: 'all 0.1s ease',
+  userSelect: 'none'
 };
 
 const overlayStyle: React.CSSProperties = {

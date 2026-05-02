@@ -119,6 +119,7 @@ export interface EventBlock {
   includeSheetId?: string;
   color?: string;
   bookmarked?: boolean;
+  isOrBlock?: boolean;
 }
 
 export interface EventSheet {
