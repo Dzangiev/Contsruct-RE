@@ -1,4 +1,4 @@
-import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet } from './project';
+import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior } from './project';
 import { generateId } from '../utils/id';
 
 /**
@@ -97,9 +97,9 @@ export function updateLayer(
 /**
  * Adds a new object type to the project.
  */
-export function addObjectType(project: Project, name: string, kind: ObjectTypeKind): Project {
+export function addObjectType(project: Project, name: string, kind: ObjectTypeKind, id: string = generateId()): Project {
   const newObjectType: ObjectType = {
-    id: generateId(),
+    id,
     name,
     kind,
     pluginId: kind,
@@ -107,6 +107,7 @@ export function addObjectType(project: Project, name: string, kind: ObjectTypeKi
     defaultHeight: 64,
     properties: {},
     instanceVariables: [],
+    behaviors: [],
   };
   return {
     ...project,
@@ -170,6 +171,68 @@ export function updateObjectType(
   return {
     ...project,
     objectTypes: project.objectTypes.map(ot => ot.id === objectTypeId ? { ...ot, ...updates } : ot),
+  };
+}
+
+/**
+ * Adds a behavior to an object type.
+ */
+export function addBehavior(
+  project: Project,
+  objectTypeId: string,
+  type: string,
+  name: string,
+  defaultProperties: Record<string, any> = {}
+): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return {
+        ...ot,
+        behaviors: [
+          ...ot.behaviors,
+          { id: generateId(), type, name, properties: { ...defaultProperties }, disabled: false }
+        ]
+      };
+    })
+  };
+}
+
+/**
+ * Removes a behavior from an object type.
+ */
+export function removeBehavior(project: Project, objectTypeId: string, behaviorId: string): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return {
+        ...ot,
+        behaviors: ot.behaviors.filter(b => b.id !== behaviorId)
+      };
+    })
+  };
+}
+
+/**
+ * Updates properties of a behavior.
+ */
+export function updateBehavior(
+  project: Project,
+  objectTypeId: string,
+  behaviorId: string,
+  updates: Partial<Omit<Behavior, 'id' | 'type'>>
+): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return {
+        ...ot,
+        behaviors: ot.behaviors.map(b => b.id === behaviorId ? { ...b, ...updates } : b)
+      };
+    })
   };
 }
 
@@ -349,4 +412,31 @@ export function pasteInstances(
     })
   };
   return { project: newProject, newIds };
+}
+
+/**
+ * Updates properties of a layout.
+ */
+export function updateLayout(
+  project: Project,
+  layoutId: string,
+  updates: Partial<Omit<Layout, 'id' | 'instances' | 'layers'>>
+): Project {
+  return {
+    ...project,
+    layouts: project.layouts.map(l => l.id === layoutId ? { ...l, ...updates } : l),
+  };
+}
+
+/**
+ * Updates global project settings.
+ */
+export function updateProjectSettings(
+  project: Project,
+  updates: Partial<Project['settings']>
+): Project {
+  return {
+    ...project,
+    settings: { ...project.settings, ...updates },
+  };
 }

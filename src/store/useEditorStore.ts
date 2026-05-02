@@ -23,7 +23,7 @@ interface EditorStore {
   addLayer: (layoutId: string, name: string) => void;
   updateLayer: (layoutId: string, layerId: string, updates: any) => void;
   moveLayer: (layoutId: string, layerId: string, direction: 'up' | 'down') => void;
-  addObjectType: (name: string, kind: ObjectTypeKind) => void;
+  addObjectType: (name: string, kind: ObjectTypeKind, id?: string) => void;
   updateObjectType: (objectTypeId: string, updates: any) => void;
   addInstance: (layoutId: string, objectTypeId: string, layerId: string, x: number, y: number, id?: string) => void;
   cloneInstance: (layoutId: string, instanceId: string) => void;
@@ -33,6 +33,11 @@ interface EditorStore {
   reorderInstance: (layoutId: string, instanceId: string, direction: 'front' | 'back' | 'forward' | 'backward') => void;
   addInstanceVariable: (objectTypeId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
   removeInstanceVariable: (objectTypeId: string, variableId: string) => void;
+  addBehavior: (objectTypeId: string, type: string, name: string, defaultProperties?: Record<string, any>) => void;
+  removeBehavior: (objectTypeId: string, behaviorId: string) => void;
+  updateBehavior: (objectTypeId: string, behaviorId: string, updates: any) => void;
+  updateLayout: (layoutId: string, updates: any) => void;
+  updateProjectSettings: (updates: any) => void;
 
   // Event Sheet Actions
   addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => void;
@@ -62,6 +67,8 @@ interface EditorStore {
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
   setGridSettings: (gridSize?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
+  setRulerSettings: (showRulers: boolean) => void;
+  setMousePosition: (x: number, y: number) => void;
   
   // Clipboard
   copySelected: () => void;
@@ -133,8 +140,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
-  addObjectType: (name, kind) => {
-    const next = projectUpdates.addObjectType(get().project, name, kind);
+  addObjectType: (name, kind, id) => {
+    const next = projectUpdates.addObjectType(get().project, name, kind, id);
     set({ project: next });
     get().pushHistory(next);
   },
@@ -184,6 +191,31 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   removeInstanceVariable: (objectTypeId, variableId) => {
     const next = projectUpdates.removeInstanceVariable(get().project, objectTypeId, variableId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addBehavior: (objectTypeId, type, name, defaultProperties) => {
+    const next = projectUpdates.addBehavior(get().project, objectTypeId, type, name, defaultProperties);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeBehavior: (objectTypeId, behaviorId) => {
+    const next = projectUpdates.removeBehavior(get().project, objectTypeId, behaviorId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateBehavior: (objectTypeId, behaviorId, updates) => {
+    const next = projectUpdates.updateBehavior(get().project, objectTypeId, behaviorId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateLayout: (layoutId, updates) => {
+    const next = projectUpdates.updateLayout(get().project, layoutId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateProjectSettings: (updates) => {
+    const next = projectUpdates.updateProjectSettings(get().project, updates);
     set({ project: next });
     get().pushHistory(next);
   },
@@ -305,6 +337,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   })),
   setGridSettings: (gridSize, snapToGrid, showGrid) => set((state) => ({
     editorState: editorUpdates.setGridSettings(state.editorState, gridSize, snapToGrid, showGrid)
+  })),
+  setRulerSettings: (showRulers) => set((state) => ({
+    editorState: editorUpdates.setRulerSettings(state.editorState, showRulers)
+  })),
+  setMousePosition: (x, y) => set((state) => ({
+    editorState: { ...state.editorState, mousePosition: { x, y } }
   })),
 
   // Clipboard

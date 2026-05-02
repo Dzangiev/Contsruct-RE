@@ -1,6 +1,9 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { generateId } from '../../utils/id';
+import { Rulers } from './Rulers';
+import { InsertObjectDialog } from './InsertObjectDialog';
+import { ObjectTypeKind } from '../../model/project';
 
 export const Viewport: React.FC = () => {
   const { 
@@ -10,6 +13,7 @@ export const Viewport: React.FC = () => {
     updateInstanceSilently,
     commitProject,
     addInstance,
+    addObjectType,
     cloneInstance,
     removeInstance,
     reorderInstance,
@@ -20,11 +24,12 @@ export const Viewport: React.FC = () => {
     copySelected,
     pasteInstances,
     cutSelected,
-    setGridSettings
+    setGridSettings,
+    setRulerSettings
   } = useEditorStore();
   
-  const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
-  const activeLayer = activeLayout?.layers.find(layer => layer.id === editorState.activeLayerId);
+  const activeLayout = project.layouts?.find(l => l.id === editorState.activeLayoutId);
+  const activeLayer = activeLayout?.layers?.find(layer => layer.id === editorState.activeLayerId);
   
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const [dragStart, setDragStart] = React.useState<{ x: number, y: number, isClone?: boolean } | null>(null);
@@ -34,9 +39,10 @@ export const Viewport: React.FC = () => {
   const [marqueeEnd, setMarqueeEnd] = React.useState<{ x: number, y: number } | null>(null);
   const [isSpaceDown, setIsSpaceDown] = React.useState(false);
   const [contextMenu, setContextMenu] = React.useState<{ x: number, y: number, instanceId?: string } | null>(null);
+  const [insertDialogPos, setInsertDialogPos] = React.useState<{ x: number, y: number } | null>(null);
   const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
-  const { zoom, panX, panY, selectedInstanceIds, tool, gridSize, snapToGrid, showGrid } = editorState;
+  const { zoom, panX, panY, selectedInstanceIds, tool, gridSize, snapToGrid, showGrid, showRulers } = editorState;
 
   // Global key handlers
   React.useEffect(() => {
@@ -434,11 +440,25 @@ export const Viewport: React.FC = () => {
     };
   }, [resizing, zoom, activeLayout, updateInstanceSilently, commitProject, panX, panY]);
 
+  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
+
+  React.useEffect(() => {
+    if (!viewportRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    observer.observe(viewportRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   if (!activeLayout) return <div style={{ flex: 1, backgroundColor: '#333' }} />;
 
   const { width, height, layers, instances } = activeLayout;
 
   const handleMouseDown = (e: React.MouseEvent) => {
+// ... (MouseDown logic remains same)
     if (e.button === 2) return; // Right click handled separately
     setContextMenu(null);
     const isMiddleButton = e.button === 1;
@@ -643,6 +663,7 @@ export const Viewport: React.FC = () => {
     const x = Math.round((e.clientX - rect.left - panX) / zoom);
     const y = Math.round((e.clientY - rect.top - panY) / zoom);
     setMouseLayoutPos({ x, y });
+    useEditorStore.getState().setMousePosition(x, y);
   };
 
   const contextMenuItemStyle: React.CSSProperties = {
@@ -660,7 +681,44 @@ export const Viewport: React.FC = () => {
       tabIndex={0} onMouseDown={handleMouseDown} onContextMenu={handleContextMenu} onClick={handleViewportClick} onMouseMove={handleMouseMoveGlobal}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDrop={handleDrop}
+      onDoubleClick={(e) => {
+        if (e.button !== 0) return;
+        const rect = viewportRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = (e.clientX - rect.left - panX) / zoom;
+        const y = (e.clientY - rect.top - panY) / zoom;
+        setInsertDialogPos({ x, y });
+      }}
     >
+      {insertDialogPos && (
+        <InsertObjectDialog 
+          onClose={() => setInsertDialogPos(null)}
+          onSelect={(kind, name) => {
+            if (activeLayout && activeLayer) {
+              const otId = generateId();
+              addObjectType(name, kind, otId);
+              addInstance(activeLayout.id, otId, activeLayer.id, Math.round(insertDialogPos.x), Math.round(insertDialogPos.y));
+            }
+            setInsertDialogPos(null);
+          }}
+        />
+      )}
+      {showRulers && (
+        <Rulers 
+          zoom={zoom} 
+          panX={panX} 
+          panY={panY} 
+          layoutWidth={width} 
+          layoutHeight={height} 
+          viewportWidth={project.settings.viewportWidth}
+          viewportHeight={project.settings.viewportHeight}
+          mouseX={mouseLayoutPos.x}
+          mouseY={mouseLayoutPos.y}
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+        />
+      )}
+      
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
         .context-menu-item:hover { background-color: rgba(255,255,255,0.05); color: #fff !important; }
@@ -715,7 +773,7 @@ export const Viewport: React.FC = () => {
                 <g key={layer.id} opacity={layer.opacity} style={{ pointerEvents: layer.locked ? 'none' : 'auto' }}>
                   {instances.filter(inst => inst.layerId === layer.id).map(inst => {
                     const isSelected = selectedInstanceIds.includes(inst.id);
-                    const objectType = project.objectTypes.find(ot => ot.id === inst.objectTypeId);
+                    const objectType = project.objectTypes?.find(ot => ot.id === inst.objectTypeId);
                     return (
                       <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} opacity={inst.opacity}>
                         <rect width={inst.width} height={inst.height} fill="#4a4a4a" stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
@@ -902,6 +960,9 @@ export const Viewport: React.FC = () => {
                  </div>
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, !snapToGrid, undefined); setContextMenu(null); }}>
                    <span style={{ flex: 1 }}>Snap to Grid</span> <span style={{ color: snapToGrid ? '#4caf50' : '#666' }}>{snapToGrid ? 'ON' : 'OFF'}</span>
+                 </div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setRulerSettings(!showRulers); setContextMenu(null); }}>
+                    <span style={{ flex: 1 }}>Show Rulers</span> <span style={{ color: showRulers ? '#4caf50' : '#666' }}>{showRulers ? 'ON' : 'OFF'}</span>
                  </div>
                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(16); setContextMenu(null); }}>Grid Size: 16</div>

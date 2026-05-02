@@ -5,6 +5,102 @@ export interface ParamDefinition {
   defaultValue?: any;
 }
 
+export interface PluginDefinition {
+  kind: string;
+  name: string;
+  description: string;
+  icon: string;
+  defaultWidth: number;
+  defaultHeight: number;
+}
+
+export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
+  {
+    kind: 'sprite',
+    name: 'Sprite',
+    description: 'An object with an image, commonly used for characters, projectiles, and scenery.',
+    icon: 'image',
+    defaultWidth: 64,
+    defaultHeight: 64
+  },
+  {
+    kind: 'tiled-background',
+    name: 'Tiled Background',
+    description: 'An object that repeats its image in a grid. Useful for backgrounds and walls.',
+    icon: 'grid',
+    defaultWidth: 128,
+    defaultHeight: 128
+  },
+  {
+    kind: 'text',
+    name: 'Text',
+    description: 'Display text on the screen.',
+    icon: 'type',
+    defaultWidth: 100,
+    defaultHeight: 20
+  }
+];
+
+export interface BehaviorDefinition {
+  type: string;
+  name: string;
+  description: string;
+  defaultProperties: Record<string, any>;
+}
+
+export const BEHAVIOR_DEFINITIONS: BehaviorDefinition[] = [
+  {
+    type: 'platform',
+    name: 'Platform',
+    description: 'Standard platformer character movement with gravity, jumping, and floor collisions.',
+    defaultProperties: {
+      maxSpeed: 330,
+      acceleration: 1500,
+      deceleration: 1500,
+      jumpStrength: 650,
+      gravity: 1500,
+      maxFallSpeed: 1000,
+      jumpSustain: 0.2,
+      doubleJump: false
+    }
+  },
+  {
+    type: 'bullet',
+    name: 'Bullet',
+    description: 'Moves the object forward at a constant speed.',
+    defaultProperties: {
+      speed: 400,
+      acceleration: 0,
+      gravity: 0,
+      bounce: false,
+      step: 0
+    }
+  },
+  {
+    type: 'eight-direction',
+    name: '8 Direction',
+    description: 'Movement in 8 directions using arrow keys.',
+    defaultProperties: {
+      maxSpeed: 200,
+      acceleration: 600,
+      deceleration: 900,
+      directions: '8-way'
+    }
+  },
+  {
+    type: 'scroll-to',
+    name: 'Scroll To',
+    description: 'Centers the viewport on this object during preview.',
+    defaultProperties: {}
+  },
+  {
+    type: 'solid',
+    name: 'Solid',
+    description: 'Makes the object a solid obstacle for other behaviors like Platform.',
+    defaultProperties: {}
+  }
+];
+
 export interface LogicDefinition {
   type: string;
   name: string;

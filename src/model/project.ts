@@ -59,6 +59,14 @@ export interface InstanceVariable {
   initialValue: any;
 }
 
+export interface Behavior {
+  id: string;
+  type: string;
+  name: string;
+  properties: Record<string, any>;
+  disabled: boolean;
+}
+
 export interface ObjectType {
   id: string;
   name: string;
@@ -69,6 +77,7 @@ export interface ObjectType {
   assetId?: string;
   properties: Record<string, any>;
   instanceVariables: InstanceVariable[];
+  behaviors: Behavior[];
 }
 
 export interface Condition {

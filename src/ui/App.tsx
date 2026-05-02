@@ -6,6 +6,23 @@ import { Inspector } from './components/Inspector';
 import { EventSheetEditor } from './components/EventSheetEditor';
 import { Runtime } from '../runtime/Runtime';
 import { Play } from 'lucide-react';
+import { StatusBar } from './components/StatusBar';
+
+import { LayersPanel } from './components/LayersPanel';
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: string }, { hasError: boolean }> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any, errorInfo: any) { console.error(`Error in ${this.props.name}:`, error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{ padding: '20px', color: '#ff4444', backgroundColor: '#2a1a1a', fontSize: '12px', border: '1px solid #442222', flex: 1 }}>
+        <strong>Error in {this.props.name}</strong><br/>Check console for details.
+      </div>;
+    }
+    return this.props.children;
+  }
+}
 
 const App: React.FC = () => {
   const { project, editorState, setTab, setPreviewMode } = useEditorStore();
@@ -19,71 +36,95 @@ const App: React.FC = () => {
       backgroundColor: '#121212',
       overflow: 'hidden',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      position: 'relative'
+      position: 'relative',
+      flexDirection: 'column'
     }}>
-      <ProjectExplorer />
-      
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        <header style={{ 
-          height: '40px', 
-          backgroundColor: '#252526', 
-          borderBottom: '1px solid #333',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 20px',
-          justifyContent: 'space-between',
-          color: '#ccc',
-          fontSize: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', height: '100%' }}>
-            <div style={{ fontWeight: 'bold', color: '#fff' }}>CRE Editor</div>
-            
-            <nav style={{ display: 'flex', gap: '2px', height: '100%' }}>
-              <TabButton 
-                active={currentTab === 'layout'} 
-                onClick={() => setTab('layout')}
-                label="Layout 1" 
-              />
-              <TabButton 
-                active={currentTab === 'eventSheet'} 
-                onClick={() => setTab('eventSheet')}
-                label="Event Sheet 1" 
-              />
-            </nav>
-          </div>
-
-          <button 
-            onClick={() => setPreviewMode(true)}
-            style={{
-              backgroundColor: '#22a043',
-              color: '#fff',
-              border: 'none',
-              padding: '4px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            <Play size={12} fill="currentColor" /> Preview
-          </button>
-        </header>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ width: '250px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
+          <ErrorBoundary name="ProjectExplorer">
+            <ProjectExplorer />
+          </ErrorBoundary>
+          <ErrorBoundary name="LayersPanel">
+            <LayersPanel />
+          </ErrorBoundary>
+        </div>
         
-        {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
-      </main>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <header style={{ 
+            height: '40px', 
+            backgroundColor: '#252526', 
+            borderBottom: '1px solid #333',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 20px',
+            justifyContent: 'space-between',
+            color: '#ccc',
+            fontSize: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', height: '100%' }}>
+              <div style={{ fontWeight: 'bold', color: '#fff' }}>CRE Editor</div>
+              
+              <nav style={{ display: 'flex', gap: '2px', height: '100%' }}>
+                <TabButton 
+                  active={currentTab === 'layout'} 
+                  onClick={() => setTab('layout')}
+                  label={project.layouts?.find(l => l.id === editorState.activeLayoutId)?.name || 'Layout'} 
+                />
+                {(() => {
+                  const activeLayout = project.layouts?.find(l => l.id === editorState.activeLayoutId);
+                  const eventSheet = project.eventSheets?.find(es => es.id === activeLayout?.eventSheetId);
+                  return (
+                    <TabButton 
+                      active={currentTab === 'eventSheet'} 
+                      onClick={() => setTab('eventSheet')}
+                      label={eventSheet?.name || 'Event Sheet'} 
+                    />
+                  );
+                })()}
+              </nav>
+            </div>
 
-      <Inspector />
+            <button 
+              onClick={() => setPreviewMode(true)}
+              style={{
+                backgroundColor: '#22a043',
+                color: '#fff',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              <Play size={12} fill="currentColor" /> Preview
+            </button>
+          </header>
+          
+          <ErrorBoundary name="MainContent">
+            {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
+          </ErrorBoundary>
+        </main>
+
+        <ErrorBoundary name="Inspector">
+          <Inspector />
+        </ErrorBoundary>
+      </div>
+
+      <StatusBar />
 
       {/* Runtime Preview Overlay */}
       {previewMode && (
-        <Runtime 
-          project={project} 
-          layoutId={editorState.activeLayoutId} 
-          onStop={() => setPreviewMode(false)} 
-        />
+        <ErrorBoundary name="Runtime">
+          <Runtime 
+            project={project} 
+            layoutId={editorState.activeLayoutId} 
+            onStop={() => setPreviewMode(false)} 
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

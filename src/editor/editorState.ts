@@ -27,6 +27,8 @@ export interface EditorState {
   gridSize: number;
   snapToGrid: boolean;
   showGrid: boolean;
+  showRulers: boolean;
+  mousePosition: { x: number, y: number };
 }
 
 /**
@@ -54,6 +56,8 @@ export function createInitialEditorState(project: Project): EditorState {
     gridSize: 32,
     snapToGrid: true,
     showGrid: true,
+    showRulers: false,
+    mousePosition: { x: 0, y: 0 },
   };
 }
 
@@ -186,5 +190,18 @@ export function setGridSettings(
     gridSize: gridSize !== undefined ? gridSize : state.gridSize,
     snapToGrid: snapToGrid !== undefined ? snapToGrid : state.snapToGrid,
     showGrid: showGrid !== undefined ? showGrid : state.showGrid,
+  };
+}
+
+/**
+ * Updates ruler settings.
+ */
+export function setRulerSettings(
+  state: EditorState,
+  showRulers: boolean
+): EditorState {
+  return {
+    ...state,
+    showRulers,
   };
 }
