@@ -18,6 +18,8 @@ const HighlightText: React.FC<{ text: string, highlight: string }> = ({ text, hi
   );
 };
 
+
+
 export const EventSheetEditor: React.FC = () => {
   const { 
     project, editorState, 
@@ -34,11 +36,11 @@ export const EventSheetEditor: React.FC = () => {
   const [showReplace, setShowReplace] = React.useState(false);
   
   const [browserState, setBrowserState] = React.useState<{
-    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, targetObjectTypeId?: string
+    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, targetObjectTypeId?: string, initialLogicTypeId?: string, editingItemId?: string
   } | null>(null);
 
   const [paramEditorState, setParamEditorState] = React.useState<{
-    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, itemId: string, def: LogicDefinition, params: any[], targetObjectTypeId?: string
+    isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, itemId: string, def: LogicDefinition, params: any[], targetObjectTypeId?: string, isNew?: boolean
   } | null>(null);
 
   const [contextMenu, setContextMenu] = React.useState<{
@@ -47,13 +49,12 @@ export const EventSheetEditor: React.FC = () => {
 
   const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
   const [draggedLogicItem, setDraggedLogicItem] = React.useState<{ type: 'condition' | 'action', blockId: string, itemId: string } | null>(null);
+  const [variableEditorState, setVariableEditorState] = React.useState<{ isOpen: boolean, eventSheetId: string, blockId: string, variable: any } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
   const activeEventSheetId = activeLayout?.eventSheetId || project.eventSheets[0]?.id;
   const eventSheet = project.eventSheets.find(es => es.id === activeEventSheetId);
-
-
 
   const expandAll = (expand: boolean) => {
     if (!eventSheet) return;
@@ -145,7 +146,6 @@ export const EventSheetEditor: React.FC = () => {
 
   if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
 
-  // Pre-calculate sequential indices (depth-first)
   const blockIndices = new Map<string, number>();
   let globalIndex = 1;
   const bookmarks: EventBlock[] = [];
@@ -160,12 +160,59 @@ export const EventSheetEditor: React.FC = () => {
   };
   calculateIndices(eventSheet.events);
 
+  React.useEffect(() => {
+    let scrollInterval: any = null;
+    const stopScrolling = () => { if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; } };
+
+    const handleWindowDragOver = (e: DragEvent) => {
+      if (!draggedBlockId && !draggedLogicItem) { stopScrolling(); return; }
+      const container = containerRef.current;
+      if (!container) return;
+      
+      const rect = container.getBoundingClientRect();
+      const threshold = 100;
+      const maxSpeed = 15;
+      const fromTop = e.clientY - rect.top;
+      const fromBottom = rect.bottom - e.clientY;
+      
+      if (fromTop < threshold && fromTop > -threshold && fromTop < rect.height) {
+        if (!scrollInterval) {
+          scrollInterval = setInterval(() => {
+            const speed = Math.max(2, Math.floor((threshold - Math.max(0, fromTop)) / threshold * maxSpeed));
+            container.scrollTop -= speed;
+          }, 16);
+        }
+      } else if (fromBottom < threshold && fromBottom > -threshold && fromBottom < rect.height) {
+        if (!scrollInterval) {
+          scrollInterval = setInterval(() => {
+            const speed = Math.max(2, Math.floor((threshold - Math.max(0, fromBottom)) / threshold * maxSpeed));
+            container.scrollTop += speed;
+          }, 16);
+        }
+      } else {
+        stopScrolling();
+      }
+    };
+
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragend', stopScrolling);
+    window.addEventListener('drop', stopScrolling);
+    return () => {
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragend', stopScrolling);
+      window.removeEventListener('drop', stopScrolling);
+      stopScrolling();
+    };
+  }, [draggedBlockId, draggedLogicItem]);
+
   return (
     <div className="event-sheet-editor" style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#181818', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
       <style>{`
-        .logic-item-hover:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
-        .logic-row-container:hover { border-bottom-color: #444 !important; }
-        .logic-item-hover { border-radius: 2px; }
+        .logic-item-hover { border-radius: 2px; transition: background-color 0.1s; cursor: pointer; }
+        .logic-item-hover:hover { background-color: rgba(255, 255, 255, 0.05); }
+        .logic-item-hover.selected { background-color: #007acc !important; }
+        .logic-item-hover.selected:hover { background-color: #008ae6 !important; }
+        .logic-row-container:hover { border-bottom-color: #444; }
       `}</style>
       <div style={{ display: 'flex', backgroundColor: '#252526', borderBottom: '1px solid #111' }}>
         {project.eventSheets.map(es => (
@@ -282,8 +329,9 @@ export const EventSheetEditor: React.FC = () => {
                 key={block.id} 
                 eventSheetId={eventSheet.id} 
                 block={block} 
-                onOpenBrowser={(m: 'condition' | 'action', b: string, t?: string) => setBrowserState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, targetObjectTypeId: t })} 
+                onOpenBrowser={(m: 'condition' | 'action', b: string, t?: string, il?: string, ei?: string) => setBrowserState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, targetObjectTypeId: t, initialLogicTypeId: il, editingItemId: ei })} 
                 onOpenParamEditor={(m: 'condition' | 'action', b: string, i: string, d: LogicDefinition, p: any[], t?: string) => setParamEditorState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, itemId: i, def: d, params: p, targetObjectTypeId: t })} 
+                onOpenVariableEditor={(esId, bId, v) => setVariableEditorState({ isOpen: true, eventSheetId: esId, blockId: bId, variable: v })}
                 onContextMenu={(e: React.MouseEvent, id: string, logicId?: string) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id, logicItemId: logicId }); }} 
                 draggedBlockId={draggedBlockId} 
                 setDraggedBlockId={setDraggedBlockId} 
@@ -298,9 +346,198 @@ export const EventSheetEditor: React.FC = () => {
       </div>
 
 
-      {browserState?.isOpen && <LogicBrowser project={project} mode={browserState.mode} initialObjectTypeId={browserState.targetObjectTypeId} onSelect={(t, ty, p) => { if (browserState.mode === 'condition') addCondition(browserState.eventSheetId, browserState.blockId, ty, p, t); else addAction(browserState.eventSheetId, browserState.blockId, ty, p, t); }} onClose={() => setBrowserState(null)} />}
-      {paramEditorState?.isOpen && <ParamEditor project={project} def={paramEditorState.def} initialParams={paramEditorState.params} targetObjectTypeId={paramEditorState.targetObjectTypeId} onSave={(p) => { if (paramEditorState.mode === 'condition') updateCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); else updateAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); setParamEditorState(null); }} onCancel={() => setParamEditorState(null)} />}
+      {browserState?.isOpen && (
+        <LogicBrowser 
+          project={project} 
+          mode={browserState.mode} 
+          initialObjectTypeId={browserState.targetObjectTypeId}
+          initialLogicTypeId={browserState.initialLogicTypeId}
+          onSelect={(t, ty, p) => { 
+            const def = browserState.mode === 'condition' ? findConditionDefinition(ty) : findActionDefinition(ty);
+            if (def && def.params.length > 0) {
+              // If it has params, transition to param editor instead of saving
+              setParamEditorState({
+                isOpen: true,
+                mode: browserState.mode,
+                eventSheetId: browserState.eventSheetId,
+                blockId: browserState.blockId,
+                itemId: browserState.editingItemId || 'NEW',
+                def,
+                params: p,
+                targetObjectTypeId: t,
+                isNew: !browserState.editingItemId
+              });
+              setBrowserState(null);
+            } else {
+              // No params, save immediately
+              if (browserState.editingItemId) {
+                if (browserState.mode === 'condition') updateCondition(browserState.eventSheetId, browserState.blockId, browserState.editingItemId, { type: ty, params: p, targetObjectTypeId: t });
+                else updateAction(browserState.eventSheetId, browserState.blockId, browserState.editingItemId, { type: ty, params: p, targetObjectTypeId: t });
+              } else {
+                if (browserState.mode === 'condition') addCondition(browserState.eventSheetId, browserState.blockId, ty, p, t);
+                else addAction(browserState.eventSheetId, browserState.blockId, ty, p, t);
+              }
+              setBrowserState(null);
+            }
+          }} 
+          onClose={() => setBrowserState(null)} 
+        />
+      )}
+      {paramEditorState?.isOpen && (
+        <ParamEditor 
+          project={project} 
+          def={paramEditorState.def} 
+          initialParams={paramEditorState.params} 
+          targetObjectTypeId={paramEditorState.targetObjectTypeId} 
+          onSave={(p) => { 
+            if (paramEditorState.itemId === 'NEW') {
+              if (paramEditorState.mode === 'condition') addCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.def.type, p, paramEditorState.targetObjectTypeId);
+              else addAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.def.type, p, paramEditorState.targetObjectTypeId);
+            } else {
+              if (paramEditorState.mode === 'condition') updateCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { type: paramEditorState.def.type, params: p, targetObjectTypeId: paramEditorState.targetObjectTypeId });
+              else updateAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { type: paramEditorState.def.type, params: p, targetObjectTypeId: paramEditorState.targetObjectTypeId });
+            }
+            setParamEditorState(null); 
+          }} 
+          onBack={() => {
+            // Go back to browser with the current item selected
+            setBrowserState({
+              isOpen: true,
+              mode: paramEditorState.mode,
+              eventSheetId: paramEditorState.eventSheetId,
+              blockId: paramEditorState.blockId,
+              targetObjectTypeId: paramEditorState.targetObjectTypeId,
+              initialLogicTypeId: paramEditorState.def.type,
+              editingItemId: paramEditorState.itemId === 'NEW' ? undefined : paramEditorState.itemId
+            });
+            setParamEditorState(null);
+          }}
+          onCancel={() => setParamEditorState(null)} 
+        />
+      )}
+      {variableEditorState?.isOpen && (
+        <VariableEditor 
+          variable={variableEditorState.variable}
+          onSave={(updates) => {
+            updateEventBlock(variableEditorState.eventSheetId, variableEditorState.blockId, { variable: { ...variableEditorState.variable, ...updates } });
+            setVariableEditorState(null);
+          }}
+          onCancel={() => setVariableEditorState(null)}
+        />
+      )}
       {contextMenu && <ContextMenu project={project} x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} logicItemId={contextMenu.logicItemId} eventSheetId={eventSheet.id} onClose={() => setContextMenu(null)} />}
+    </div>
+  );
+};
+
+const VariableEditor: React.FC<{ 
+  variable: any, 
+  onSave: (updates: any) => void, 
+  onCancel: () => void 
+}> = ({ variable, onSave, onCancel }) => {
+  const [name, setName] = React.useState(variable.name);
+  const [type, setType] = React.useState(variable.type);
+  const [initialValue, setInitialValue] = React.useState(variable.initialValue);
+  const [description, setDescription] = React.useState(variable.description || '');
+  const [isStatic, setIsStatic] = React.useState(variable.isStatic || false);
+  const [isConstant, setIsConstant] = React.useState(variable.isConstant || false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!name.trim()) return setError('Name cannot be empty');
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return setError('Invalid variable name (start with letter, no spaces)');
+    onSave({ name, type, initialValue, description, isStatic, isConstant });
+  };
+
+  const labelStyle: React.CSSProperties = { fontSize: '11px', fontWeight: 700, color: '#888', width: '130px', textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.5px' };
+  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '20px' };
+  const inputBaseStyle: React.CSSProperties = { backgroundColor: '#181818', border: '1px solid #333', borderRadius: '4px', padding: '8px 12px', color: '#fff', fontSize: '13px', outline: 'none', flex: 1, transition: 'border-color 0.2s' };
+
+  return (
+    <div style={overlayStyle} onClick={onCancel}>
+      <div style={{ ...modalStyle, width: '500px', padding: '0', overflow: 'hidden', backgroundColor: '#252526', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', border: '1px solid #444' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', backgroundColor: '#2d2d2d', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ backgroundColor: '#3498db', padding: '6px', borderRadius: '6px' }}><Variable size={18} color="#fff" /></div>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>Edit Variable</div>
+            <div style={{ fontSize: '11px', color: '#666' }}>Configure global or local project variable</div>
+          </div>
+        </div>
+
+        <div style={{ padding: '32px 40px 24px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={rowStyle}>
+              <label style={labelStyle}>Name</label>
+              <input 
+                autoFocus 
+                value={name} 
+                onChange={e => { setName(e.target.value); setError(null); }} 
+                style={{ ...inputBaseStyle, borderColor: error ? '#f44336' : '#333' }} 
+              />
+            </div>
+
+            <div style={rowStyle}>
+              <label style={labelStyle}>Type</label>
+              <select value={type} onChange={e => setType(e.target.value as any)} style={inputBaseStyle}>
+                <option value="number">Number</option>
+                <option value="string">String</option>
+                <option value="boolean">Boolean</option>
+              </select>
+            </div>
+
+            <div style={rowStyle}>
+              <label style={labelStyle}>Initial value</label>
+              {type === 'boolean' ? (
+                <select value={String(initialValue)} onChange={e => setInitialValue(e.target.value === 'true')} style={inputBaseStyle}>
+                  <option value="true">True</option>
+                  <option value="false">False</option>
+                </select>
+              ) : (
+                <input 
+                  type={type === 'number' ? 'number' : 'text'}
+                  value={initialValue} 
+                  onChange={e => setInitialValue(type === 'number' ? Number(e.target.value) : e.target.value)} 
+                  style={inputBaseStyle} 
+                />
+              )}
+            </div>
+
+            <div style={rowStyle}>
+              <label style={labelStyle}>Description</label>
+              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description..." style={inputBaseStyle} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingLeft: '150px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsStatic(!isStatic)}>
+                <div style={{ width: '16px', height: '16px', backgroundColor: isStatic ? '#007acc' : '#1e1e1e', border: '1px solid #444', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isStatic && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}
+                </div>
+                <span style={{ fontSize: '13px', color: isStatic ? '#fff' : '#888', fontWeight: isStatic ? 600 : 400 }}>Static</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsConstant(!isConstant)}>
+                <div style={{ width: '16px', height: '16px', backgroundColor: isConstant ? '#007acc' : '#1e1e1e', border: '1px solid #444', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isConstant && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}
+                </div>
+                <span style={{ fontSize: '13px', color: isConstant ? '#fff' : '#888', fontWeight: isConstant ? 600 : 400 }}>Constant</span>
+              </div>
+            </div>
+
+            {error && <div style={{ fontSize: '12px', color: '#f44336', paddingLeft: '150px', marginTop: '-10px' }}>{error}</div>}
+          </form>
+        </div>
+
+        <div style={{ padding: '16px 24px', backgroundColor: '#2d2d2d', borderTop: '1px solid #1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '11px', color: '#555', fontStyle: 'italic' }}>
+            Preview: <span style={{ color: '#aaa' }}>{name} = {type === 'string' ? `"${initialValue}"` : String(initialValue)}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={onCancel} style={{ ...cancelButtonStyle, padding: '8px 20px' }}>Cancel</button>
+            <button onClick={() => handleSubmit()} style={{ ...saveButtonStyle, padding: '8px 24px', minWidth: '80px' }}>OK</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -308,8 +545,9 @@ export const EventSheetEditor: React.FC = () => {
 const EventBlockItem: React.FC<{ 
   eventSheetId: string, 
   block: EventBlock, 
-  onOpenBrowser: any, 
+  onOpenBrowser: (mode: 'condition' | 'action', blockId: string, targetObjectTypeId?: string, initialLogicTypeId?: string, editingItemId?: string) => void, 
   onOpenParamEditor: any, 
+  onOpenVariableEditor: (eventSheetId: string, blockId: string, variable: any) => void,
   onContextMenu: any, 
   draggedBlockId: any, 
   setDraggedBlockId: any, 
@@ -318,36 +556,106 @@ const EventBlockItem: React.FC<{
   depth?: number, 
   searchTerm?: string,
   blockIndices: Map<string, number>
-}> = ({ eventSheetId, block, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices }) => {
+}> = ({ eventSheetId, block, onOpenBrowser, onOpenParamEditor, onOpenVariableEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices }) => {
   const { editorState, setSelectedEventBlocks, updateEventBlock, addEventBlock, moveEventBlock, moveCondition, moveAction } = useEditorStore();
   const isSelected = editorState.selectedEventBlockIds.includes(block.id);
   const isDisabled = block.disabled;
   const isDragged = draggedBlockId === block.id;
 
+  const [dragIndicator, setDragIndicator] = React.useState<'before' | 'inside' | 'after' | null>(null);
+
   const handleDragStart = (e: React.DragEvent) => { e.stopPropagation(); setDraggedBlockId(block.id); e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; };
-  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); 
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedBlockId || draggedBlockId === block.id) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const canHaveChildren = block.type === 'event' || block.type === 'group' || block.type === 'function';
+    
+    if (y < rect.height * 0.4) {
+      setDragIndicator('before');
+    } else if (canHaveChildren && x > 150) {
+      setDragIndicator('inside');
+    } else {
+      setDragIndicator('after');
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragIndicator(null);
+  };
+
+  const handleDrop = (e: React.DragEvent) => { 
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    const indicator = dragIndicator;
+    setDragIndicator(null);
+
     if (draggedLogicItem) { 
       if (draggedLogicItem.type === 'condition') moveCondition(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.conditions.length); 
       else moveAction(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.actions.length); 
       return setDraggedLogicItem(null); 
     } 
+    
     if (!draggedBlockId || draggedBlockId === block.id) return; 
-    moveEventBlock(eventSheetId, draggedBlockId, null, 0); // Simplified for now, or calculate real index
+
+    if (indicator === 'inside') {
+      moveEventBlock(eventSheetId, draggedBlockId, block.id, 0);
+    } else if (indicator === 'before') {
+      moveEventBlock(eventSheetId, draggedBlockId, null, 0, undefined, block.id);
+    } else {
+      moveEventBlock(eventSheetId, draggedBlockId, null, -1, block.id); 
+    }
     setDraggedBlockId(null); 
   };
 
-  const itemStyleWrapper: React.CSSProperties = { position: 'relative', marginLeft: depth > 0 ? '16px' : '0', borderLeft: (depth > 0 || block.children.length > 0) ? '1px solid #444' : 'none', paddingLeft: depth > 0 ? '8px' : '0', borderTop: block.color ? `2px solid ${block.color}` : 'none', opacity: isDragged ? 0.4 : 1, transition: 'opacity 0.2s' };
+  const itemStyleWrapper: React.CSSProperties = { position: 'relative', marginLeft: depth > 0 ? '16px' : '0', borderLeft: (depth > 0 || block.children.length > 0) ? '1px solid #444' : 'none', paddingLeft: depth > 0 ? '8px' : '0', borderTop: block.color ? `2px solid ${block.color}` : 'none', opacity: isDragged ? 0.4 : 1, transition: 'opacity 0.2s', marginBottom: '2px' };
+
+  const DragIndicatorLine = () => {
+    if (!dragIndicator) return null;
+    const isInside = dragIndicator === 'inside';
+    const isBefore = dragIndicator === 'before';
+    return (
+      <div style={{
+        position: 'absolute',
+        top: isBefore ? '-2px' : 'auto',
+        bottom: !isBefore ? '-2px' : 'auto',
+        left: isInside ? '100px' : '0',
+        right: '0',
+        height: '3px',
+        backgroundColor: '#1abc9c',
+        zIndex: 100,
+        borderRadius: '2px',
+        boxShadow: '0 0 8px rgba(26, 188, 156, 0.5)'
+      }} />
+    );
+  };
 
   if (block.type === 'variable' && block.variable) {
     const isLocal = depth > 0;
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid', borderLeftColor: isLocal ? '#e67e22' : '#3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
-        <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px' }}>{isLocal ? 'Local' : 'Global'}</div>
-        <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div 
+        className="event-block-item-container" 
+        data-block-id={block.id} 
+        draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} 
+        onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
+        onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} 
+        onDoubleClick={(e) => { e.stopPropagation(); onOpenVariableEditor(eventSheetId, block.id, block.variable); }}
+        onContextMenu={(e) => onContextMenu(e, block.id)} 
+        style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid', borderLeftColor: isLocal ? '#e67e22' : '#3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), cursor: 'pointer' }}
+      >
+        <DragIndicatorLine />
+        <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? 'Local' : 'Global'}</div>
+        <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
           <Variable size={14} color={isLocal ? '#e67e22' : '#3498db'} /> 
-          <input value={block.variable.name} onChange={(e) => updateEventBlock(eventSheetId, block.id, { variable: { ...block.variable, name: e.target.value } })} style={{ backgroundColor: 'transparent', border: 'none', color: '#fff', fontWeight: 'bold', outline: 'none', width: '100%' }} />
+          <span>{block.variable.name}</span>
           <span style={{ color: '#888' }}>=</span>
-          <span style={{ color: '#fff' }}>{block.variable.initialValue}</span>
+          <span style={{ color: block.variable.type === 'string' ? '#e67e22' : '#2ecc71' }}>{block.variable.type === 'string' ? `"${block.variable.initialValue}"` : String(block.variable.initialValue)}</span>
+          {block.variable.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#444', padding: '1px 4px', borderRadius: '2px', color: '#aaa' }}>CONST</span>}
         </div>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
       </div>
@@ -356,7 +664,8 @@ const EventBlockItem: React.FC<{
 
   if (block.type === 'function') {
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#2d2d2d', borderLeft: '4px solid #9b59b6', borderRadius: '4px', overflow: 'hidden', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#2d2d2d', borderLeft: '4px solid #9b59b6', borderRadius: '4px', overflow: 'visible', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+        <DragIndicatorLine />
         <div style={{ backgroundColor: '#333', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Zap size={14} color="#9b59b6" />
           <div style={{ fontWeight: 'bold', flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -367,7 +676,7 @@ const EventBlockItem: React.FC<{
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
         <div style={{ padding: '4px 4px 4px 24px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       </div>
     );
@@ -376,7 +685,8 @@ const EventBlockItem: React.FC<{
   if (block.type === 'include') {
     const includedSheet = useEditorStore.getState().project.eventSheets.find(s => s.id === block.includeSheetId);
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid #2ecc71', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '10px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid #2ecc71', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '10px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+        <DragIndicatorLine />
         <FilePlus size={14} color="#2ecc71" />
         <div style={{ fontWeight: 'bold', flex: 1 }}>Include sheet: <span style={{ color: '#2ecc71' }}>{includedSheet?.name || 'Unknown'}</span></div>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
@@ -386,7 +696,8 @@ const EventBlockItem: React.FC<{
 
   if (block.type === 'comment') {
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#333' : '#feffc1', color: '#000', padding: '8px 12px', borderLeft: '4px solid #f1c40f', fontStyle: 'italic', display: 'flex', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#333' : '#feffc1', color: '#000', padding: '8px 12px', borderLeft: '4px solid #f1c40f', fontStyle: 'italic', display: 'flex', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+        <DragIndicatorLine />
         <div style={{ flex: 1 }}>
           <input value={block.commentText} onChange={(e) => updateEventBlock(eventSheetId, block.id, { commentText: e.target.value })} style={{ backgroundColor: 'transparent', border: 'none', color: '#000', fontStyle: 'italic', outline: 'none', width: '100%' }} />
         </div>
@@ -398,7 +709,8 @@ const EventBlockItem: React.FC<{
   if (block.type === 'group') {
     const isExpanded = searchTerm ? true : block.groupExpanded;
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'hidden', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'visible', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+        <DragIndicatorLine />
         <div style={{ backgroundColor: isSelected ? '#007acc' : '#2d2d2d', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderLeft: '4px solid #f39c12' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
           <span style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>▶</span>
           <div style={{ fontWeight: 'bold', flex: 1 }}>
@@ -408,7 +720,7 @@ const EventBlockItem: React.FC<{
         </div>
         {isExpanded && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
+            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
           </div>
         )}
       </div>
@@ -416,7 +728,8 @@ const EventBlockItem: React.FC<{
   }
 
   return (
-    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '3px', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', boxShadow: isSelected ? '0 0 12px rgba(0, 122, 204, 0.3)' : 'none', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '6px', overflow: 'hidden', borderLeft: isSelected ? '4px solid #007acc' : '4px solid #3498db' }}>
+    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '3px', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', boxShadow: isSelected ? '0 0 12px rgba(0, 122, 204, 0.3)' : 'none', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '6px', overflow: 'visible', borderLeft: isSelected ? '4px solid #007acc' : '4px solid #3498db' }}>
+      <DragIndicatorLine />
       <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', minHeight: '60px', position: 'relative' }}>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
         {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}
@@ -427,21 +740,21 @@ const EventBlockItem: React.FC<{
           {block.conditions.map((c, i) => (
             <React.Fragment key={c.id}>
               {block.isOrBlock && i > 0 && <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', margin: '3px 0', fontWeight: 'bold', backgroundColor: '#222' }}>— OR —</div>}
-              <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} index={i+1} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
+              <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
             </React.Fragment>
           ))}
           <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '12px' }}>+ Add condition</div>
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           {block.actions.map((a, i) => (
-            <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} index={i+1} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
+            <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
           ))}
           <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '12px' }}>+ Add action</div>
         </div>
       </div>
       {block.children.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       )}
     </div>
@@ -545,7 +858,7 @@ const LogicItemContent: React.FC<{
   );
 };
 
-const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, condition: any, index: number, onOpenParamEditor: any, onContextMenu: any, searchTerm: string, setDraggedLogicItem: any, draggedLogicItem: any }> = ({ project, eventSheetId, blockId, condition, index, onOpenParamEditor, onContextMenu, searchTerm, setDraggedLogicItem, draggedLogicItem }) => {
+const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, condition: any, index: number, onOpenBrowser: any, onOpenParamEditor: any, onContextMenu: any, searchTerm: string, setDraggedLogicItem: any, draggedLogicItem: any }> = ({ project, eventSheetId, blockId, condition, index, onOpenBrowser, onOpenParamEditor, onContextMenu, searchTerm, setDraggedLogicItem, draggedLogicItem }) => {
   const { editorState, setSelectedLogicItems, moveCondition } = useEditorStore();
   const def = findConditionDefinition(condition.type);
   const selectionId = `${blockId}:${condition.id}`;
@@ -565,17 +878,27 @@ const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId:
       onDragOver={(e) => { if (draggedLogicItem?.type === 'condition') e.preventDefault(); }}
       onDrop={handleDrop}
       onClick={(e) => { e.stopPropagation(); setSelectedLogicItems([selectionId]); }} 
-      onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params, condition.targetObjectTypeId); }} 
+      onDoubleClick={(e) => { 
+        e.stopPropagation(); 
+        if (def) {
+          if (def.params.length > 0) {
+            onOpenParamEditor('condition', blockId, condition.id, def, condition.params, condition.targetObjectTypeId); 
+          } else {
+            // Item has no params, open browser to allow changing it
+            onOpenBrowser('condition', blockId, condition.targetObjectTypeId, condition.type, condition.id);
+          }
+        }
+      }} 
       onContextMenu={(e) => onContextMenu(e, blockId, condition.id)}
-      className="logic-item-hover"
-      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === condition.id) ? 0.3 : 1, width: '100%', cursor: 'pointer', transition: 'background-color 0.1s' }}
+      className={`logic-item-hover ${isSelected ? 'selected' : ''}`}
+      style={{ opacity: (draggedLogicItem?.itemId === condition.id) ? 0.3 : 1, width: '100%' }}
     >
       <LogicItemContent item={condition} def={def} project={project} type="condition" searchTerm={searchTerm} />
     </div>
   );
 };
 
-const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, action: any, index: number, onOpenParamEditor: any, onContextMenu: any, searchTerm: string, setDraggedLogicItem: any, draggedLogicItem: any }> = ({ project, eventSheetId, blockId, action, index, onOpenParamEditor, onContextMenu, searchTerm, setDraggedLogicItem, draggedLogicItem }) => {
+const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: string, action: any, index: number, onOpenBrowser: any, onOpenParamEditor: any, onContextMenu: any, searchTerm: string, setDraggedLogicItem: any, draggedLogicItem: any }> = ({ project, eventSheetId, blockId, action, index, onOpenBrowser, onOpenParamEditor, onContextMenu, searchTerm, setDraggedLogicItem, draggedLogicItem }) => {
   const { editorState, setSelectedLogicItems, moveAction } = useEditorStore();
   const def = findActionDefinition(action.type);
   const selectionId = `${blockId}:${action.id}`;
@@ -595,10 +918,20 @@ const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: st
       onDragOver={(e) => { if (draggedLogicItem?.type === 'action') e.preventDefault(); }}
       onDrop={handleDrop}
       onClick={(e) => { e.stopPropagation(); setSelectedLogicItems([selectionId]); }} 
-      onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('action', blockId, action.id, def, action.params, action.targetObjectTypeId); }} 
+      onDoubleClick={(e) => { 
+        e.stopPropagation(); 
+        if (def) {
+          if (def.params.length > 0) {
+            onOpenParamEditor('action', blockId, action.id, def, action.params, action.targetObjectTypeId); 
+          } else {
+            // Item has no params, open browser to allow changing it
+            onOpenBrowser('action', blockId, action.targetObjectTypeId, action.type, action.id);
+          }
+        }
+      }} 
       onContextMenu={(e) => onContextMenu(e, blockId, action.id)}
-      className="logic-item-hover"
-      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === action.id) ? 0.3 : 1, width: '100%', cursor: 'pointer', transition: 'background-color 0.1s' }}
+      className={`logic-item-hover ${isSelected ? 'selected' : ''}`}
+      style={{ opacity: (draggedLogicItem?.itemId === action.id) ? 0.3 : 1, width: '100%' }}
     >
       <LogicItemContent item={action} def={def} project={project} type="action" searchTerm={searchTerm} />
     </div>
@@ -658,7 +991,15 @@ const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: s
   );
 };
 
-const ParamEditor: React.FC<{ project: Project, def: LogicDefinition, initialParams: any[], targetObjectTypeId?: string, onSave: (p: any[]) => void, onCancel: () => void }> = ({ project, def, initialParams, targetObjectTypeId, onSave, onCancel }) => {
+const ParamEditor: React.FC<{ 
+  project: Project, 
+  def: LogicDefinition, 
+  initialParams: any[], 
+  targetObjectTypeId?: string, 
+  onSave: (p: any[]) => void, 
+  onBack: () => void,
+  onCancel: () => void 
+}> = ({ project, def, initialParams, targetObjectTypeId, onSave, onBack, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
 
   React.useEffect(() => {
@@ -734,9 +1075,16 @@ const ParamEditor: React.FC<{ project: Project, def: LogicDefinition, initialPar
     >
       <div style={{ ...modalStyle, width: '900px', height: '650px', flexDirection: 'row' }} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#1e1e1e', borderRight: '1px solid #333' }}>
-          <div style={{ ...modalHeaderStyle, backgroundColor: '#252526', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ ...modalHeaderStyle, backgroundColor: '#252526', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+            <button 
+              onClick={onBack} 
+              style={{ ...iconButtonStyle, width: '32px', height: '32px', border: '1px solid #444', borderRadius: '6px' }}
+              title="Back to logic selection"
+            >
+              <ChevronUp size={18} style={{ transform: 'rotate(-90deg)' }} />
+            </button>
             <div style={{ width: '32px', height: '32px', backgroundColor: '#007acc', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={18} color="#fff" /></div>
-            <div>
+            <div style={{ flex: 1 }}>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Parameters: {def.name}</h3>
               <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{def.description}</div>
             </div>

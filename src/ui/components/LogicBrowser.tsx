@@ -9,18 +9,41 @@ interface LogicBrowserProps {
   onSelect: (targetObjectTypeId: string | undefined, type: string, params: any[]) => void;
   onClose: () => void;
   initialObjectTypeId?: string;
+  initialLogicTypeId?: string;
 }
 
-export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSelect, onClose, initialObjectTypeId }) => {
+const ObjectCard: React.FC<{ name: string, icon: React.ReactNode, onClick: () => void, selected?: boolean }> = ({ name, icon, onClick, selected }) => (
+  <div 
+    onClick={onClick}
+    className={`object-card ${selected ? 'selected' : ''}`}
+  >
+    {icon}
+    <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', textAlign: 'center' }}>{name}</div>
+  </div>
+);
+
+export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSelect, onClose, initialObjectTypeId, initialLogicTypeId }) => {
   const initialOT = initialObjectTypeId ? project.objectTypes.find(ot => ot.id === initialObjectTypeId) : undefined;
   
-  const [step, setStep] = React.useState<'object' | 'logic'>(initialObjectTypeId !== undefined ? 'logic' : 'object');
+  const [step, setStep] = React.useState<'object' | 'logic'>((initialObjectTypeId !== undefined || initialLogicTypeId !== undefined) ? 'logic' : 'object');
   const [selectedObjectType, setSelectedObjectType] = React.useState<ObjectType | undefined>(initialOT);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>('All');
-  const [hoveredItem, setHoveredItem] = React.useState<LogicDefinition | null>(null);
 
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    // Focus search when entering logic step or when modal opens directly in logic step
+    if (step === 'logic') {
+      setTimeout(() => searchInputRef.current?.focus(), 10);
+    }
+  }, [step]);
+  
   const items = mode === 'condition' ? CONDITIONS : ACTIONS;
+  const [hoveredItem, setHoveredItem] = React.useState<LogicDefinition | null>(
+    initialLogicTypeId ? (items.find(i => i.type === initialLogicTypeId) || null) : null
+  );
+
+
   
   // 1. First find all items that match the target (System/Object) and search term
   const availableItems = items.filter(item => {
@@ -58,6 +81,32 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
 
   return (
     <div style={overlayStyle} onClick={onClose}>
+      <style>{`
+        .object-card {
+          background-color: #2d2d2d;
+          border: 1px solid #333;
+          border-radius: 8px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .object-card:hover {
+          background-color: #37373d;
+          border-color: #444;
+          transform: translateY(-2px);
+        }
+        .object-card.selected {
+          background-color: #004b7e !important;
+          border-color: #007acc !important;
+        }
+        .object-card.selected:hover {
+          background-color: #005d9e !important;
+        }
+      `}</style>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
@@ -81,6 +130,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
         <div style={searchContainerStyle}>
           <Search size={14} style={{ position: 'absolute', left: '24px', color: '#666' }} />
           <input 
+            ref={searchInputRef}
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -129,15 +179,24 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
 
               {/* Main List Grid */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}>
+                <div 
+                  style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}
+                  onMouseLeave={() => setHoveredItem(null)}
+                >
                   {filteredItems.map(def => (
                     <div 
                       key={def.type} 
-                      style={logicItemStyle} 
+                      style={{
+                        ...logicItemStyle,
+                        backgroundColor: hoveredItem?.type === def.type 
+                          ? (initialLogicTypeId === def.type ? '#005d9e' : '#37373d') 
+                          : (initialLogicTypeId === def.type ? '#004b7e' : 'transparent'),
+                        borderLeft: initialLogicTypeId === def.type ? '3px solid #007acc' : '3px solid transparent'
+                      }} 
                       onClick={() => handleLogicSelect(def)}
                       onMouseEnter={() => setHoveredItem(def)}
                     >
-                      <ChevronRight size={14} style={{ opacity: 0.2 }} />
+                      <ChevronRight size={14} style={{ opacity: hoveredItem?.type === def.type ? 1 : 0.2 }} />
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontWeight: 600, fontSize: '13px' }}>{def.name}</span>
                         <span style={{ fontSize: '11px', color: '#666' }}>{def.category}</span>
@@ -179,31 +238,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   );
 };
 
-const ObjectCard: React.FC<{ name: string, icon: React.ReactNode, onClick: () => void, selected: boolean }> = ({ name, icon, onClick, selected }) => (
-  <div 
-    onClick={onClick}
-    style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '12px',
-      padding: '20px 12px',
-      backgroundColor: selected ? '#37373d' : '#252526',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      border: '1px solid',
-      borderColor: selected ? '#007acc' : '#333',
-      transition: 'all 0.15s ease',
-      userSelect: 'none'
-    }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = '#007acc'}
-    onMouseLeave={e => e.currentTarget.style.borderColor = selected ? '#007acc' : '#333'}
-  >
-    <div style={{ transform: 'scale(1.2)' }}>{icon}</div>
-    <span style={{ fontSize: '12px', fontWeight: 600, color: selected ? '#fff' : '#ccc' }}>{name}</span>
-  </div>
-);
+
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',

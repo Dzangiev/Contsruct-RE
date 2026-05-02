@@ -43,7 +43,7 @@ interface EditorStore {
   addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => void;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
   removeEventBlock: (eventSheetId: string, blockId: string) => void;
-  moveEventBlock: (eventSheetId: string, blockId: string, targetParentId: string | null, targetIndex: number) => void;
+  moveEventBlock: (eventSheetId: string, blockId: string, targetParentId: string | null, targetIndex: number, afterBlockId?: string, beforeBlockId?: string) => void;
   addCondition: (eventSheetId: string, blockId: string, type: string, params?: any[], targetObjectTypeId?: string) => void;
   updateCondition: (eventSheetId: string, blockId: string, conditionId: string, updates: any) => void;
   removeCondition: (eventSheetId: string, blockId: string, conditionId: string) => void;
@@ -237,8 +237,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
-  moveEventBlock: (eventSheetId, blockId, targetParentId, targetIndex) => {
-    const next = eventUpdates.moveEventBlock(get().project, eventSheetId, blockId, targetParentId, targetIndex);
+  moveEventBlock: (eventSheetId, blockId, targetParentId, targetIndex, afterBlockId, beforeBlockId) => {
+    const next = eventUpdates.moveEventBlock(get().project, eventSheetId, blockId, targetParentId, targetIndex, afterBlockId, beforeBlockId);
     set({ project: next });
     get().pushHistory(next);
   },

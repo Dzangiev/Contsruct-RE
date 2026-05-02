@@ -57,6 +57,9 @@ export interface InstanceVariable {
   name: string;
   type: 'number' | 'string' | 'boolean';
   initialValue: any;
+  description?: string;
+  isStatic?: boolean;
+  isConstant?: boolean;
 }
 
 export interface Behavior {
@@ -100,6 +103,9 @@ export interface GlobalVariable {
   name: string;
   type: 'number' | 'string' | 'boolean';
   initialValue: any;
+  description?: string;
+  isStatic?: boolean;
+  isConstant?: boolean;
   comment?: string;
 }
 

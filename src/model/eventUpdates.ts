@@ -385,7 +385,9 @@ export function moveEventBlock(
   eventSheetId: string,
   blockId: string,
   targetParentId: string | null,
-  targetIndex: number
+  targetIndex: number,
+  afterBlockId?: string,
+  beforeBlockId?: string
 ): Project {
   const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
   if (!eventSheet) return project;
@@ -401,16 +403,39 @@ export function moveEventBlock(
 
   // 2. Insert into new position
   const insert = (blocks: EventBlock[]): EventBlock[] => {
-    if (targetParentId === null) {
+    let parentId = targetParentId;
+    let index = targetIndex;
+
+    // If afterBlockId or beforeBlockId is provided, find its parent and index
+    if (afterBlockId || beforeBlockId) {
+      const refId = afterBlockId || beforeBlockId;
+      const findParentAndIndex = (list: EventBlock[], pId: string | null): { pId: string | null, idx: number } | null => {
+        const foundIdx = list.findIndex(b => b.id === refId);
+        if (foundIdx !== -1) return { pId, idx: afterBlockId ? foundIdx + 1 : foundIdx };
+        for (const b of list) {
+          const res = findParentAndIndex(b.children, b.id);
+          if (res) return res;
+        }
+        return null;
+      };
+      const res = findParentAndIndex(sheetWithoutBlock.events, null);
+      if (res) {
+        parentId = res.pId;
+        index = res.idx;
+      }
+    }
+
+    if (parentId === null) {
       const next = [...blocks];
-      const safeIndex = Math.min(targetIndex, next.length);
+      const safeIndex = Math.min(index, next.length);
       next.splice(safeIndex, 0, blockToMove);
       return next;
     }
+
     return blocks.map(b => {
-      if (b.id === targetParentId) {
+      if (b.id === parentId) {
         const nextChildren = [...b.children];
-        const safeIndex = Math.min(targetIndex, nextChildren.length);
+        const safeIndex = Math.min(index, nextChildren.length);
         nextChildren.splice(safeIndex, 0, blockToMove);
         return { ...b, children: nextChildren };
       }
