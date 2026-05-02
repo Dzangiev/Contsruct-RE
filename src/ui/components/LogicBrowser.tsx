@@ -117,21 +117,6 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
         .object-card.selected:hover {
           background-color: #005d9e !important;
         }
-        .logic-browser-scroll::-webkit-scrollbar {
-          width: 8px;
-        }
-        .logic-browser-scroll::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.05);
-          border-radius: 4px;
-        }
-        .logic-browser-scroll::-webkit-scrollbar-thumb {
-          background: #444;
-          border-radius: 4px;
-          border: 2px solid #1e1e1e;
-        }
-        .logic-browser-scroll::-webkit-scrollbar-thumb:hover {
-          background: #555;
-        }
       `}</style>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -167,7 +152,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {step === 'object' ? (
-            <div className="logic-browser-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
               <ObjectCard 
                 name="System" 
                 icon={<Monitor size={24} color="#3498db" />} 
@@ -187,7 +172,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
           ) : (
             <>
               {/* Sidebar Categories */}
-              <div className="logic-browser-scroll" style={{ ...sidebarStyle, overflowY: 'auto' }}>
+              <div style={sidebarStyle}>
                 {categories.map(cat => (
                   <div 
                     key={cat} 
@@ -204,7 +189,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
               </div>
 
               {/* Main List Grid */}
-              <div className="logic-browser-scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
                 <div 
                   style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}
                   onMouseLeave={() => setHoveredItem(null)}
