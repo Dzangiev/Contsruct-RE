@@ -98,14 +98,32 @@ export function updateLayer(
  * Adds a new object type to the project.
  */
 export function addObjectType(project: Project, name: string, kind: ObjectTypeKind, id: string = generateId()): Project {
+  let defaultWidth = 64;
+  let defaultHeight = 64;
+  const properties: Record<string, any> = {};
+
+  if (kind === ObjectTypeKind.TiledBackground) {
+    defaultWidth = 128;
+    defaultHeight = 128;
+  } else if (kind === ObjectTypeKind.Text) {
+    defaultWidth = 120;
+    defaultHeight = 24;
+    properties.text = 'Text';
+    properties.color = '#ffffff';
+    properties.fontSize = 12;
+    properties.fontFace = 'Arial';
+    properties.horizontalAlign = 'left';
+    properties.verticalAlign = 'top';
+  }
+
   const newObjectType: ObjectType = {
     id,
     name,
     kind,
     pluginId: kind,
-    defaultWidth: 64,
-    defaultHeight: 64,
-    properties: {},
+    defaultWidth,
+    defaultHeight,
+    properties,
     instanceVariables: [],
     behaviors: [],
   };

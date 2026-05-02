@@ -50,6 +50,15 @@ export const Inspector: React.FC = () => {
             <PropertyRow label="Visible" value={instance.visible ? 'Yes' : 'No'} onChange={v => updateInstance(activeLayoutId!, instanceId, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
           </Category>
 
+          {objectType?.kind === 'text' && (
+            <Category label="Text Properties">
+              <PropertyRow label="Text" value={instance.properties.text ?? 'Text'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, text: String(v) } })} />
+              <PropertyRow label="Color" value={instance.properties.color ?? '#ffffff'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
+              <PropertyRow label="Font Size" value={instance.properties.fontSize ?? 12} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, fontSize: Number(v) } })} type="number" />
+              <PropertyRow label="Font Face" value={instance.properties.fontFace ?? 'Arial'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, fontFace: String(v) } })} />
+            </Category>
+          )}
+
           {objectType?.behaviors?.map(b => (
             <Category key={b.id} label={b.name}>
               {Object.keys(b.properties || {}).map(prop => (

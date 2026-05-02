@@ -808,11 +808,65 @@ export const Viewport: React.FC = () => {
                   {instances.filter(inst => inst.layerId === layer.id).map(inst => {
                     const isSelected = selectedInstanceIds.includes(inst.id);
                     const objectType = project.objectTypes?.find(ot => ot.id === inst.objectTypeId);
+                    const kind = objectType?.kind || ObjectTypeKind.Sprite;
+
+                    const renderContent = () => {
+                      switch (kind) {
+                        case ObjectTypeKind.Text: {
+                          const textValue = inst.properties.text || objectType?.properties.text || 'Text';
+                          const color = inst.properties.color || objectType?.properties.color || '#ffffff';
+                          const fontSize = (inst.properties.fontSize || objectType?.properties.fontSize || 12);
+                          const fontFace = inst.properties.fontFace || objectType?.properties.fontFace || 'Arial';
+                          return (
+                            <g>
+                              <rect width={inst.width} height={inst.height} fill="transparent" stroke={isSelected ? "#0099ff" : "rgba(255,255,255,0.1)"} strokeWidth={1/zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                              <text 
+                                x={2} y={inst.height / 2} 
+                                fontSize={fontSize} 
+                                fill={color} 
+                                fontFamily={fontFace}
+                                dominantBaseline="middle"
+                                pointerEvents="none"
+                                style={{ userSelect: 'none' }}
+                              >
+                                {textValue}
+                              </text>
+                            </g>
+                          );
+                        }
+                        case ObjectTypeKind.TiledBackground: {
+                          return (
+                            <g>
+                              <defs>
+                                <pattern id={`tiled-${inst.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
+                                  <rect width="32" height="32" fill="#2d2d2d" stroke="#3d3d3d" strokeWidth="0.5" />
+                                  <path d="M 0 16 L 32 16 M 16 0 L 16 32" stroke="#3d3d3d" strokeWidth="0.5" opacity="0.3" />
+                                </pattern>
+                              </defs>
+                              <rect width={inst.width} height={inst.height} fill={`url(#tiled-${inst.id})`} stroke={isSelected ? "#0099ff" : "#444"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                              <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="#666" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>Tiled</text>
+                            </g>
+                          );
+                        }
+                        case ObjectTypeKind.Sprite:
+                        default: {
+                          return (
+                            <g>
+                              <rect width={inst.width} height={inst.height} fill="#4a4a4a" stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
+                              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                                transform={`translate(${inst.width/2 - 12}, ${inst.height/2 - 12}) scale(${Math.min(inst.width, inst.height)/48})`}
+                                fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}
+                              />
+                              <text x={inst.width/2} y={inst.height - (isSelected ? 10/zoom : 5/zoom)} fontSize={Math.max(8 / zoom, 2)} fill="#888" textAnchor="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Sprite'}</text>
+                            </g>
+                          );
+                        }
+                      }
+                    };
+
                     return (
                       <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} opacity={inst.opacity}>
-                        <rect width={inst.width} height={inst.height} fill="#4a4a4a" stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
-                        {isSelected && <rect width={inst.width} height={inst.height} fill="none" stroke="#0099ff" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />}
-                        <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="#aaa" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Instance'}</text>
+                        {renderContent()}
                         {isSelected && (
                           <g>
                             <rect width={inst.width} height={inst.height} fill="rgba(0, 153, 255, 0.1)" pointerEvents="none" />

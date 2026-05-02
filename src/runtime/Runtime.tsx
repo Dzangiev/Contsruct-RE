@@ -673,20 +673,70 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                       const layerInstances = runtimeInstances.filter(inst => inst.layerId === layer.id);
                       return (
                         <g key={layer.id} opacity={layer.opacity ?? 1}>
-                          {layerInstances.map(inst => (
-                            <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle || 0}, ${inst.width/2}, ${inst.height/2})`}>
-                              <rect 
-                                width={inst.width} height={inst.height} 
-                                fill="#5c5c5c" 
-                                stroke={debugDraw ? "#f0f" : "#777"}
-                                strokeWidth={debugDraw ? 2 : 1}
-                                style={{ display: inst.visible !== false ? 'block' : 'none' }} 
-                              />
-                              {debugDraw && (
-                                <text x={inst.width/2} y={-5} fontSize="8" fill="#f0f" textAnchor="middle" pointerEvents="none">{inst.id.split('-')[0]}</text>
-                              )}
-                            </g>
-                          ))}
+                          {layerInstances.map(inst => {
+                            const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+                            const kind = ot?.kind || 'sprite';
+                            
+                            const renderContent = () => {
+                              switch (kind) {
+                                case 'text': {
+                                  const textValue = inst.properties.text || ot?.properties.text || 'Text';
+                                  const color = inst.properties.color || ot?.properties.color || '#ffffff';
+                                  const fontSize = (inst.properties.fontSize || ot?.properties.fontSize || 12);
+                                  const fontFace = inst.properties.fontFace || ot?.properties.fontFace || 'Arial';
+                                  return (
+                                    <text 
+                                      x={2} y={inst.height / 2} 
+                                      fontSize={fontSize} 
+                                      fill={color} 
+                                      fontFamily={fontFace}
+                                      dominantBaseline="middle"
+                                      pointerEvents="none"
+                                      style={{ userSelect: 'none' }}
+                                    >
+                                      {textValue}
+                                    </text>
+                                  );
+                                }
+                                case 'tiled-background': {
+                                  return (
+                                    <g>
+                                      <defs>
+                                        <pattern id={`rt-tiled-${inst.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
+                                          <rect width="32" height="32" fill="#2d2d2d" stroke="#3d3d3d" strokeWidth="0.5" />
+                                          <path d="M 0 16 L 32 16 M 16 0 L 16 32" stroke="#3d3d3d" strokeWidth="0.5" opacity="0.3" />
+                                        </pattern>
+                                      </defs>
+                                      <rect width={inst.width} height={inst.height} fill={`url(#rt-tiled-${inst.id})`} stroke={debugDraw ? "#f0f" : "none"} strokeWidth={1} />
+                                    </g>
+                                  );
+                                }
+                                case 'sprite':
+                                default: {
+                                  return (
+                                    <rect 
+                                      width={inst.width} height={inst.height} 
+                                      fill="#5c5c5c" 
+                                      stroke={debugDraw ? "#f0f" : "#777"}
+                                      strokeWidth={debugDraw ? 2 : 1}
+                                    />
+                                  );
+                                }
+                              }
+                            };
+
+                            return (
+                              <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle || 0}, ${inst.width/2}, ${inst.height/2})`}>
+                                {renderContent()}
+                                {debugDraw && (
+                                  <g>
+                                    <rect width={inst.width} height={inst.height} fill="none" stroke="#f0f" strokeWidth="1" />
+                                    <text x={inst.width/2} y={-5} fontSize="8" fill="#f0f" textAnchor="middle" pointerEvents="none">{inst.id.split('-')[0]}</text>
+                                  </g>
+                                )}
+                              </g>
+                            );
+                          })}
                         </g>
                       );
                     })}
