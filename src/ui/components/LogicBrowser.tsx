@@ -52,10 +52,21 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
       (item.target === 'system' || item.target === 'both') : 
       (item.target === 'object' || item.target === 'both');
     
+    // Check requiredKind
+    let matchesKind = true;
+    if (!isSystemSelected && item.requiredKind) {
+      const kinds = Array.isArray(item.requiredKind) ? item.requiredKind : [item.requiredKind];
+      matchesKind = kinds.includes(selectedObjectType.kind);
+    } else if (isSystemSelected && item.requiredKind) {
+      // System items with requiredKind are usually invalid unless target is system, 
+      // but let's be safe: if it's a system item, it shouldn't have requiredKind for an object.
+      matchesKind = false;
+    }
+    
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.category.toLowerCase().includes(searchTerm.toLowerCase());
                           
-    return matchesTarget && matchesSearch;
+    return matchesTarget && matchesKind && matchesSearch;
   });
 
   // 2. Generate categories list from ALL available items (not just the ones in the current category)
@@ -106,6 +117,21 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
         .object-card.selected:hover {
           background-color: #005d9e !important;
         }
+        .logic-browser-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .logic-browser-scroll::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 4px;
+        }
+        .logic-browser-scroll::-webkit-scrollbar-thumb {
+          background: #444;
+          border-radius: 4px;
+          border: 2px solid #1e1e1e;
+        }
+        .logic-browser-scroll::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
       `}</style>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -141,7 +167,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {step === 'object' ? (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+            <div className="logic-browser-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
               <ObjectCard 
                 name="System" 
                 icon={<Monitor size={24} color="#3498db" />} 
@@ -161,7 +187,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
           ) : (
             <>
               {/* Sidebar Categories */}
-              <div style={sidebarStyle}>
+              <div className="logic-browser-scroll" style={{ ...sidebarStyle, overflowY: 'auto' }}>
                 {categories.map(cat => (
                   <div 
                     key={cat} 
@@ -178,7 +204,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
               </div>
 
               {/* Main List Grid */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
+              <div className="logic-browser-scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px', backgroundColor: '#1e1e1e' }}>
                 <div 
                   style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}
                   onMouseLeave={() => setHoveredItem(null)}

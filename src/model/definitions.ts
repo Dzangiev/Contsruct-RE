@@ -108,6 +108,7 @@ export interface LogicDefinition {
   params: ParamDefinition[];
   category: string;
   target: 'system' | 'object' | 'both';
+  requiredKind?: string | string[];
 }
 
 export const CONDITIONS: LogicDefinition[] = [
@@ -244,6 +245,18 @@ export const CONDITIONS: LogicDefinition[] = [
     ],
     category: 'Instance Variables',
     target: 'object'
+  },
+  {
+    type: 'compareText',
+    name: 'Compare text',
+    description: 'Compare the current text of the object.',
+    params: [
+      { name: 'Comparison', type: 'enum', options: ['==', '!=', 'includes'], defaultValue: '==' },
+      { name: 'Value', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Text',
+    target: 'object',
+    requiredKind: 'text'
   }
 ];
 
@@ -376,6 +389,42 @@ export const ACTIONS: LogicDefinition[] = [
     ],
     category: 'System',
     target: 'system'
+  },
+  {
+    type: 'setText',
+    name: 'Set text',
+    description: 'Change the text displayed by the object.',
+    params: [{ name: 'Text', type: 'string', defaultValue: '"Hello"' }],
+    category: 'Text',
+    target: 'object',
+    requiredKind: 'text'
+  },
+  {
+    type: 'appendText',
+    name: 'Append text',
+    description: 'Add text to the end of the existing text.',
+    params: [{ name: 'Text', type: 'string', defaultValue: '" World"' }],
+    category: 'Text',
+    target: 'object',
+    requiredKind: 'text'
+  },
+  {
+    type: 'setTextColor',
+    name: 'Set text color',
+    description: 'Change the color of the text.',
+    params: [{ name: 'Color', type: 'string', defaultValue: '"#ffffff"' }],
+    category: 'Text',
+    target: 'object',
+    requiredKind: 'text'
+  },
+  {
+    type: 'setFontSize',
+    name: 'Set font size',
+    description: 'Change the size of the font.',
+    params: [{ name: 'Size', type: 'number', defaultValue: 12 }],
+    category: 'Text',
+    target: 'object',
+    requiredKind: 'text'
   }
 ];
 

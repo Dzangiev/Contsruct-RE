@@ -218,6 +218,18 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               default: return false;
             }
           }
+          case 'compareText': {
+            const operator = condition.params[0];
+            const context = getEvaluationContext(dt, [i], i);
+            const compareValue = String(evaluateExpression(condition.params[1], context));
+            const val = String(i.properties.text || '');
+            switch (operator) {
+              case '==': return val === compareValue;
+              case '!=': return val !== compareValue;
+              case 'includes': return val.includes(compareValue);
+              default: return false;
+            }
+          }
           default: return true;
         }
       };
@@ -379,6 +391,10 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               runtimeVariablesRef.current[varName] = (runtimeVariablesRef.current[varName] || 0) + Number(val);
               return inst;
             }
+            case 'setText': return { ...inst, properties: { ...inst.properties, text: String(evalParam(0)) } };
+            case 'appendText': return { ...inst, properties: { ...inst.properties, text: (inst.properties.text || '') + String(evalParam(0)) } };
+            case 'setTextColor': return { ...inst, properties: { ...inst.properties, color: String(evalParam(0)) } };
+            case 'setFontSize': return { ...inst, properties: { ...inst.properties, fontSize: Number(evalParam(0)) } };
             default: return inst;
           }
         });
@@ -699,12 +715,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                                   );
                                 }
                                 case 'tiled-background': {
+                                  const tileW = inst.properties.tileWidth || 32;
+                                  const tileH = inst.properties.tileHeight || 32;
+                                  const bgColor = inst.properties.color || '#2d2d2d';
                                   return (
                                     <g>
                                       <defs>
-                                        <pattern id={`rt-tiled-${inst.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
-                                          <rect width="32" height="32" fill="#2d2d2d" stroke="#3d3d3d" strokeWidth="0.5" />
-                                          <path d="M 0 16 L 32 16 M 16 0 L 16 32" stroke="#3d3d3d" strokeWidth="0.5" opacity="0.3" />
+                                        <pattern id={`rt-tiled-${inst.id}`} width={tileW} height={tileH} patternUnits="userSpaceOnUse">
+                                          <rect width={tileW} height={tileH} fill={bgColor} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                                          <path d={`M 0 ${tileH/2} L ${tileW} ${tileH/2} M ${tileW/2} 0 L ${tileW/2} ${tileH}`} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" opacity="0.3" />
                                         </pattern>
                                       </defs>
                                       <rect width={inst.width} height={inst.height} fill={`url(#rt-tiled-${inst.id})`} stroke={debugDraw ? "#f0f" : "none"} strokeWidth={1} />
@@ -713,10 +732,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                                 }
                                 case 'sprite':
                                 default: {
+                                  const spriteColor = inst.properties.color || '#5c5c5c';
                                   return (
                                     <rect 
                                       width={inst.width} height={inst.height} 
-                                      fill="#5c5c5c" 
+                                      fill={spriteColor} 
                                       stroke={debugDraw ? "#f0f" : "#777"}
                                       strokeWidth={debugDraw ? 2 : 1}
                                     />

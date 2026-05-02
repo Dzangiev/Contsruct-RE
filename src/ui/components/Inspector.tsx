@@ -59,6 +59,20 @@ export const Inspector: React.FC = () => {
             </Category>
           )}
 
+          {objectType?.kind === 'sprite' && (
+            <Category label="Sprite Visuals">
+              <PropertyRow label="Color/Tint" value={instance.properties.color ?? '#4a4a4a'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
+            </Category>
+          )}
+
+          {objectType?.kind === 'tiled-background' && (
+            <Category label="Tiled Properties">
+              <PropertyRow label="Color" value={instance.properties.color ?? '#2d2d2d'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
+              <PropertyRow label="Tile Width" value={instance.properties.tileWidth ?? 32} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, tileWidth: Number(v) } })} type="number" />
+              <PropertyRow label="Tile Height" value={instance.properties.tileHeight ?? 32} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, tileHeight: Number(v) } })} type="number" />
+            </Category>
+          )}
+
           {objectType?.behaviors?.map(b => (
             <Category key={b.id} label={b.name}>
               {Object.keys(b.properties || {}).map(prop => (
