@@ -431,6 +431,18 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           <button onClick={() => setShowStats(!showStats)} style={toolbarButtonStyle}>
             {showStats ? 'Hide Stats' : 'Show Stats'}
           </button>
+          <button 
+            onClick={() => {
+              const el = document.querySelector('.runtime-preview');
+              if (el) {
+                if (!document.fullscreenElement) el.requestFullscreen();
+                else document.exitFullscreen();
+              }
+            }} 
+            style={toolbarButtonStyle}
+          >
+            Fullscreen
+          </button>
         </div>
         <button 
           onClick={onStop}
