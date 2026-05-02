@@ -110,7 +110,7 @@ const App: React.FC = () => {
             </div>
           </header>
           
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
             <ErrorBoundary name="MainContent">
               {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
             </ErrorBoundary>

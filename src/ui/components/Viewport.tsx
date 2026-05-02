@@ -1007,12 +1007,7 @@ export const Viewport: React.FC = () => {
         )}
       </div>
 
-      <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(20,20,20,0.85)', color: '#eee', padding: '8px 16px', borderRadius: '8px', fontSize: '11px', pointerEvents: 'none', display: 'flex', gap: '20px', border: '1px solid #444', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0,0,0,0.6)', zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>POS</span> {mouseLayoutPos.x}, {mouseLayoutPos.y}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>SIZE</span> {width} × {height}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>ZOOM</span> {Math.round(zoom * 100)}%</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#007acc', fontWeight: 'bold' }}>GRID</span> {gridSize}px</div>
-      </div>
+
     </div>
   );
 };

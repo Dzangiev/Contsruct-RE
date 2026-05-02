@@ -53,11 +53,7 @@ export const EventSheetEditor: React.FC = () => {
   const activeEventSheetId = activeLayout?.eventSheetId || project.eventSheets[0]?.id;
   const eventSheet = project.eventSheets.find(es => es.id === activeEventSheetId);
 
-  const countTotalEvents = (blocks: EventBlock[]): number => {
-    let count = 0;
-    blocks.forEach(b => { if (b.type === 'event') count++; count += countTotalEvents(b.children); });
-    return count;
-  };
+
 
   const expandAll = (expand: boolean) => {
     if (!eventSheet) return;
@@ -301,10 +297,6 @@ export const EventSheetEditor: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ padding: '4px 16px', backgroundColor: '#007acc', color: '#fff', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #005a9e' }}>
-        <div style={{ display: 'flex', gap: '12px' }}><span>{project.globalVariables.length} Global</span><span>{countTotalEvents(eventSheet.events)} Blocks</span></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2ecc71' }}></div> <span>C3 ELITE MODE ACTIVE</span></div>
-      </div>
 
       {browserState?.isOpen && <LogicBrowser project={project} mode={browserState.mode} initialObjectTypeId={browserState.targetObjectTypeId} onSelect={(t, ty, p) => { if (browserState.mode === 'condition') addCondition(browserState.eventSheetId, browserState.blockId, ty, p, t); else addAction(browserState.eventSheetId, browserState.blockId, ty, p, t); }} onClose={() => setBrowserState(null)} />}
       {paramEditorState?.isOpen && <ParamEditor project={project} def={paramEditorState.def} initialParams={paramEditorState.params} targetObjectTypeId={paramEditorState.targetObjectTypeId} onSave={(p) => { if (paramEditorState.mode === 'condition') updateCondition(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); else updateAction(paramEditorState.eventSheetId, paramEditorState.blockId, paramEditorState.itemId, { params: p }); setParamEditorState(null); }} onCancel={() => setParamEditorState(null)} />}
@@ -428,23 +420,23 @@ const EventBlockItem: React.FC<{
       <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', minHeight: '60px', position: 'relative' }}>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
         {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}
-        <div style={{ backgroundColor: isSelected ? '#007acc' : '#1e1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: isSelected ? '#fff' : '#555', borderRight: '1px solid #333', width: '30px', fontWeight: 'bold' }}>
+        <div style={{ backgroundColor: isSelected ? '#007acc' : '#1e1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: isSelected ? '#fff' : '#555', borderRight: '1px solid #333', width: '30px', fontWeight: 'bold' }}>
           {blockIndices.get(block.id)}
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', borderRight: '1px solid #333', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           {block.conditions.map((c, i) => (
             <React.Fragment key={c.id}>
-              {block.isOrBlock && i > 0 && <div style={{ fontSize: '10px', color: '#888', textAlign: 'center', margin: '2px 0', fontWeight: 'bold', backgroundColor: '#222' }}>— OR —</div>}
+              {block.isOrBlock && i > 0 && <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', margin: '3px 0', fontWeight: 'bold', backgroundColor: '#222' }}>— OR —</div>}
               <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} condition={c} index={i+1} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
             </React.Fragment>
           ))}
-          <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '11px' }}>+ Add condition</div>
+          <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '12px' }}>+ Add condition</div>
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           {block.actions.map((a, i) => (
             <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} action={a} index={i+1} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} />
           ))}
-          <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '11px' }}>+ Add action</div>
+          <div style={{ ...addLinkStyle, padding: '4px 8px', color: '#555', fontSize: '12px' }}>+ Add action</div>
         </div>
       </div>
       {block.children.length > 0 && (
@@ -517,7 +509,7 @@ const LogicItemContent: React.FC<{
   };
 
   return (
-    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '22px', fontSize: '11px', width: '100%', borderBottom: '1px solid #111' }}>
+    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', borderBottom: '1px solid #111' }}>
       {/* Object Column */}
       <div style={{ 
         width: '120px', 

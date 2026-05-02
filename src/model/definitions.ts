@@ -107,6 +107,7 @@ export interface LogicDefinition {
   description?: string;
   params: ParamDefinition[];
   category: string;
+  target: 'system' | 'object' | 'both';
 }
 
 export const CONDITIONS: LogicDefinition[] = [
@@ -116,14 +117,16 @@ export const CONDITIONS: LogicDefinition[] = [
     name: 'Every tick',
     description: 'Condition is always true.',
     params: [],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'onStartOfLayout',
     name: 'On start of layout',
     description: 'Runs once when the layout starts.',
     params: [],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'compareGlobalVariable',
@@ -134,49 +137,56 @@ export const CONDITIONS: LogicDefinition[] = [
       { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
       { name: 'Value', type: 'number', defaultValue: 0 }
     ],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'else',
     name: 'Else',
     description: 'Runs if the preceding event was false.',
     params: [],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'keyDown',
     name: 'Key is down',
     description: 'True if a specific key is currently held down.',
     params: [{ name: 'Key', type: 'string', defaultValue: 'Space' }],
-    category: 'Keyboard'
+    category: 'Keyboard',
+    target: 'system'
   },
   {
     type: 'keyPressed',
     name: 'On key pressed',
     description: 'True only during the frame the key was pressed.',
     params: [{ name: 'Key', type: 'string', defaultValue: 'Space' }],
-    category: 'Keyboard'
+    category: 'Keyboard',
+    target: 'system'
   },
   {
     type: 'pointerDown',
     name: 'Pointer is down',
     description: 'True if the pointer (mouse/touch) is currently held down.',
     params: [],
-    category: 'Pointer'
+    category: 'Pointer',
+    target: 'system'
   },
   {
     type: 'pointerPressed',
     name: 'On pointer pressed',
     description: 'True only during the frame the pointer was pressed.',
     params: [],
-    category: 'Pointer'
+    category: 'Pointer',
+    target: 'system'
   },
   {
     type: 'pointerReleased',
     name: 'On pointer released',
     description: 'True only during the frame the pointer was released.',
     params: [],
-    category: 'Pointer'
+    category: 'Pointer',
+    target: 'system'
   },
   // Object Conditions
   {
@@ -184,7 +194,8 @@ export const CONDITIONS: LogicDefinition[] = [
     name: 'Is visible',
     description: 'Check if the object is currently visible.',
     params: [],
-    category: 'Appearance'
+    category: 'Appearance',
+    target: 'object'
   },
   {
     type: 'comparePosition',
@@ -195,28 +206,32 @@ export const CONDITIONS: LogicDefinition[] = [
       { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
       { name: 'Value', type: 'number', defaultValue: 0 }
     ],
-    category: 'Transform'
+    category: 'Transform',
+    target: 'object'
   },
   {
     type: 'pointerOverObject',
     name: 'Is pointer over object',
     description: 'True if the pointer is currently over the object.',
     params: [],
-    category: 'Pointer'
+    category: 'Pointer',
+    target: 'object'
   },
   {
     type: 'pointerPressedOnObject',
     name: 'On pointer pressed on object',
     description: 'True only if the pointer was pressed while over the object.',
     params: [],
-    category: 'Pointer'
+    category: 'Pointer',
+    target: 'object'
   },
   {
     type: 'isOverlapping',
     name: 'Is overlapping another object',
     description: 'True if the object is overlapping another instance of a specific type.',
     params: [{ name: 'Object Type', type: 'objectType' }],
-    category: 'Collisions'
+    category: 'Collisions',
+    target: 'object'
   },
   {
     type: 'compareInstanceVariable',
@@ -227,7 +242,8 @@ export const CONDITIONS: LogicDefinition[] = [
       { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
       { name: 'Value', type: 'number', defaultValue: 0 }
     ],
-    category: 'Instance Variables'
+    category: 'Instance Variables',
+    target: 'object'
   }
 ];
 
@@ -237,7 +253,8 @@ export const ACTIONS: LogicDefinition[] = [
     name: 'Destroy',
     description: 'Remove the object instance from the layout.',
     params: [],
-    category: 'Misc'
+    category: 'Misc',
+    target: 'object'
   },
   {
     type: 'setPosition',
@@ -247,7 +264,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'X', type: 'number', defaultValue: 0 },
       { name: 'Y', type: 'number', defaultValue: 0 }
     ],
-    category: 'Transform'
+    category: 'Transform',
+    target: 'object'
   },
   {
     type: 'moveBy',
@@ -257,14 +275,16 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'DX', type: 'number', defaultValue: 10 },
       { name: 'DY', type: 'number', defaultValue: 0 }
     ],
-    category: 'Transform'
+    category: 'Transform',
+    target: 'object'
   },
   {
     type: 'setVisible',
     name: 'Set visible',
     description: 'Show or hide the object.',
     params: [{ name: 'Visible', type: 'boolean', defaultValue: true }],
-    category: 'Appearance'
+    category: 'Appearance',
+    target: 'object'
   },
   {
     type: 'createInstance',
@@ -276,7 +296,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Y', type: 'number', defaultValue: 0 },
       { name: 'Layer', type: 'layer' }
     ],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'callFunction',
@@ -287,7 +308,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Param 1', type: 'string', defaultValue: '' },
       { name: 'Param 2', type: 'string', defaultValue: '' }
     ],
-    category: 'Functions'
+    category: 'Functions',
+    target: 'system'
   },
   {
     type: 'setVariable',
@@ -297,7 +319,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Variable', type: 'globalVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 0 }
     ],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'addVariable',
@@ -307,7 +330,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Variable', type: 'globalVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 1 }
     ],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   },
   {
     type: 'setInstanceVariable',
@@ -317,7 +341,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 100 }
     ],
-    category: 'Instance Variables'
+    category: 'Instance Variables',
+    target: 'object'
   },
   {
     type: 'addInstanceVariable',
@@ -327,7 +352,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 1 }
     ],
-    category: 'Instance Variables'
+    category: 'Instance Variables',
+    target: 'object'
   },
   {
     type: 'subtractInstanceVariable',
@@ -337,7 +363,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Variable', type: 'instanceVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 1 }
     ],
-    category: 'Instance Variables'
+    category: 'Instance Variables',
+    target: 'object'
   },
   {
     type: 'log',
@@ -347,7 +374,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Message', type: 'string', defaultValue: '"Hello World"' },
       { name: 'Type', type: 'enum', options: ['info', 'warn', 'error'], defaultValue: 'info' }
     ],
-    category: 'System'
+    category: 'System',
+    target: 'system'
   }
 ];
 

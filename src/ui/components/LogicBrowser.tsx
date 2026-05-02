@@ -21,13 +21,27 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   const [hoveredItem, setHoveredItem] = React.useState<LogicDefinition | null>(null);
 
   const items = mode === 'condition' ? CONDITIONS : ACTIONS;
-  const filteredItems = items.filter(item => 
-    (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedCategoryId === 'All' || item.category === selectedCategoryId)
-  );
+  
+  // 1. First find all items that match the target (System/Object) and search term
+  const availableItems = items.filter(item => {
+    const isSystemSelected = selectedObjectType === undefined;
+    const matchesTarget = isSystemSelected ? 
+      (item.target === 'system' || item.target === 'both') : 
+      (item.target === 'object' || item.target === 'both');
+    
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
+                          
+    return matchesTarget && matchesSearch;
+  });
 
-  const categories = ['All', ...Array.from(new Set(items.map(i => i.category)))];
+  // 2. Generate categories list from ALL available items (not just the ones in the current category)
+  const categories = ['All', ...Array.from(new Set(availableItems.map(i => i.category)))];
+
+  // 3. Finally, filter for display based on the selected category
+  const filteredItems = availableItems.filter(item => 
+    selectedCategoryId === 'All' || item.category === selectedCategoryId
+  );
 
   const handleObjectSelect = (ot: ObjectType | undefined) => {
     setSelectedObjectType(ot);
