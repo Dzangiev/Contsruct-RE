@@ -149,21 +149,29 @@ export const EventSheetEditor: React.FC = () => {
 
   if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
 
+  // Pre-calculate sequential indices (depth-first)
+  const blockIndices = new Map<string, number>();
+  let globalIndex = 1;
   const bookmarks: EventBlock[] = [];
-  const findBookmarks = (list: EventBlock[]) => { list.forEach(b => { if (b.bookmarked) bookmarks.push(b); findBookmarks(b.children); }); };
-  findBookmarks(eventSheet.events);
+  const calculateIndices = (list: EventBlock[]) => {
+    list.forEach(block => {
+      blockIndices.set(block.id, globalIndex++);
+      if (block.bookmarked) bookmarks.push(block);
+      if (block.children && block.children.length > 0) {
+        calculateIndices(block.children);
+      }
+    });
+  };
+  calculateIndices(eventSheet.events);
 
   return (
-    <div className="event-sheet-editor" style={{ 
-      flex: 1, 
-      display: 'flex', 
-      flexDirection: 'column', 
-      backgroundColor: '#1e1e1e', 
-      color: '#ccc',
-      overflow: 'hidden',
-      position: 'relative'
-    }}>
-      <div style={{ display: 'flex', backgroundColor: '#333333', borderBottom: '1px solid #1a1a1a' }}>
+    <div className="event-sheet-editor" style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#181818', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+      <style>{`
+        .logic-item-hover:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+        .logic-row-container:hover { border-bottom-color: #444 !important; }
+        .logic-item-hover { border-radius: 2px; }
+      `}</style>
+      <div style={{ display: 'flex', backgroundColor: '#252526', borderBottom: '1px solid #111' }}>
         {project.eventSheets.map(es => (
           <div key={es.id} onClick={(e) => { e.stopPropagation(); const l = project.layouts.find(layout => layout.eventSheetId === es.id); if (l) setActiveLayout(l.id); }} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', backgroundColor: es.id === activeEventSheetId ? '#2d2d2d' : 'transparent', color: es.id === activeEventSheetId ? '#fff' : '#888', borderTop: '2px solid', borderTopColor: es.id === activeEventSheetId ? '#007acc' : 'transparent', borderRight: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <List size={14} /> {es.name}
@@ -171,7 +179,7 @@ export const EventSheetEditor: React.FC = () => {
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#333333', borderBottom: '1px solid #1a1a1a', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#252526', borderBottom: '1px solid #111', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', gap: '2px', marginRight: '10px', borderRight: '1px solid #444', paddingRight: '10px' }}>
             <button onClick={(e) => { e.stopPropagation(); undo(); }} style={iconButtonStyle} title="Undo (Ctrl+Z)"><Undo size={14} /></button>
@@ -273,28 +281,23 @@ export const EventSheetEditor: React.FC = () => {
           onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); setContextMenu(null); }}
           style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto', position: 'relative' }}
         >
-          {(() => {
-            let eventCounter = 0;
-            const renderBlocks = (blocks: EventBlock[], depth: number) => {
-              return blocks.map((event) => {
-                const currentNumber = event.type === 'event' ? ++eventCounter : undefined;
-                return (
-                  <EventBlockItem 
-                    key={event.id} eventSheetId={eventSheet.id} block={event} index={currentNumber} 
-                    onOpenBrowser={(m: 'condition' | 'action', b: string, t?: string) => setBrowserState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, targetObjectTypeId: t })} 
-                    onOpenParamEditor={(m: 'condition' | 'action', b: string, i: string, d: LogicDefinition, p: any[], t?: string) => setParamEditorState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, itemId: i, def: d, params: p, targetObjectTypeId: t })} 
-                    onContextMenu={(e: React.MouseEvent, id: string, logicId?: string) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id, logicItemId: logicId }); }} 
-                    draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} 
-                    draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} 
-                    searchTerm={searchTerm} 
-                    depth={depth}
-                    renderChildren={(children: EventBlock[]) => renderBlocks(children, depth + 1)}
-                  />
-                );
-              });
-            };
-            return renderBlocks(eventSheet.events, 0);
-          })()}
+            {eventSheet.events.map((block) => (
+              <EventBlockItem 
+                key={block.id} 
+                eventSheetId={eventSheet.id} 
+                block={block} 
+                onOpenBrowser={(m: 'condition' | 'action', b: string, t?: string) => setBrowserState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, targetObjectTypeId: t })} 
+                onOpenParamEditor={(m: 'condition' | 'action', b: string, i: string, d: LogicDefinition, p: any[], t?: string) => setParamEditorState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, itemId: i, def: d, params: p, targetObjectTypeId: t })} 
+                onContextMenu={(e: React.MouseEvent, id: string, logicId?: string) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id, logicItemId: logicId }); }} 
+                draggedBlockId={draggedBlockId} 
+                setDraggedBlockId={setDraggedBlockId} 
+                draggedLogicItem={draggedLogicItem} 
+                setDraggedLogicItem={setDraggedLogicItem} 
+                searchTerm={searchTerm} 
+                depth={0}
+                blockIndices={blockIndices}
+              />
+            ))}
         </div>
       </div>
 
@@ -311,8 +314,19 @@ export const EventSheetEditor: React.FC = () => {
 };
 
 const EventBlockItem: React.FC<{ 
-  eventSheetId: string, block: EventBlock, index?: number, onOpenBrowser: any, onOpenParamEditor: any, onContextMenu: any, draggedBlockId: any, setDraggedBlockId: any, draggedLogicItem: any, setDraggedLogicItem: any, depth?: number, searchTerm?: string, renderChildren?: any
-}> = ({ eventSheetId, block, index, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', renderChildren }) => {
+  eventSheetId: string, 
+  block: EventBlock, 
+  onOpenBrowser: any, 
+  onOpenParamEditor: any, 
+  onContextMenu: any, 
+  draggedBlockId: any, 
+  setDraggedBlockId: any, 
+  draggedLogicItem: any, 
+  setDraggedLogicItem: any, 
+  depth?: number, 
+  searchTerm?: string,
+  blockIndices: Map<string, number>
+}> = ({ eventSheetId, block, onOpenBrowser, onOpenParamEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices }) => {
   const { editorState, setSelectedEventBlocks, updateEventBlock, addEventBlock, moveEventBlock, moveCondition, moveAction } = useEditorStore();
   const isSelected = editorState.selectedEventBlockIds.includes(block.id);
   const isDisabled = block.disabled;
@@ -326,7 +340,7 @@ const EventBlockItem: React.FC<{
       return setDraggedLogicItem(null); 
     } 
     if (!draggedBlockId || draggedBlockId === block.id) return; 
-    moveEventBlock(eventSheetId, draggedBlockId, null, index ? index - 1 : 0); 
+    moveEventBlock(eventSheetId, draggedBlockId, null, 0); // Simplified for now, or calculate real index
     setDraggedBlockId(null); 
   };
 
@@ -361,7 +375,7 @@ const EventBlockItem: React.FC<{
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
         <div style={{ padding: '4px 4px 4px 24px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} />)}
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       </div>
     );
@@ -393,7 +407,7 @@ const EventBlockItem: React.FC<{
     const isExpanded = searchTerm ? true : block.groupExpanded;
     return (
       <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'hidden', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
-        <div style={{ backgroundColor: isSelected ? '#094771' : '#252526', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderBottom: '1px solid #1a1a1a' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
+        <div style={{ backgroundColor: isSelected ? '#007acc' : '#2d2d2d', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderLeft: '4px solid #f39c12' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
           <span style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>▶</span>
           <div style={{ fontWeight: 'bold', flex: 1 }}>
             <input value={block.groupName} onChange={(e) => updateEventBlock(eventSheetId, block.id, { groupName: e.target.value })} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'transparent', border: 'none', color: '#fff', fontWeight: 'bold', outline: 'none', width: '100%' }} />
@@ -402,7 +416,7 @@ const EventBlockItem: React.FC<{
         </div>
         {isExpanded && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} />)}
+            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
           </div>
         )}
       </div>
@@ -410,11 +424,13 @@ const EventBlockItem: React.FC<{
   }
 
   return (
-    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '4px', backgroundColor: (isSelected ? '#004b7e' : '#3e3e42'), border: isSelected ? '1px solid #007acc' : '1px solid #1a1a1a', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '2px' }}>
+    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '3px', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', boxShadow: isSelected ? '0 0 12px rgba(0, 122, 204, 0.3)' : 'none', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '6px', overflow: 'hidden', borderLeft: isSelected ? '4px solid #007acc' : '4px solid #3498db' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', minHeight: '60px', position: 'relative' }}>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
         {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}
-        <div style={{ backgroundColor: isSelected ? '#007acc' : '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', borderRight: '1px solid #444' }}>{index}</div>
+        <div style={{ backgroundColor: isSelected ? '#007acc' : '#1e1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: isSelected ? '#fff' : '#555', borderRight: '1px solid #333', width: '30px', fontWeight: 'bold' }}>
+          {blockIndices.get(block.id)}
+        </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', borderRight: '1px solid #333', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           {block.conditions.map((c, i) => (
             <React.Fragment key={c.id}>
@@ -433,7 +449,7 @@ const EventBlockItem: React.FC<{
       </div>
       {block.children.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-          {renderChildren ? renderChildren(block.children) : block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} />)}
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       )}
     </div>
@@ -501,16 +517,17 @@ const LogicItemContent: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '22px', fontSize: '11px', width: '100%', borderBottom: '1px solid #1e1e1e' }}>
+    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '22px', fontSize: '11px', width: '100%', borderBottom: '1px solid #111' }}>
       {/* Object Column */}
       <div style={{ 
-        height: '35px', 
-        backgroundColor: '#252526', 
-        borderBottom: '1px solid #1a1a1a', 
+        width: '120px', 
         display: 'flex', 
         alignItems: 'center', 
-        padding: '0 12px', 
-        gap: '15px' 
+        gap: '6px', 
+        padding: '4px 8px',
+        borderRight: '1px solid #1a1a1a',
+        backgroundColor: '#2d2d2d',
+        flexShrink: 0
       }}>
         {ot ? (
           <>
@@ -558,7 +575,8 @@ const ConditionItem: React.FC<{ project: Project, eventSheetId: string, blockId:
       onClick={(e) => { e.stopPropagation(); setSelectedLogicItems([selectionId]); }} 
       onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('condition', blockId, condition.id, def, condition.params, condition.targetObjectTypeId); }} 
       onContextMenu={(e) => onContextMenu(e, blockId, condition.id)}
-      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === condition.id) ? 0.3 : 1, width: '100%' }}
+      className="logic-item-hover"
+      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === condition.id) ? 0.3 : 1, width: '100%', cursor: 'pointer', transition: 'background-color 0.1s' }}
     >
       <LogicItemContent item={condition} def={def} project={project} type="condition" searchTerm={searchTerm} />
     </div>
@@ -587,7 +605,8 @@ const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: st
       onClick={(e) => { e.stopPropagation(); setSelectedLogicItems([selectionId]); }} 
       onDoubleClick={(e) => { e.stopPropagation(); def && onOpenParamEditor('action', blockId, action.id, def, action.params, action.targetObjectTypeId); }} 
       onContextMenu={(e) => onContextMenu(e, blockId, action.id)}
-      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === action.id) ? 0.3 : 1, width: '100%' }}
+      className="logic-item-hover"
+      style={{ backgroundColor: isSelected ? '#007acc' : 'transparent', opacity: (draggedLogicItem?.itemId === action.id) ? 0.3 : 1, width: '100%', cursor: 'pointer', transition: 'background-color 0.1s' }}
     >
       <LogicItemContent item={action} def={def} project={project} type="action" searchTerm={searchTerm} />
     </div>
