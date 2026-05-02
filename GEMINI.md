@@ -172,6 +172,8 @@ npm run lint
 
 If a command is unavailable or fails because of existing project setup, explain it clearly.
 
+After making the changes, be sure to run the "npx tsc --noEmit" command.
+
 ### Implementation Rules
 
 Do not hardcode temporary hacks if a clean model-level solution is possible.

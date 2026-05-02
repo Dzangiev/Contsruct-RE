@@ -27,13 +27,14 @@ export const Viewport: React.FC = () => {
   const activeLayer = activeLayout?.layers.find(layer => layer.id === editorState.activeLayerId);
   
   const viewportRef = React.useRef<HTMLDivElement>(null);
-  const [dragStart, setDragStart] = React.useState<{ x: number, y: number } | null>(null);
+  const [dragStart, setDragStart] = React.useState<{ x: number, y: number, isClone?: boolean } | null>(null);
   const [initialPositions, setInitialPositions] = React.useState<Map<string, { x: number, y: number }>>(new Map());
   const [panStart, setPanStart] = React.useState<{ x: number, y: number, panX: number, panY: number } | null>(null);
   const [marqueeStart, setMarqueeStart] = React.useState<{ x: number, y: number } | null>(null);
   const [marqueeEnd, setMarqueeEnd] = React.useState<{ x: number, y: number } | null>(null);
   const [isSpaceDown, setIsSpaceDown] = React.useState(false);
   const [contextMenu, setContextMenu] = React.useState<{ x: number, y: number, instanceId?: string } | null>(null);
+  const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
   const { zoom, panX, panY, selectedInstanceIds, tool, gridSize, snapToGrid, showGrid } = editorState;
 
@@ -163,6 +164,12 @@ export const Viewport: React.FC = () => {
           let newX = pos.x + dx;
           let newY = pos.y + dy;
           
+          if (e.shiftKey) {
+            // Constrain to axis
+            if (Math.abs(dx) > Math.abs(dy)) newY = pos.y;
+            else newX = pos.x;
+          }
+
           if (snapToGrid) {
             newX = Math.round(newX / gridSize) * gridSize;
             newY = Math.round(newY / gridSize) * gridSize;
@@ -172,7 +179,14 @@ export const Viewport: React.FC = () => {
           const snapThreshold = 10 / zoom;
           const inst = activeLayout.instances.find(i => i.id === id);
           if (inst) {
-            const others = activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id));
+            const others = [
+              ...activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id)),
+              // Also snap to Layout boundaries
+              { x: 0, y: 0, width: activeLayout.width, height: activeLayout.height, isLayout: true },
+              // Also snap to Viewport Window
+              { x: 0, y: 0, width: project.settings.viewportWidth, height: project.settings.viewportHeight, isViewport: true }
+            ];
+
             others.forEach(other => {
               // X snaps (Left, Center, Right)
               const otherEdgesX = [other.x, other.x + other.width / 2, other.x + other.width];
@@ -221,7 +235,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSize, snapToGrid, selectedInstanceIds]);
+  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSize, snapToGrid, selectedInstanceIds, project.settings.viewportWidth, project.settings.viewportHeight]);
 
   // Panning
   React.useEffect(() => {
@@ -314,7 +328,9 @@ export const Viewport: React.FC = () => {
         angle = (angle + 90) % 360;
         if (angle < 0) angle += 360;
         if (e.shiftKey) angle = Math.round(angle / 15) * 15;
-        updateInstanceSilently(activeLayout.id, id, { angle: Math.round(angle) });
+        const finalAngle = Math.round(angle);
+        updateInstanceSilently(activeLayout.id, id, { angle: finalAngle });
+        setCurrentRotation(finalAngle);
         return;
       }
 
@@ -363,6 +379,7 @@ export const Viewport: React.FC = () => {
     };
     const handleMouseUp = () => {
       setResizing(null);
+      setCurrentRotation(null);
       commitProject();
     };
     window.addEventListener('mousemove', handleMouseMove);
@@ -412,14 +429,27 @@ export const Viewport: React.FC = () => {
   const handleInstanceMouseDown = (e: React.MouseEvent, instanceId: string) => {
     if (tool !== 'select' || isSpaceDown || e.button !== 0) return;
     e.stopPropagation();
+    
     let currentSelection = [...selectedInstanceIds];
-    if (e.shiftKey) {
-      if (currentSelection.includes(instanceId)) currentSelection = currentSelection.filter(id => id !== instanceId);
-      else currentSelection.push(instanceId);
+    
+    if (e.altKey) {
+      // Alt+Drag: Duplicate
+      if (!currentSelection.includes(instanceId)) {
+        currentSelection = [instanceId];
+        setSelectedInstances(currentSelection);
+      }
+      currentSelection.forEach(id => cloneInstance(activeLayout.id, id));
+      // Selection will be updated by cloneInstance calls
     } else {
-      if (!currentSelection.includes(instanceId)) currentSelection = [instanceId];
+      if (e.shiftKey) {
+        if (currentSelection.includes(instanceId)) currentSelection = currentSelection.filter(id => id !== instanceId);
+        else currentSelection.push(instanceId);
+      } else {
+        if (!currentSelection.includes(instanceId)) currentSelection = [instanceId];
+      }
+      setSelectedInstances(currentSelection);
     }
-    setSelectedInstances(currentSelection);
+
     if (currentSelection.includes(instanceId)) {
       setDragStart({ x: e.clientX, y: e.clientY });
       const positions = new Map<string, { x: number, y: number }>();
@@ -528,16 +558,28 @@ export const Viewport: React.FC = () => {
               <>
                 <defs>
                   <pattern id="grid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
-                    <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
+                    <circle cx={1 / zoom} cy={1 / zoom} r={1 / zoom} fill="rgba(255,255,255,0.1)" />
                   </pattern>
                   <pattern id="grid-large" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
                     <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid)" />
-                    <path d={`M ${gridSize * 4} 0 L 0 0 0 ${gridSize * 4}`} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={1.5 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}/>
+                    <circle cx={2 / zoom} cy={2 / zoom} r={1.5 / zoom} fill="rgba(255,255,255,0.2)" />
                   </pattern>
                 </defs>
                 <rect width={width} height={height} fill="url(#grid-large)" pointerEvents="none" />
               </>
             )}
+
+            <filter id="handleShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1" />
+              <feOffset dx="0" dy="1" result="offsetblur" />
+              <feComponentTransfer>
+                <feFuncA type="linear" slope="0.5" />
+              </feComponentTransfer>
+              <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
             
             {/* Viewport Window Boundary (Project Settings) - CLEARER VISUAL */}
             <rect 
@@ -568,10 +610,22 @@ export const Viewport: React.FC = () => {
                                   { h: 'r', x: inst.width, y: inst.height / 2 }, { h: 'br', x: inst.width, y: inst.height },
                                   { h: 'b', x: inst.width / 2, y: inst.height }, { h: 'bl', x: 0, y: inst.height }, { h: 'l', x: 0, y: inst.height / 2 },
                                 ].map(handle => (
-                                  <rect key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, inst.angle), vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], handle.h)} />
+                                  <rect 
+                                    key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} 
+                                    width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" 
+                                    strokeWidth={1 / zoom} filter="url(#handleShadow)"
+                                    style={{ cursor: getHandleCursor(handle.h, inst.angle), vectorEffect: 'non-scaling-stroke' }} 
+                                    onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], handle.h)} 
+                                  />
                                 ))}
-                                <line x1={inst.width / 2} y1={0} x2={inst.width / 2} y2={-20 / zoom} stroke="#0099ff" strokeWidth={1 / zoom} />
-                                <circle cx={inst.width / 2} cy={-20 / zoom} r={5 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], 'rotate')} />
+                                <line x1={inst.width / 2} y1={0} x2={inst.width / 2} y2={-20 / zoom} stroke="#0099ff" strokeWidth={1.5 / zoom} />
+                                <circle 
+                                  cx={inst.width / 2} cy={-20 / zoom} r={5 / zoom} 
+                                  fill="white" stroke="#0099ff" strokeWidth={1 / zoom} 
+                                  filter="url(#handleShadow)"
+                                  style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} 
+                                  onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], 'rotate')} 
+                                />
                               </g>
                             )}
                           </g>
@@ -600,10 +654,22 @@ export const Viewport: React.FC = () => {
                     { h: 'r', x: maxX, y: minY + (maxY - minY) / 2 }, { h: 'br', x: maxX, y: maxY },
                     { h: 'b', x: minX + (maxX - minX) / 2, y: maxY }, { h: 'bl', x: minX, y: maxY }, { h: 'l', x: minX, y: minY + (maxY - minY) / 2 }
                   ].map(handle => (
-                    <rect key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: getHandleCursor(handle.h, 0), vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, handle.h)} />
+                    <rect 
+                      key={handle.h} x={handle.x - 4 / zoom} y={handle.y - 4 / zoom} 
+                      width={8 / zoom} height={8 / zoom} fill="white" stroke="#0099ff" 
+                      strokeWidth={1 / zoom} filter="url(#handleShadow)"
+                      style={{ cursor: getHandleCursor(handle.h, 0), vectorEffect: 'non-scaling-stroke' }} 
+                      onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, handle.h)} 
+                    />
                   ))}
-                  <line x1={minX + (maxX - minX) / 2} y1={minY} x2={minX + (maxX - minX) / 2} y2={minY - 20 / zoom} stroke="#0099ff" strokeWidth={1 / zoom} />
-                  <circle cx={minX + (maxX - minX) / 2} cy={minY - 20 / zoom} r={5 / zoom} fill="white" stroke="#0099ff" strokeWidth={1 / zoom} style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, 'rotate')} />
+                  <line x1={minX + (maxX - minX) / 2} y1={minY} x2={minX + (maxX - minX) / 2} y2={minY - 20 / zoom} stroke="#0099ff" strokeWidth={1.5 / zoom} />
+                  <circle 
+                    cx={minX + (maxX - minX) / 2} cy={minY - 20 / zoom} r={5 / zoom} 
+                    fill="white" stroke="#0099ff" strokeWidth={1 / zoom} 
+                    filter="url(#handleShadow)"
+                    style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} 
+                    onMouseDown={(e) => handleHandleMouseDown(e, selectedInstanceIds, 'rotate')} 
+                  />
                 </g>
               );
             })()}
@@ -619,6 +685,24 @@ export const Viewport: React.FC = () => {
             ))}
           </g>
         </svg>
+
+        {currentRotation !== null && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: '#fff',
+            padding: '4px 10px',
+            borderRadius: '4px',
+            fontSize: '14px',
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}>
+            Angle: {currentRotation}°
+          </div>
+        )}
 
         {contextMenu && (
           <div 
@@ -638,6 +722,25 @@ export const Viewport: React.FC = () => {
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
                    <span style={{ flex: 1 }}>Clone</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
                  </div>
+                 <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                 <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>TRANSFORM</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { 
+                   selectedInstanceIds.forEach(id => {
+                     const inst = activeLayout.instances.find(i => i.id === id);
+                     if (inst) updateInstanceSilently(activeLayout.id, id, { 
+                       x: Math.round(inst.x / gridSize) * gridSize, 
+                       y: Math.round(inst.y / gridSize) * gridSize 
+                     });
+                   });
+                   commitProject();
+                   setContextMenu(null);
+                 }}>Align to Grid</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { 
+                   selectedInstanceIds.forEach(id => updateInstanceSilently(activeLayout.id, id, { angle: 0 }));
+                   commitProject();
+                   setContextMenu(null);
+                 }}>Reset Rotation</div>
+                 
                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDER</div>
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>Bring to Front</div>
