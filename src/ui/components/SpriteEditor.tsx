@@ -376,7 +376,7 @@ export const SpriteEditor: React.FC = () => {
                             fill="rgba(46, 204, 113, 0.2)" stroke="#2ecc71" strokeWidth={1 / (zoom * canvasSize.w)} style={{ vectorEffect: 'non-scaling-stroke' }}
                           />
                           {tool === 'collision' && selectedFrame.collisionPolygon.map((p, idx) => (
-                            <circle key={idx} cx={p.x} cy={p.y} r={4 / (zoom * canvasSize.w)} fill="#2ecc71" stroke="#fff" strokeWidth={1 / (zoom * canvasSize.w)} pointerEvents="auto" />
+                            <circle key={idx} cx={p.x} cy={p.y} r={4 / (zoom * canvasSize.w)} fill="#2ecc71" stroke="#fff" strokeWidth={1 / (zoom * canvasSize.w)} pointerEvents="none" />
                           ))}
                         </svg>
                       )}
@@ -524,12 +524,10 @@ const ToolBtn: React.FC<{ active?: boolean, onClick: () => void, icon: React.Rea
 const Marker: React.FC<{ x: number, y: number, color: string, active: boolean }> = ({ x, y, color, active }) => (
   <div style={{
     position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`,
-    width: '6px', height: '6px', border: `1.5px solid ${color}`, borderRadius: '50%', transform: 'translate(-50%, -50%)',
-    boxShadow: active ? `0 0 10px ${color}` : 'none', zIndex: active ? 10 : 1, vectorEffect: 'non-scaling-stroke', backgroundColor: 'rgba(0,0,0,0.3)'
-  }}>
-    <div style={{ position: 'absolute', left: '50%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: color }} />
-    <div style={{ position: 'absolute', top: '50%', left: '-4px', right: '-4px', height: '1px', backgroundColor: color }} />
-  </div>
+    width: '4px', height: '4px', border: `1px solid ${active ? '#fff' : color}`, borderRadius: '50%', transform: 'translate(-50%, -50%)',
+    boxShadow: active ? `0 0 0 2px ${color}` : '0 0 0 1px rgba(0,0,0,0.5)', zIndex: active ? 10 : 1, backgroundColor: active ? color : 'rgba(0,0,0,0.5)',
+    pointerEvents: 'none'
+  }} />
 );
 
 const checkerboardStyle: React.CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%)', backgroundSize: '10px 10px', backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px', backgroundColor: '#080808' };
