@@ -1,5 +1,6 @@
 import React from 'react';
 import { Project, Instance, EventBlock } from '../model/project';
+import Matter from 'matter-js';
 import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
 import { evaluateExpression, EvaluationContext } from './expressionEvaluator';
@@ -15,6 +16,86 @@ type ScalingMode = 'letterbox' | 'fit' | 'stretch' | 'integer';
 /**
  * A professional runtime engine that renders and executes the game layout with advanced controls.
  */
+
+// A* Pathfinding Helper
+interface Point { x: number; y: number; }
+interface Node extends Point {
+  g: number; h: number; f: number;
+  parent: Node | null;
+}
+
+function findPath(start: Point, end: Point, grid: boolean[][], cellSize: number): Point[] {
+  const openList: Node[] = [];
+  const closedList: Set<string> = new Set();
+  
+  const startNode: Node = { 
+    x: Math.floor(start.x / cellSize), 
+    y: Math.floor(start.y / cellSize), 
+    g: 0, h: 0, f: 0, parent: null 
+  };
+  const endNode: Node = { 
+    x: Math.floor(end.x / cellSize), 
+    y: Math.floor(end.y / cellSize), 
+    g: 0, h: 0, f: 0, parent: null 
+  };
+
+  openList.push(startNode);
+
+  while (openList.length > 0) {
+    let current = openList[0];
+    let currentIndex = 0;
+    openList.forEach((node, index) => {
+      if (node.f < current.f) {
+        current = node;
+        currentIndex = index;
+      }
+    });
+
+    openList.splice(currentIndex, 1);
+    closedList.add(`${current.x},${current.y}`);
+
+    if (current.x === endNode.x && current.y === endNode.y) {
+      const path: Point[] = [];
+      let temp: Node | null = current;
+      while (temp) {
+        path.push({ x: temp.x * cellSize + cellSize / 2, y: temp.y * cellSize + cellSize / 2 });
+        temp = temp.parent;
+      }
+      return path.reverse();
+    }
+
+    const neighbors = [
+      { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+      { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }
+    ];
+
+    for (const offset of neighbors) {
+      const nx = current.x + offset.x;
+      const ny = current.y + offset.y;
+
+      if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+      if (grid[ny][nx]) continue; // Obstacle
+      if (closedList.has(`${nx},${ny}`)) continue;
+
+      const g = current.g + (offset.x !== 0 && offset.y !== 0 ? 1.414 : 1);
+      const h = Math.abs(nx - endNode.x) + Math.abs(ny - endNode.y);
+      const f = g + h;
+
+      const existing = openList.find(n => n.x === nx && n.y === ny);
+      if (existing && g >= existing.g) continue;
+
+      if (!existing) {
+        openList.push({ x: nx, y: ny, g, h, f, parent: current });
+      } else {
+        existing.g = g;
+        existing.f = f;
+        existing.parent = current;
+      }
+    }
+  }
+
+  return [];
+}
 export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) => {
   const { editorState } = useEditorStore();
   const layout = project.layouts.find(l => l.id === layoutId) || project.layouts[0];
@@ -46,6 +127,43 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     });
     runtimeInstancesRef.current = initial;
     setRuntimeInstances(initial);
+
+    // Initialize Physics Engine
+    if (!physicsEngineRef.current) {
+      physicsEngineRef.current = Matter.Engine.create({
+        gravity: { x: 0, y: 1 } // Standard gravity
+      });
+    }
+    const engine = physicsEngineRef.current;
+    Matter.World.clear(engine.world, false);
+    physicsBodiesRef.current.clear();
+
+    initial.forEach(inst => {
+      const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+      const physBehavior = ot?.behaviors.find(b => b.type === 'physics' && !b.disabled);
+      
+      if (physBehavior) {
+        const props = physBehavior.properties;
+        const body = Matter.Bodies.rectangle(
+          inst.x + inst.width / 2, 
+          inst.y + inst.height / 2, 
+          inst.width, 
+          inst.height, 
+          {
+            isStatic: !!props.isStatic,
+            density: Number(props.density ?? 0.001),
+            friction: Number(props.friction ?? 0.1),
+            restitution: Number(props.restitution ?? 0.2),
+            frictionAir: Number(props.frictionAir ?? 0.01),
+            inertia: props.fixedRotation ? Infinity : undefined
+          }
+        );
+        Matter.Body.setAngle(body, inst.angle * (Math.PI / 180));
+        Matter.World.add(engine.world, body);
+        physicsBodiesRef.current.set(inst.id, body);
+      }
+    });
+
   }, [layout, project.objectTypes]);
 
   const [fps, setFps] = React.useState(0);
@@ -103,6 +221,13 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const behaviorsStateRef = React.useRef<Record<string, Record<string, any>>>({});
   const lastReturnValueRef = React.useRef<any>(0);
   const staticVariablesRef = React.useRef<Record<string, any>>({});
+
+  // Pathfinding Refs
+  const pathfindingGridRef = React.useRef<{ width: number, height: number, data: boolean[][] } | null>(null);
+
+  // Physics Engine Refs
+  const physicsEngineRef = React.useRef<Matter.Engine | null>(null);
+  const physicsBodiesRef = React.useRef<Map<string, Matter.Body>>(new Map());
 
   React.useEffect(() => {
     addLog(`Runtime initialized for layout: ${layout?.name}`, 'info');
@@ -193,20 +318,20 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
       });
 
-      return {
-        variables: runtimeVariablesRef.current,
-        objects,
-        system: {
-          dt,
-          time: (performance.now() - lastFpsUpdateRef.current) / 1000, 
-          pointerX: pointerPosRef.current.x,
-          pointerY: pointerPosRef.current.y
-        },
-        functionParams: funcParams,
-        returnValue: lastReturnValueRef.current,
-        localVariables: localVars
-      };
+    return {
+      variables: runtimeVariablesRef.current,
+      objects,
+      system: {
+        dt,
+        time: (performance.now() - lastFpsUpdateRef.current) / 1000, 
+        pointerX: pointerPosRef.current.x,
+        pointerY: pointerPosRef.current.y
+      },
+      functionParams: funcParams,
+      returnValue: lastReturnValueRef.current,
+      localVariables: localVars
     };
+  };
 
     type PickedSets = Record<string, string[]>; // objectTypeId -> instanceIds
 
@@ -464,6 +589,18 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           continue;
         }
 
+        const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+
+        if (condition.type === 'setPhysicsGravity') {
+           if (physicsEngineRef.current) {
+             const gx = Number(evaluateExpression(condition.params[0], context) ?? 0);
+             const gy = Number(evaluateExpression(condition.params[1], context) ?? 1);
+             physicsEngineRef.current.gravity.x = gx;
+             physicsEngineRef.current.gravity.y = gy;
+           }
+           continue;
+        }
+
         if (!currentPickedSets[otid]) {
           const family = project.families.find(f => f.id === otid);
           if (family) {
@@ -681,6 +818,62 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             case 'appendText': return { ...inst, properties: { ...inst.properties, text: (inst.properties.text || '') + String(evalParam(0)) } };
             case 'setTextColor': return { ...inst, properties: { ...inst.properties, color: String(evalParam(0)) } };
             case 'setFontSize': return { ...inst, properties: { ...inst.properties, fontSize: Number(evalParam(0)) } };
+            case 'applyPhysicsForce': {
+              const body = physicsBodiesRef.current.get(inst.id);
+              if (body) {
+                const fx = Number(evalParam(0) ?? 0);
+                const fy = Number(evalParam(1) ?? 0);
+                Matter.Body.applyForce(body, body.position, { x: fx, y: fy });
+              }
+              return inst;
+            }
+            case 'setPhysicsVelocity': {
+              const body = physicsBodiesRef.current.get(inst.id);
+              if (body) {
+                const vx = Number(evalParam(0) ?? 0);
+                const vy = Number(evalParam(1) ?? 0);
+                Matter.Body.setVelocity(body, { x: vx, y: vy });
+              }
+              return inst;
+            }
+            case 'findPath': {
+              const tx = Number(evalParam(0) ?? 0);
+              const ty = Number(evalParam(1) ?? 0);
+              const cellSize = 32; // Default or from behavior props
+              
+              // Build grid (Optimization: this should ideally be done once per frame if solids changed)
+              const layoutW = layout.width;
+              const layoutH = layout.height;
+              const cols = Math.ceil(layoutW / cellSize);
+              const rows = Math.ceil(layoutH / cellSize);
+              const grid: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+              
+              const solids = nextInstances.filter(o => {
+                const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
+                return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
+              });
+
+              solids.forEach(s => {
+                const startX = Math.floor(s.x / cellSize);
+                const startY = Math.floor(s.y / cellSize);
+                const endX = Math.floor((s.x + s.width) / cellSize);
+                const endY = Math.floor((s.y + s.height) / cellSize);
+                for (let y = startY; y <= endY && y < rows; y++) {
+                  for (let x = startX; x <= endX && x < cols; x++) {
+                    if (x >= 0 && y >= 0) grid[y][x] = true;
+                  }
+                }
+              });
+
+              const behavior = project.objectTypes.find(ot => ot.id === inst.objectTypeId)?.behaviors.find(b => b.type === 'pathfinding');
+              if (behavior) {
+                const state = behaviorsStateRef.current[inst.id]?.[behavior.id];
+                if (state) {
+                  state.path = findPath({ x: inst.x + inst.width/2, y: inst.y + inst.height/2 }, { x: tx, y: ty }, grid, cellSize);
+                }
+              }
+              return inst;
+            }
             default: return inst;
           }
         });
@@ -719,6 +912,29 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       let nextInstances = [...runtimeInstancesRef.current];
 
+      // 0. Step Physics
+      if (physicsEngineRef.current) {
+        Matter.Engine.update(physicsEngineRef.current, dt * 1000);
+        nextInstances = nextInstances.map(inst => {
+          const body = physicsBodiesRef.current.get(inst.id);
+          if (body && !body.isStatic) {
+            return {
+              ...inst,
+              x: body.position.x - inst.width / 2,
+              y: body.position.y - inst.height / 2,
+              angle: body.angle * (180 / Math.PI)
+            };
+          }
+          return inst;
+        });
+      }
+
+      // 0.5 Update Pathfinding Grid (if needed - optimization: only on start or when solids move)
+      const solids = nextInstances.filter(o => {
+          const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
+          return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
+      });
+
       // 1. Process Behaviors
       nextInstances = nextInstances.map(inst => {
         const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
@@ -729,7 +945,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           if (behavior.disabled) return;
           if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
           if (!behaviorsStateRef.current[inst.id][behavior.id]) {
-            behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+          behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
           }
           const state = behaviorsStateRef.current[inst.id][behavior.id];
           const props = behavior.properties;
@@ -847,6 +1063,40 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
 
               state.onFloor = onFloor;
+              break;
+            }
+            case 'pathfinding': {
+              const maxSpeed = Number(props.maxSpeed ?? 200);
+              const cellSize = Number(props.cellSide ?? 32);
+              
+              if (state.path === undefined) {
+                state.path = [];
+                state.targetX = updatedInst.x;
+                state.targetY = updatedInst.y;
+              }
+
+              // Logic to calculate path if target changes (usually triggered by action)
+              // For now, let's assume we follow the path waypoints
+              if (state.path && state.path.length > 0) {
+                const waypoint = state.path[0];
+                const dx = waypoint.x - (updatedInst.x + updatedInst.width / 2);
+                const dy = waypoint.y - (updatedInst.y + updatedInst.height / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 5) {
+                  state.path.shift();
+                } else {
+                  const moveDist = Math.min(dist, maxSpeed * dt);
+                  updatedInst.x += (dx / dist) * moveDist;
+                  updatedInst.y += (dy / dist) * moveDist;
+                  
+                  if (props.rotateSpeed > 0) {
+                    const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+                    // Simple angle lerp could be added here
+                    updatedInst.angle = targetAngle;
+                  }
+                }
+              }
               break;
             }
           }

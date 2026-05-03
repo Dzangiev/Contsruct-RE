@@ -98,6 +98,31 @@ export const BEHAVIOR_DEFINITIONS: BehaviorDefinition[] = [
     name: 'Solid',
     description: 'Makes the object a solid obstacle for other behaviors like Platform.',
     defaultProperties: {}
+  },
+  {
+    type: 'physics',
+    name: 'Physics',
+    description: 'Simulates realistic physics using the Matter.js engine.',
+    defaultProperties: {
+      isStatic: false,
+      density: 0.001,
+      friction: 0.1,
+      restitution: 0.2,
+      frictionAir: 0.01,
+      fixedRotation: false
+    }
+  },
+  {
+    type: 'pathfinding',
+    name: 'Pathfinding',
+    description: 'Allows the object to find and follow a path around Solid obstacles.',
+    defaultProperties: {
+      maxSpeed: 200,
+      acceleration: 600,
+      deceleration: 600,
+      rotateSpeed: 180,
+      cellSide: 32
+    }
   }
 ];
 
@@ -516,6 +541,39 @@ export const ACTIONS: LogicDefinition[] = [
     category: 'Text',
     target: 'object',
     requiredKind: 'text'
+  },
+  {
+    type: 'applyPhysicsForce',
+    name: 'Apply force',
+    description: 'Apply a physical force to the object.',
+    params: [
+      { name: 'Force X', type: 'number', defaultValue: 0 },
+      { name: 'Force Y', type: 'number', defaultValue: -0.1 }
+    ],
+    category: 'Physics',
+    target: 'object'
+  },
+  {
+    type: 'setPhysicsVelocity',
+    name: 'Set velocity',
+    description: 'Set the linear velocity of the object.',
+    params: [
+      { name: 'Velocity X', type: 'number', defaultValue: 0 },
+      { name: 'Velocity Y', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Physics',
+    target: 'object'
+  },
+  {
+    type: 'findPath',
+    name: 'Find path to',
+    description: 'Calculate a path to the target coordinates and start moving.',
+    params: [
+      { name: 'Target X', type: 'number', defaultValue: 0 },
+      { name: 'Target Y', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Pathfinding',
+    target: 'object'
   }
 ];
 
