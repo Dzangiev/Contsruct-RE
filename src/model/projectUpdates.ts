@@ -1,4 +1,4 @@
-import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior } from './project';
+import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior, InstanceVariable } from './project';
 import { generateId } from '../utils/id';
 
 /**
@@ -126,6 +126,21 @@ export function addObjectType(project: Project, name: string, kind: ObjectTypeKi
     properties,
     instanceVariables: [],
     behaviors: [],
+    animations: kind === ObjectTypeKind.Sprite ? [{
+      id: generateId(),
+      name: 'Animation 1',
+      speed: 5,
+      loop: true,
+      repeatCount: 0,
+      frames: [{
+        id: generateId(),
+        assetId: '', // Empty initially
+        duration: 1,
+        originX: 0.5,
+        originY: 0.5,
+        imagePoints: []
+      }]
+    }] : []
   };
   return {
     ...project,
@@ -134,7 +149,55 @@ export function addObjectType(project: Project, name: string, kind: ObjectTypeKi
 }
 
 /**
- * Adds an instance variable to an object type.
+ * Updates an instance variable definition.
+ */
+export function updateInstanceVariable(
+  project: Project,
+  objectTypeId: string,
+  variableId: string,
+  updates: Partial<Omit<InstanceVariable, 'id'>>
+): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      const oldVar = ot.instanceVariables.find(v => v.id === variableId);
+      if (!oldVar) return ot;
+
+      const newVar = { ...oldVar, ...updates };
+      
+      // If name changed, we might want to update all instances' properties to match?
+      // Actually, Construct 3 uses names as keys in instance properties, so renaming 
+      // a variable should ideally rename the key in all instances.
+      let updatedProject = project;
+      if (updates.name && updates.name !== oldVar.name) {
+        updatedProject = {
+          ...project,
+          layouts: project.layouts.map(l => ({
+            ...l,
+            instances: l.instances.map(inst => {
+              if (inst.objectTypeId !== objectTypeId) return inst;
+              const nextProps = { ...inst.properties };
+              if (oldVar.name in nextProps) {
+                nextProps[updates.name!] = nextProps[oldVar.name];
+                delete nextProps[oldVar.name];
+              }
+              return { ...inst, properties: nextProps };
+            })
+          }))
+        };
+      }
+
+      return {
+        ...ot,
+        instanceVariables: ot.instanceVariables.map(v => v.id === variableId ? newVar : v)
+      };
+    })
+  };
+}
+
+/**
+ * Updates properties of an object type.
  */
 export function addInstanceVariable(
   project: Project,

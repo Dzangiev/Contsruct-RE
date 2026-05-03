@@ -7,6 +7,7 @@ import { EventSheetEditor } from './components/EventSheetEditor';
 import { Runtime } from '../runtime/Runtime';
 import { Play, Monitor, FileText } from 'lucide-react';
 import { StatusBar } from './components/StatusBar';
+import { SpriteEditor } from './components/SpriteEditor';
 
 import { LayersPanel } from './components/LayersPanel';
 import { SimpleModal } from './components/SimpleModal';
@@ -152,6 +153,13 @@ const App: React.FC = () => {
             useEditorStore.setState({ dialogState: null });
           }}
         />
+      )}
+
+      {/* Sprite Editor Overlay */}
+      {editorState.spriteEditor?.isOpen && (
+        <ErrorBoundary name="SpriteEditor">
+          <SpriteEditor />
+        </ErrorBoundary>
       )}
     </div>
   );

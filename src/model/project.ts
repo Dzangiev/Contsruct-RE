@@ -62,6 +62,32 @@ export interface InstanceVariable {
   isConstant?: boolean;
 }
 
+export interface ImagePoint {
+  id: string;
+  name: string;
+  x: number; // 0 to 1
+  y: number; // 0 to 1
+}
+
+export interface AnimationFrame {
+  id: string;
+  assetId: string;
+  duration: number; // multiplier for animation speed
+  originX: number; // 0 to 1
+  originY: number; // 0 to 1
+  imagePoints: ImagePoint[];
+  collisionPolygon?: { x: number, y: number }[];
+}
+
+export interface Animation {
+  id: string;
+  name: string;
+  speed: number;
+  loop: boolean;
+  repeatCount: number; // 0 for infinite if loop is false? Or just loop/repeat.
+  frames: AnimationFrame[];
+}
+
 export interface Behavior {
   id: string;
   type: string;
@@ -77,7 +103,8 @@ export interface ObjectType {
   pluginId: string;
   defaultWidth: number;
   defaultHeight: number;
-  assetId?: string;
+  assetId?: string; // For backward compatibility or non-animated objects
+  animations: Animation[];
   properties: Record<string, any>;
   instanceVariables: InstanceVariable[];
   behaviors: Behavior[];

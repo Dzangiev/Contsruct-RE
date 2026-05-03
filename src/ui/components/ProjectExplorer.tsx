@@ -16,6 +16,7 @@ export const ProjectExplorer: React.FC = () => {
     addObjectType,
     setTool,
     setSelectedObjectType,
+    openSpriteEditor,
     showDialog
   } = useEditorStore();
 
@@ -80,6 +81,11 @@ export const ProjectExplorer: React.FC = () => {
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
                 onClick={() => setSelectedObjectType(ot.id)}
+                onDoubleClick={() => {
+                  if (ot.kind === ObjectTypeKind.Sprite) {
+                    openSpriteEditor(ot.id);
+                  }
+                }}
                 style={itemStyle(editorState.selectedObjectTypeId === ot.id)}
               >
                 <Package size={14} color={editorState.selectedObjectTypeId === ot.id ? '#007acc' : '#666'} />

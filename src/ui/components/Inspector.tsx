@@ -1,19 +1,20 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight } from 'lucide-react';
-
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
+import { VariableDialog } from './VariableDialog';
 
 export const Inspector: React.FC = () => {
   const { 
-    project, editorState, updateInstance, updateLayer, updateObjectType, addInstanceVariable, removeInstanceVariable,
-    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog
+    project, editorState, updateInstance, updateLayer, updateObjectType, addInstanceVariable, updateInstanceVariable, removeInstanceVariable,
+    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog, openSpriteEditor
   } = useEditorStore();
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
   const activeLayout = project.layouts.find(l => l.id === activeLayoutId);
 
   const [showBehaviorsDialog, setShowBehaviorsDialog] = React.useState(false);
+  const [variableEditor, setVariableEditor] = React.useState<{ isOpen: boolean, variable?: any, objectTypeId: string } | null>(null);
 
   // 1. Inspect Selected Instance
   if (selectedInstanceIds.length === 1) {
@@ -89,10 +90,9 @@ export const Inspector: React.FC = () => {
           
           <Category 
             label="Instance Variables" 
-            action={<button onClick={async () => { 
+            action={<button onClick={() => { 
               if (objectType) { 
-                const name = await showDialog({ title: 'New Variable', message: 'Enter variable name:', type: 'prompt', defaultValue: 'Variable1' });
-                if (name && typeof name === 'string') addInstanceVariable(objectType.id, name, 'number', 0); 
+                setVariableEditor({ isOpen: true, objectTypeId: objectType.id });
               } 
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
@@ -118,6 +118,22 @@ export const Inspector: React.FC = () => {
               onClose={() => setShowBehaviorsDialog(false)}
             />
           )}
+          {variableEditor?.isOpen && (
+            <VariableDialog 
+              title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
+              variable={variableEditor.variable}
+              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId)?.instanceVariables.map(v => v.name) || []}
+              onSave={(updates) => {
+                if (variableEditor.variable) {
+                  updateInstanceVariable(variableEditor.objectTypeId, variableEditor.variable.id, updates);
+                } else {
+                  addInstanceVariable(variableEditor.objectTypeId, updates.name, updates.type, updates.initialValue);
+                }
+                setVariableEditor(null);
+              }}
+              onCancel={() => setVariableEditor(null)}
+            />
+          )}
         </div>
       );
     }
@@ -134,8 +150,11 @@ export const Inspector: React.FC = () => {
           <Category label="General">
             <PropertyRow label="Name" value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Package size={12}/>} />
             <PropertyRow label="Kind" value={objectType.kind} readOnly />
-            <div style={{ padding: '8px 10px' }}>
+            <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({objectType.behaviors?.length || 0})</button>
+              {objectType.kind === 'sprite' && (
+                <button onClick={() => openSpriteEditor(objectType.id)} style={linkButtonStyle}>Edit Animations</button>
+              )}
             </div>
           </Category>
           
@@ -154,9 +173,8 @@ export const Inspector: React.FC = () => {
 
           <Category 
             label="Instance Variables" 
-            action={<button onClick={async () => { 
-              const name = await showDialog({ title: 'New Variable', message: 'Enter variable name:', type: 'prompt', defaultValue: 'Variable1' });
-              if (name && typeof name === 'string') addInstanceVariable(objectType.id, name, 'number', 0); 
+            action={<button onClick={() => { 
+              setVariableEditor({ isOpen: true, objectTypeId: objectType.id });
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {objectType.instanceVariables?.map(v => (
@@ -180,9 +198,8 @@ export const Inspector: React.FC = () => {
                   type="text" 
                   value={v.initialValue ?? ''} 
                   onChange={e => {
-                    const val = Number(e.target.value) || 0;
-                    const next = (objectType.instanceVariables || []).map(iv => iv.id === v.id ? { ...iv, initialValue: val } : iv);
-                    updateObjectType(objectType.id, { instanceVariables: next });
+                    const val = v.type === 'number' ? (Number(e.target.value) || 0) : e.target.value;
+                    updateInstanceVariable(objectType.id, v.id, { initialValue: val });
                   }}
                   onFocus={e => {
                     e.currentTarget.style.borderColor = '#007acc';
@@ -197,10 +214,20 @@ export const Inspector: React.FC = () => {
                   style={{ ...inputStyle, height: '22px' }}
                 />
                 <button 
+                  onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })} 
+                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#007acc'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#444'}
+                  title="Edit variable properties"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button 
                   onClick={() => removeInstanceVariable(objectType.id, v.id)} 
                   style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#ff4444'}
                   onMouseLeave={e => e.currentTarget.style.color = '#444'}
+                  title="Delete variable"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -217,6 +244,22 @@ export const Inspector: React.FC = () => {
               onAdd={(type, name, defaults) => addBehavior(objectType.id, type, name, defaults)}
               onRemove={id => removeBehavior(objectType.id, id)}
               onClose={() => setShowBehaviorsDialog(false)}
+            />
+          )}
+          {variableEditor?.isOpen && (
+            <VariableDialog 
+              title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
+              variable={variableEditor.variable}
+              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId)?.instanceVariables.map(v => v.name) || []}
+              onSave={(updates) => {
+                if (variableEditor.variable) {
+                  updateInstanceVariable(variableEditor.objectTypeId, variableEditor.variable.id, updates);
+                } else {
+                  addInstanceVariable(variableEditor.objectTypeId, updates.name, updates.type, updates.initialValue);
+                }
+                setVariableEditor(null);
+              }}
+              onCancel={() => setVariableEditor(null)}
             />
           )}
         </div>

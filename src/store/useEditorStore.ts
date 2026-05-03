@@ -32,6 +32,7 @@ interface EditorStore {
   removeInstance: (layoutId: string, instanceId: string) => void;
   reorderInstance: (layoutId: string, instanceId: string, direction: 'front' | 'back' | 'forward' | 'backward') => void;
   addInstanceVariable: (objectTypeId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
+  updateInstanceVariable: (objectTypeId: string, variableId: string, updates: any) => void;
   removeInstanceVariable: (objectTypeId: string, variableId: string) => void;
   addBehavior: (objectTypeId: string, type: string, name: string, defaultProperties?: Record<string, any>) => void;
   removeBehavior: (objectTypeId: string, behaviorId: string) => void;
@@ -71,6 +72,10 @@ interface EditorStore {
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
   
+  // Sprite Editor
+  openSpriteEditor: (objectTypeId: string) => void;
+  closeSpriteEditor: () => void;
+  
   // Clipboard
   copySelected: () => void;
   cutSelected: () => void;
@@ -91,7 +96,10 @@ const initialProject = createEmptyProject();
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
   project: initialProject,
-  editorState: createInitialEditorState(initialProject),
+  editorState: {
+    ...createInitialEditorState(initialProject),
+    spriteEditor: null
+  },
   
   history: [initialProject],
   historyIndex: 0,
@@ -192,6 +200,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   addInstanceVariable: (objectTypeId, name, type, initialValue) => {
     const next = projectUpdates.addInstanceVariable(get().project, objectTypeId, name, type, initialValue);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateInstanceVariable: (objectTypeId, variableId, updates) => {
+    const next = projectUpdates.updateInstanceVariable(get().project, objectTypeId, variableId, updates);
     set({ project: next });
     get().pushHistory(next);
   },
@@ -478,7 +491,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       get().pushHistory(next);
     }
   },
-
+  
+  // Sprite Editor
+  openSpriteEditor: (objectTypeId) => set((state) => ({
+    editorState: { ...state.editorState, spriteEditor: { objectTypeId, isOpen: true } }
+  })),
+  closeSpriteEditor: () => set((state) => ({
+    editorState: { ...state.editorState, spriteEditor: null }
+  })),
+ 
   commitProject: () => {
     get().pushHistory(get().project);
   },
