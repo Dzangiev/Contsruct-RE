@@ -9,6 +9,7 @@ import { Play, Monitor, FileText } from 'lucide-react';
 import { StatusBar } from './components/StatusBar';
 
 import { LayersPanel } from './components/LayersPanel';
+import { SimpleModal } from './components/SimpleModal';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: string }, { hasError: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false }; }
@@ -25,7 +26,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: s
 }
 
 const App: React.FC = () => {
-  const { project, editorState, setTab, setPreviewMode } = useEditorStore();
+  const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog } = useEditorStore();
   const { currentTab, previewMode } = editorState;
 
   return (
@@ -133,6 +134,24 @@ const App: React.FC = () => {
             onStop={() => setPreviewMode(false)} 
           />
         </ErrorBoundary>
+      )}
+
+      {/* Global Dialog */}
+      {dialogState?.isOpen && (
+        <SimpleModal 
+          title={dialogState.title}
+          message={dialogState.message}
+          type={dialogState.type}
+          defaultValue={dialogState.defaultValue}
+          onConfirm={(val) => {
+            dialogState.resolve(val ?? true);
+            useEditorStore.setState({ dialogState: null });
+          }}
+          onCancel={() => {
+            dialogState.resolve(undefined);
+            useEditorStore.setState({ dialogState: null });
+          }}
+        />
       )}
     </div>
   );

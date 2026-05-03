@@ -7,7 +7,7 @@ import { BehaviorsDialog } from './BehaviorsDialog';
 export const Inspector: React.FC = () => {
   const { 
     project, editorState, updateInstance, updateLayer, updateObjectType, addInstanceVariable, removeInstanceVariable,
-    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings
+    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog
   } = useEditorStore();
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
@@ -89,7 +89,12 @@ export const Inspector: React.FC = () => {
           
           <Category 
             label="Instance Variables" 
-            action={<button onClick={() => { if (objectType) { const name = prompt('Variable name?'); if (name) addInstanceVariable(objectType.id, name, 'number', 0); } }} style={miniButtonStyle}><Plus size={12} /></button>}
+            action={<button onClick={async () => { 
+              if (objectType) { 
+                const name = await showDialog({ title: 'New Variable', message: 'Enter variable name:', type: 'prompt', defaultValue: 'Variable1' });
+                if (name && typeof name === 'string') addInstanceVariable(objectType.id, name, 'number', 0); 
+              } 
+            }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {objectType?.instanceVariables?.map(v => (
               <PropertyRow 
@@ -149,7 +154,10 @@ export const Inspector: React.FC = () => {
 
           <Category 
             label="Instance Variables" 
-            action={<button onClick={() => { const name = prompt('Variable name?'); if (name) addInstanceVariable(objectType.id, name, 'number', 0); }} style={miniButtonStyle}><Plus size={12} /></button>}
+            action={<button onClick={async () => { 
+              const name = await showDialog({ title: 'New Variable', message: 'Enter variable name:', type: 'prompt', defaultValue: 'Variable1' });
+              if (name && typeof name === 'string') addInstanceVariable(objectType.id, name, 'number', 0); 
+            }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {objectType.instanceVariables?.map(v => (
               <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>

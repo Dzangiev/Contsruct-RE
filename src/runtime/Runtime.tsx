@@ -473,36 +473,93 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             }
             case 'platform': {
               const maxSpeed = Number(props.maxSpeed ?? 330);
+              const acceleration = Number(props.acceleration ?? 1500);
+              const deceleration = Number(props.deceleration ?? 1500);
               const gravity = Number(props.gravity ?? 1500);
               const jumpStrength = Number(props.jumpStrength ?? 650);
-              if (state.vx === undefined) { state.vx = 0; state.vy = 0; state.onFloor = false; }
-              let moveDir = 0;
-              if (keysDownRef.current.has('ArrowLeft')) moveDir -= 1;
-              if (keysDownRef.current.has('ArrowRight')) moveDir += 1;
-              state.vx = moveDir * maxSpeed;
+
+              if (state.vx === undefined) { 
+                state.vx = 0; 
+                state.vy = 0; 
+                state.onFloor = false; 
+              }
+
+              // 1. Horizontal Movement
+              let targetVx = 0;
+              if (keysDownRef.current.has('ArrowLeft')) targetVx -= 1;
+              if (keysDownRef.current.has('ArrowRight')) targetVx += 1;
+              targetVx *= maxSpeed;
+
+              if (targetVx !== 0) {
+                // Accelerate
+                if (state.vx < targetVx) state.vx = Math.min(targetVx, state.vx + acceleration * dt);
+                else if (state.vx > targetVx) state.vx = Math.max(targetVx, state.vx - acceleration * dt);
+              } else {
+                // Decelerate
+                if (state.vx > 0) state.vx = Math.max(0, state.vx - deceleration * dt);
+                else if (state.vx < 0) state.vx = Math.min(0, state.vx + deceleration * dt);
+              }
+
+              // 2. Vertical Movement (Gravity & Jump)
               state.vy += gravity * dt;
               if (keysPressedRef.current.has('ArrowUp') && state.onFloor) {
                 state.vy = -jumpStrength;
                 state.onFloor = false;
               }
-              let nextX = updatedInst.x + state.vx * dt;
-              let nextY = updatedInst.y + state.vy * dt;
+
+              // 3. Collision Resolution
               const solids = nextInstances.filter(o => {
+                if (o.id === inst.id) return false;
                 const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
                 return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
               });
+
+              const checkCollision = (tx: number, ty: number) => {
+                return solids.some(s => {
+                  return tx < s.x + s.width && 
+                         tx + updatedInst.width > s.x && 
+                         ty < s.y + s.height && 
+                         ty + updatedInst.height > s.y;
+                });
+              };
+
+              // X Pass
+              let newX = updatedInst.x + state.vx * dt;
+              if (checkCollision(newX, updatedInst.y)) {
+                // Binary search or simple step back to find edge
+                const step = state.vx > 0 ? 1 : -1;
+                while (checkCollision(updatedInst.x + step, updatedInst.y) === false && Math.abs(updatedInst.x - newX) > 1) {
+                  updatedInst.x += step;
+                }
+                state.vx = 0;
+                newX = updatedInst.x;
+              } else {
+                updatedInst.x = newX;
+              }
+
+              // Y Pass
+              let newY = updatedInst.y + state.vy * dt;
               let onFloor = false;
-              solids.forEach(s => {
-                if (nextX < s.x + s.width && nextX + updatedInst.width > s.x) {
-                  if (updatedInst.y + updatedInst.height <= s.y && nextY + updatedInst.height > s.y) {
-                    nextY = s.y - updatedInst.height;
-                    state.vy = 0;
-                    onFloor = true;
+              if (checkCollision(updatedInst.x, newY)) {
+                if (state.vy > 0) {
+                  // Hit floor
+                  const step = 1;
+                  while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y < newY) {
+                    updatedInst.y += step;
+                  }
+                  onFloor = true;
+                } else if (state.vy < 0) {
+                  // Hit ceiling
+                  const step = -1;
+                  while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y > newY) {
+                    updatedInst.y += step;
                   }
                 }
-              });
-              updatedInst.x = nextX;
-              updatedInst.y = nextY;
+                state.vy = 0;
+              } else {
+                updatedInst.y = newY;
+              }
+
               state.onFloor = onFloor;
               break;
             }

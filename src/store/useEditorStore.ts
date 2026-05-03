@@ -80,6 +80,11 @@ interface EditorStore {
   
   // History
   commitProject: () => void;
+
+  // Dialogs
+  showDialog: (options: { title: string, message?: string, type: 'prompt' | 'confirm' | 'alert', defaultValue?: string }) => Promise<string | boolean | undefined>;
+  closeDialog: () => void;
+  dialogState: { isOpen: boolean, title: string, message?: string, type: 'prompt' | 'confirm' | 'alert', defaultValue?: string, resolve: (val: any) => void } | null;
 }
 
 const initialProject = createEmptyProject();
@@ -474,5 +479,19 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   commitProject: () => {
     get().pushHistory(get().project);
+  },
+
+  dialogState: null,
+  showDialog: (options) => {
+    return new Promise((resolve) => {
+      set({ dialogState: { ...options, isOpen: true, resolve } });
+    });
+  },
+  closeDialog: () => {
+    const { dialogState } = get();
+    if (dialogState) {
+      dialogState.resolve(undefined);
+      set({ dialogState: null });
+    }
   }
 }));

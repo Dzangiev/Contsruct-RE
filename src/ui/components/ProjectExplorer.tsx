@@ -15,7 +15,8 @@ export const ProjectExplorer: React.FC = () => {
     addLayout, 
     addObjectType,
     setTool,
-    setSelectedObjectType
+    setSelectedObjectType,
+    showDialog
   } = useEditorStore();
 
   return (
@@ -30,7 +31,10 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '0 5px' }}>
             <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Layouts</span>
             <button 
-              onClick={() => addLayout(`Layout ${(project.layouts?.length || 0) + 1}`)}
+              onClick={async () => {
+                const name = await showDialog({ title: 'New Layout', message: 'Enter layout name:', type: 'prompt', defaultValue: `Layout ${(project.layouts?.length || 0) + 1}` });
+                if (name && typeof name === 'string') addLayout(name);
+              }}
               style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
               title="Add Layout"
             >
@@ -56,7 +60,10 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '0 5px' }}>
             <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Object Types</span>
             <button 
-              onClick={() => addObjectType(`Sprite ${(project.objectTypes?.length || 0) + 1}`, ObjectTypeKind.Sprite)}
+              onClick={async () => {
+                const name = await showDialog({ title: 'New Sprite', message: 'Enter sprite name:', type: 'prompt', defaultValue: `Sprite ${(project.objectTypes?.length || 0) + 1}` });
+                if (name && typeof name === 'string') addObjectType(name, ObjectTypeKind.Sprite);
+              }}
               style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px' }}
               title="Add Object Type"
             >

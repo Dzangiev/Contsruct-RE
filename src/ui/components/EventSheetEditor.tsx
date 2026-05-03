@@ -71,6 +71,7 @@ export const EventSheetEditor: React.FC = () => {
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (editorState.previewMode) return;
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
       if (!eventSheet) return;
 
@@ -142,7 +143,7 @@ export const EventSheetEditor: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorState, eventSheet, setSelectedEventBlocks, updateEventBlock, toggleConditionInverted, addEventBlock, removeEventBlock, addCondition, removeCondition, removeAction, copySelected, cutSelected, pasteSelected, pasteLogicItem]);
+  }, [editorState, eventSheet, setSelectedEventBlocks, updateEventBlock, toggleConditionInverted, addEventBlock, removeEventBlock, addCondition, removeCondition, removeAction, copySelected, cutSelected, pasteSelected, pasteLogicItem, editorState.previewMode]);
 
   if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
 

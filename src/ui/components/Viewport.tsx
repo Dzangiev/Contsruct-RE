@@ -47,6 +47,7 @@ export const Viewport: React.FC = () => {
   // Global key handlers
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (editorState.previewMode) return;
       if (e.key === 'Escape') {
         setTool('select');
         setContextMenu(null);
@@ -132,7 +133,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSize, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSize, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
