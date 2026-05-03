@@ -69,6 +69,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   
   const keysDownRef = React.useRef<Set<string>>(new Set());
   const keysPressedRef = React.useRef<Set<string>>(new Set());
+  const prevOverlapsRef = React.useRef<Set<string>>(new Set()); // "id1:id2"
   
   const pointerPosRef = React.useRef({ x: 0, y: 0 });
   const pointerDownRef = React.useRef(false);
@@ -139,11 +140,18 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     let animationFrameId: number;
 
-    const getEvaluationContext = (dt: number, currentInstances: Instance[], inst?: Instance): EvaluationContext => {
+    const getEvaluationContext = (dt: number, instances: Instance[], currentInstance?: Instance, funcParams?: any[]): EvaluationContext => {
       const objects: Record<string, any> = {};
-      currentInstances.forEach(i => {
-        const ot = project.objectTypes.find(o => o.id === i.objectTypeId);
-        if (ot) objects[ot.name] = { ...i, instanceVariables: i.properties }; 
+      project.objectTypes.forEach(ot => {
+        const insts = instances.filter(i => i.objectTypeId === ot.id);
+        if (insts.length > 0) {
+          // If we have a current instance of this type, use it, otherwise use the first one
+          const target = (currentInstance && currentInstance.objectTypeId === ot.id) ? currentInstance : insts[0];
+          objects[ot.name] = {
+            ...target,
+            instanceVariables: target.properties
+          };
+        }
       });
 
       return {
@@ -154,7 +162,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           time: (performance.now() - lastFpsUpdateRef.current) / 1000, 
           pointerX: pointerPosRef.current.x,
           pointerY: pointerPosRef.current.y
-        }
+        },
+        functionParams: funcParams
       };
     };
 
@@ -203,6 +212,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                      i.y + i.height > o.y;
             });
           }
+          case 'onCollision': {
+            const otherTypeId = condition.params[0];
+            if (!otherTypeId) return false;
+            const others = allInstances.filter(o => o.objectTypeId === otherTypeId);
+            return others.some(o => {
+              const isOverlapping = i.x < o.x + o.width &&
+                                    i.x + i.width > o.x &&
+                                    i.y < o.y + o.height &&
+                                    i.y + i.height > o.y;
+              if (!isOverlapping) return false;
+              
+              const pairId = i.id < o.id ? `${i.id}:${o.id}` : `${o.id}:${i.id}`;
+              return !prevOverlapsRef.current.has(pairId);
+            });
+          }
           case 'compareInstanceVariable': {
             const varName = condition.params[0];
             const operator = condition.params[1];
@@ -239,8 +263,9 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         : currentPicked.filter(i => checkInstance(i));
     };
 
-    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean): { instances: Instance[], result: boolean } => {
+    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[]): { instances: Instance[], result: boolean } => {
       if (block.disabled) return { instances, result: false };
+      if (block.type === 'function' && !isExplicitCall) return { instances, result: false }; // Only execute functions if explicitly called
 
       let currentPickedSets: PickedSets = { ...parentPickedSets };
       let allPass = true;
@@ -249,7 +274,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         const otid = condition.targetObjectTypeId;
         if (!otid) {
           let result = true;
-          const context = getEvaluationContext(dt, instances);
+          const context = getEvaluationContext(dt, instances, undefined, funcParams);
           switch (condition.type) {
             case 'always': result = true; break;
             case 'onStartOfLayout': result = !hasStartedRef.current; break;
@@ -301,15 +326,51 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       block.actions.forEach(action => {
         const otid = action.targetObjectTypeId;
         
-        const context = getEvaluationContext(dt, nextInstances);
+        const context = getEvaluationContext(dt, nextInstances, undefined, funcParams);
         const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
-        if (!otid && action.type !== 'log') return;
+        const isSystemAction = !otid || action.type === 'callFunction' || action.type === 'setVariable' || action.type === 'addVariable' || action.type === 'log';
+        if (!isSystemAction && !otid) return;
 
         if (action.type === 'log') {
           const msg = String(evalParam(0));
           const type = (action.params[1] || 'info') as any;
           addLog(msg, type);
+          return;
+        }
+
+        if (action.type === 'callFunction') {
+          const rawParam = action.params[0];
+          const evaluatedName = String(evaluateExpression(rawParam, context)).trim();
+          
+          // Collect parameters for the function call
+          const callParams = action.params.slice(1).map(p => evaluateExpression(p, context));
+
+          addLog(`CALL FUNCTION: "${evaluatedName}" (params: ${callParams.join(', ')})`, 'info');
+          
+          const allSheets = project.eventSheets;
+          let foundCount = 0;
+          
+          allSheets.forEach(es => {
+            const findAndCall = (blocks: EventBlock[]) => {
+              blocks.forEach(b => {
+                if (b.type === 'function' && b.functionName?.trim() === evaluatedName) {
+                  addLog(`Found function "${evaluatedName}" in sheet "${es.name}", executing...`, 'info');
+                  const res = processBlock(b, nextInstances, {}, dt, true, true, callParams); // Explicit call with params
+                  nextInstances = res.instances;
+                  foundCount++;
+                }
+                if (b.children.length > 0) findAndCall(b.children);
+              });
+            };
+            findAndCall(es.events);
+          });
+          
+          if (foundCount === 0) {
+            addLog(`ERROR: Function "${evaluatedName}" not found in any event sheet!`, 'error');
+          } else {
+            addLog(`Function "${evaluatedName}" executed ${foundCount} time(s).`, 'info');
+          }
           return;
         }
 
@@ -402,7 +463,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       let currentResult = allPass;
       block.children.forEach(child => {
-        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult);
+        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult, isExplicitCall, funcParams);
         nextInstances = childRes.instances;
         // Sub-events don't necessarily update the 'result' of the parent for the next sibling, 
         // but they might in some cases. In C3, 'else' applies to the previous sibling at the same level.
@@ -584,6 +645,19 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       runtimeInstancesRef.current = nextInstances;
       setRuntimeInstances(nextInstances);
 
+      // Update collision state for next frame
+      const currentOverlaps = new Set<string>();
+      nextInstances.forEach(i => {
+        nextInstances.forEach(o => {
+          if (i.id === o.id) return;
+          if (i.x < o.x + o.width && i.x + i.width > o.x && i.y < o.y + o.height && i.y + i.height > o.y) {
+            const pairId = i.id < o.id ? `${i.id}:${o.id}` : `${o.id}:${i.id}`;
+            currentOverlaps.add(pairId);
+          }
+        });
+      });
+      prevOverlapsRef.current = currentOverlaps;
+
       keysPressedRef.current.clear();
       pointerPressedRef.current = false;
       pointerReleasedRef.current = false;
@@ -633,11 +707,16 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     const cameraTransform = `translate(${vw/2 - currentCameraPos.x}, ${vh/2 - currentCameraPos.y})`;
 
+    React.useEffect(() => {
+      containerRef.current?.focus();
+    }, []);
+
     return (
-      <div ref={containerRef} className="runtime-preview" style={{
+      <div ref={containerRef} tabIndex={0} className="runtime-preview" style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: '#0a0a0a', zIndex: 1000, display: 'flex', flexDirection: 'column',
-        fontFamily: 'Inter, sans-serif', color: '#fff', overflow: 'hidden'
+        fontFamily: 'Inter, sans-serif', color: '#fff', overflow: 'hidden',
+        outline: 'none'
       }}>
         {/* Runtime Toolbar */}
         <div style={{

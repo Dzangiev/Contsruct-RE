@@ -61,8 +61,10 @@ export function addEventBlock(
       globalVariables: [...project.globalVariables, newBlock.variable]
     };
   } else if (type === 'function') {
-    newBlock.functionName = 'NewFunction';
+    newBlock.functionName = 'Function' + (generateId().substring(0, 4));
+    newBlock.functionDescription = '';
     newBlock.functionParams = [];
+    newBlock.functionReturnType = 'none';
   } else if (type === 'include') {
     // Default to the first event sheet that isn't the current one
     const otherSheet = project.eventSheets.find(es => es.id !== eventSheetId);

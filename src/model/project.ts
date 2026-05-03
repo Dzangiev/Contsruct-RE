@@ -121,7 +121,9 @@ export interface EventBlock {
   commentText?: string;
   variable?: GlobalVariable;
   functionName?: string;
-  functionParams?: string[];
+  functionDescription?: string;
+  functionParams?: { name: string, type: 'string' | 'number' | 'any', defaultValue: any }[];
+  functionReturnType?: 'none' | 'string' | 'number' | 'any';
   includeSheetId?: string;
   color?: string;
   bookmarked?: boolean;

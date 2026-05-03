@@ -12,6 +12,7 @@ export interface EvaluationContext {
     pointerX: number;
     pointerY: number;
   };
+  functionParams?: any[];
 }
 
 export function evaluateExpression(expr: any, context: EvaluationContext): any {
@@ -99,7 +100,14 @@ export function evaluateExpression(expr: any, context: EvaluationContext): any {
     return context.variables[trimmed];
   }
 
-  // 6. System keywords
+  // 6. Function Parameters (e.g., Function.Param(0))
+  const funcParamMatch = trimmed.match(/^Function\.Param\s*\(\s*(\d+)\s*\)$/i);
+  if (funcParamMatch) {
+    const index = parseInt(funcParamMatch[1]!);
+    return context.functionParams ? context.functionParams[index] : 0;
+  }
+
+  // 7. System keywords
   switch (trimmed.toLowerCase()) {
     case 'dt': return context.system.dt;
     case 'time': return context.system.time;

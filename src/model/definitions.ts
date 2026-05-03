@@ -1,6 +1,6 @@
 export interface ParamDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable';
+  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable' | 'functionName';
   options?: string[]; // For enum type
   defaultValue?: any;
 }
@@ -235,6 +235,14 @@ export const CONDITIONS: LogicDefinition[] = [
     target: 'object'
   },
   {
+    type: 'onCollision',
+    name: 'On collision with another object',
+    description: 'True only during the frame the object first overlaps another instance of a specific type.',
+    params: [{ name: 'Object Type', type: 'objectType' }],
+    category: 'Collisions',
+    target: 'object'
+  },
+  {
     type: 'compareInstanceVariable',
     name: 'Compare instance variable',
     description: 'Compare the value of an instance variable.',
@@ -313,18 +321,6 @@ export const ACTIONS: LogicDefinition[] = [
     target: 'system'
   },
   {
-    type: 'callFunction',
-    name: 'Call function',
-    description: 'Invoke a previously defined function.',
-    params: [
-      { name: 'Name', type: 'string', defaultValue: 'MyFunction' },
-      { name: 'Param 1', type: 'string', defaultValue: '' },
-      { name: 'Param 2', type: 'string', defaultValue: '' }
-    ],
-    category: 'Functions',
-    target: 'system'
-  },
-  {
     type: 'setVariable',
     name: 'Set variable',
     description: 'Set the value of a global variable.',
@@ -388,6 +384,26 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Type', type: 'enum', options: ['info', 'warn', 'error'], defaultValue: 'info' }
     ],
     category: 'System',
+    target: 'system'
+  },
+  {
+    type: 'callFunction',
+    name: 'Call function',
+    description: 'Execute the logic inside a named function.',
+    params: [
+      { name: 'Function', type: 'functionName', defaultValue: '' }
+    ],
+    category: 'Functions',
+    target: 'system'
+  },
+  {
+    type: 'setReturnValue',
+    name: 'Set return value',
+    description: 'Set the value that this function will return to its caller.',
+    params: [
+      { name: 'Value', type: 'any', defaultValue: '0' }
+    ],
+    category: 'Functions',
     target: 'system'
   },
   {
