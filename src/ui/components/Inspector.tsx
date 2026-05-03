@@ -1,7 +1,8 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
+import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
 import { FamilyMembersDialog } from './FamilyMembersDialog';
 
@@ -58,56 +59,129 @@ export const Inspector: React.FC = () => {
             <PropertyRow label="Visible" value={instance.visible ? 'Yes' : 'No'} onChange={v => updateInstance(activeLayoutId!, instanceId, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
           </Category>
 
-          {objectType?.kind === 'text' && (
-            <Category label="Text Properties">
-              <PropertyRow label="Text" value={instance.properties.text ?? 'Text'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, text: String(v) } })} />
-              <PropertyRow label="Color" value={instance.properties.color ?? '#ffffff'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
-              <PropertyRow label="Font Size" value={instance.properties.fontSize ?? 12} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, fontSize: Number(v) } })} type="number" />
-              <PropertyRow label="Font Face" value={instance.properties.fontFace ?? 'Arial'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, fontFace: String(v) } })} />
-            </Category>
-          )}
+          {(() => {
+            const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
+            if (!pluginDef || pluginDef.propertyDefinitions.length === 0) return null;
+            return (
+              <Category label={`${pluginDef.name} Properties`}>
+                {pluginDef.propertyDefinitions.map(pDef => {
+                  const val = instance.properties[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
 
-          {objectType?.kind === 'sprite' && (
-            <Category label="Sprite Visuals">
-              <PropertyRow label="Color/Tint" value={instance.properties.color ?? '#4a4a4a'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
-            </Category>
-          )}
+                  if (pDef.type === 'number') type = 'number';
+                  else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  } else if (pDef.name.toLowerCase().includes('color')) {
+                    type = 'color';
+                  }
 
-          {objectType?.kind === 'tiled-background' && (
-            <Category label="Tiled Properties">
-              <PropertyRow label="Color" value={instance.properties.color ?? '#2d2d2d'} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, color: String(v) } })} type="color" />
-              <PropertyRow label="Tile Width" value={instance.properties.tileWidth ?? 32} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, tileWidth: Number(v) } })} type="number" />
-              <PropertyRow label="Tile Height" value={instance.properties.tileHeight ?? 32} onChange={v => updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, tileHeight: Number(v) } })} type="number" />
-            </Category>
-          )}
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+              </Category>
+            );
+          })()}
 
-          {objectType?.behaviors?.map(b => (
-            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
-              {Object.keys(b.properties || {}).map(prop => (
-                <PropertyRow 
-                  key={prop} 
-                  label={prop} 
-                  value={b.properties?.[prop]} 
-                  onChange={val => updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
-                />
-              ))}
-              <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateBehavior(objectType.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
-            </Category>
-          ))}
+          {objectType?.behaviors?.map(b => {
+            const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
+            return (
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
+                {def?.propertyDefinitions.map(pDef => {
+                  const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
+                  let icon = null;
 
-          {families.map(family => family.behaviors.map(b => (
-            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
-              {Object.keys(b.properties || {}).map(prop => (
-                <PropertyRow 
-                  key={prop} 
-                  label={prop} 
-                  value={b.properties?.[prop]} 
-                  onChange={val => updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
-                />
-              ))}
-              <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
-            </Category>
-          )))}
+                  if (pDef.type === 'number') {
+                    type = 'number';
+                    icon = <Hash size={12}/>;
+                  } else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                    icon = val ? <CheckSquare size={12} color="#4caf50" /> : <Square size={12} />;
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  }
+
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      icon={icon}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateBehavior(objectType.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+              </Category>
+            );
+          })}
+
+          {families.map(family => family.behaviors.map(b => {
+            const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
+            return (
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
+                {def?.propertyDefinitions.map(pDef => {
+                  const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
+
+                  if (pDef.type === 'number') type = 'number';
+                  else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  }
+
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+              </Category>
+            );
+          }))}
           
           <Category 
             label="Instance Variables" 
@@ -211,19 +285,85 @@ export const Inspector: React.FC = () => {
               )}
             </div>
           </Category>
+
+          {(() => {
+            const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
+            if (!pluginDef || pluginDef.propertyDefinitions.length === 0) return null;
+            return (
+              <Category label={`${pluginDef.name} Defaults`}>
+                {pluginDef.propertyDefinitions.map(pDef => {
+                  const val = objectType.properties[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
+
+                  if (pDef.type === 'number') type = 'number';
+                  else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  } else if (pDef.name.toLowerCase().includes('color')) {
+                    type = 'color';
+                  }
+
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateObjectType(objectType.id, { properties: { ...objectType.properties, [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+              </Category>
+            );
+          })()}
           
-          {objectType.behaviors?.map(b => (
-            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
-              {Object.keys(b.properties || {}).map(prop => (
-                <PropertyRow 
-                  key={prop} 
-                  label={prop} 
-                  value={b.properties?.[prop]} 
-                  onChange={val => updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
-                />
-              ))}
-            </Category>
-          ))}
+          {objectType.behaviors?.map(b => {
+            const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
+            return (
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
+                {def?.propertyDefinitions.map(pDef => {
+                  const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
+
+                  if (pDef.type === 'number') type = 'number';
+                  else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  }
+
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+              </Category>
+            );
+          })}
 
           {families.map(family => family.behaviors.map(b => (
             <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
@@ -395,19 +535,44 @@ export const Inspector: React.FC = () => {
             </div>
           </Category>
 
-          {family.behaviors?.map(b => (
-            <Category key={b.id} label={b.name}>
-              {Object.keys(b.properties || {}).map(prop => (
-                <PropertyRow 
-                  key={prop} 
-                  label={prop} 
-                  value={b.properties?.[prop]} 
-                  onChange={val => updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
-                />
-              ))}
-              <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
-            </Category>
-          ))}
+          {family.behaviors?.map(b => {
+            const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
+            return (
+              <Category key={b.id} label={b.name}>
+                {def?.propertyDefinitions.map(pDef => {
+                  const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
+                  let type: any = 'text';
+                  let options: string[] = [];
+
+                  if (pDef.type === 'number') type = 'number';
+                  else if (pDef.type === 'boolean') {
+                    type = 'select';
+                    options = ['Yes', 'No'];
+                  } else if (pDef.type === 'enum') {
+                    type = 'select';
+                    options = pDef.options || [];
+                  }
+
+                  return (
+                    <PropertyRow 
+                      key={pDef.name} 
+                      label={pDef.name} 
+                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                      type={type}
+                      options={options}
+                      onChange={val => {
+                        let finalVal = val;
+                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'number') finalVal = Number(val);
+                        updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
+                      }} 
+                    />
+                  );
+                })}
+                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+              </Category>
+            );
+          })}
 
           <Category 
             label="Family Variables" 

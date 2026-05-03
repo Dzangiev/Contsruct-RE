@@ -56,17 +56,38 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
     let matchesKind = true;
     if (!isSystemSelected && item.requiredKind) {
       const kinds = Array.isArray(item.requiredKind) ? item.requiredKind : [item.requiredKind];
-      matchesKind = kinds.includes(selectedObjectType.kind);
-    } else if (isSystemSelected && item.requiredKind) {
-      // System items with requiredKind are usually invalid unless target is system, 
-      // but let's be safe: if it's a system item, it shouldn't have requiredKind for an object.
-      matchesKind = false;
+      if (selectedObjectType.kind) {
+        matchesKind = kinds.includes(selectedObjectType.kind);
+      } else if (selectedObjectType.objectTypeIds) {
+        // It's a family
+        const memberTypes = project.objectTypes.filter(ot => selectedObjectType.objectTypeIds.includes(ot.id));
+        matchesKind = memberTypes.some(ot => kinds.includes(ot.kind));
+      } else {
+        matchesKind = false;
+      }
     }
-    
+
+    // Check behaviorType
+    let matchesBehavior = true;
+    if (!isSystemSelected && item.behaviorType) {
+      const hasDirectBehavior = selectedObjectType.behaviors?.some((b: any) => b.type === item.behaviorType);
+      if (hasDirectBehavior) {
+        matchesBehavior = true;
+      } else if (selectedObjectType.objectTypeIds) {
+        // It's a family
+        const memberTypes = project.objectTypes.filter(ot => selectedObjectType.objectTypeIds.includes(ot.id));
+        matchesBehavior = memberTypes.some(ot => ot.behaviors?.some((b: any) => b.type === item.behaviorType));
+      } else {
+        matchesBehavior = false;
+      }
+    } else if (isSystemSelected && item.behaviorType) {
+      matchesBehavior = false;
+    }
+
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.category.toLowerCase().includes(searchTerm.toLowerCase());
                           
-    return matchesTarget && matchesKind && matchesSearch;
+    return matchesTarget && matchesKind && matchesBehavior && matchesSearch;
   });
 
   // 2. Generate categories list from ALL available items (not just the ones in the current category)

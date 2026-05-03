@@ -844,15 +844,29 @@ export const Viewport: React.FC = () => {
                           const color = inst.properties.color || objectType?.properties.color || '#ffffff';
                           const fontSize = (inst.properties.fontSize || objectType?.properties.fontSize || 12);
                           const fontFace = inst.properties.fontFace || objectType?.properties.fontFace || 'Arial';
+                          const hAlign = inst.properties.horizontalAlign || objectType?.properties.horizontalAlign || 'left';
+                          const vAlign = inst.properties.verticalAlign || objectType?.properties.verticalAlign || 'top';
+
+                          let textAnchor: any = 'start';
+                          let tx = 2;
+                          if (hAlign === 'center') { textAnchor = 'middle'; tx = inst.width / 2; }
+                          else if (hAlign === 'right') { textAnchor = 'end'; tx = inst.width - 2; }
+
+                          let domBaseline: any = 'hanging';
+                          let ty = 2;
+                          if (vAlign === 'center') { domBaseline = 'central'; ty = inst.height / 2; }
+                          else if (vAlign === 'bottom') { domBaseline = 'auto'; ty = inst.height - 2; }
+
                           return (
                             <g>
                               <rect width={inst.width} height={inst.height} fill="transparent" stroke={isSelected ? "#0099ff" : "rgba(255,255,255,0.1)"} strokeWidth={1/zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
                               <text 
-                                x={2} y={inst.height / 2} 
+                                x={tx} y={ty} 
                                 fontSize={fontSize} 
                                 fill={color} 
                                 fontFamily={fontFace}
-                                dominantBaseline="middle"
+                                textAnchor={textAnchor}
+                                dominantBaseline={domBaseline}
                                 pointerEvents="none"
                                 style={{ userSelect: 'none' }}
                               >

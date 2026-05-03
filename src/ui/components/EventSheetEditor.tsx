@@ -1235,10 +1235,21 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
           newParams[i] = ot.instanceVariables[0].name;
           changed = true;
         }
+      } else if (pDef.type === 'objectType' && !newParams[i]) {
+        if (project.objectTypes.length > 0) {
+          newParams[i] = project.objectTypes[0].id;
+          changed = true;
+        }
+      } else if ((pDef.type as string) === 'layer' && !newParams[i]) {
+        const layout = project.layouts.find(l => l.eventSheetId === eventSheetId) || project.layouts[0];
+        if (layout && layout.layers.length > 0) {
+          newParams[i] = layout.layers[0].id;
+          changed = true;
+        }
       }
     });
     if (changed) setParams(newParams);
-  }, [def, project, targetObjectTypeId]);
+  }, [def, project, targetObjectTypeId, eventSheetId]);
 
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const [filter, setFilter] = React.useState('');
@@ -1439,6 +1450,55 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
                       </optgroup>
                     )}
                   </select>
+                ) : (pDef.type as string) === 'boolean' ? (
+                  <select 
+                    value={params[i] === true || params[i] === 'true' ? 'true' : 'false'} 
+                    onFocus={() => setActiveParamIndex(i)}
+                    onChange={(e) => { const n = [...params]; n[i] = e.target.value === 'true'; setParams(n); }}
+                    style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                ) : (pDef.type as string) === 'color' ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="color" 
+                      value={String(params[i] || '#ffffff').replace(/"/g, '')} 
+                      onFocus={() => setActiveParamIndex(i)}
+                      onChange={(e) => { const n = [...params]; n[i] = `"${e.target.value}"`; setParams(n); }}
+                      style={{ width: '40px', height: '32px', padding: 0, border: '1px solid #333', background: 'none', cursor: 'pointer' }}
+                    />
+                    <input 
+                      type="text" 
+                      value={params[i]} 
+                      onFocus={() => setActiveParamIndex(i)}
+                      onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }}
+                      style={{ ...paramInputStyle, flex: 1, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}
+                    />
+                  </div>
+                ) : (pDef.type as string) === 'layer' ? (
+                  <select 
+                    value={params[i]} 
+                    onFocus={() => setActiveParamIndex(i)}
+                    onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }}
+                    style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}
+                  >
+                    {(() => {
+                      const layout = project.layouts.find(l => l.eventSheetId === eventSheetId) || project.layouts[0];
+                      return layout?.layers.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ));
+                    })()}
+                  </select>
+                ) : (pDef.type as string) === 'number' ? (
+                  <input 
+                    type="text" 
+                    onFocus={() => setActiveParamIndex(i)} 
+                    value={params[i]} 
+                    onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} 
+                    style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333', borderLeft: activeParamIndex === i ? '4px solid #007acc' : '1px solid #333' }} 
+                  />
                 ) : (
                   <input 
                     type="text" 

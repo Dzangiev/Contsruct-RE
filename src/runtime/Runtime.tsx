@@ -4,6 +4,7 @@ import Matter from 'matter-js';
 import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
 import { evaluateExpression, EvaluationContext } from './expressionEvaluator';
+import { PLUGIN_DEFINITIONS } from '../model/definitions';
 
 interface RuntimeProps {
   project: Project;
@@ -441,6 +442,10 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             const targetId = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], i)));
             return i.id === targetId;
           }
+          case 'physicsIsStatic': {
+            const body = physicsBodiesRef.current.get(i.id);
+            return body ? body.isStatic : false;
+          }
           case 'pickByIndex': {
             return true; // Logic handled in bulk
           }
@@ -725,25 +730,104 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         if (action.type === 'createInstance') {
-          const spawnTypeId = action.params[0];
-          const objectType = project.objectTypes.find(ot => ot.id === spawnTypeId);
-          if (!objectType) return;
-          const targetLayerId = action.params[3] || layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id;
-
-          const spawn = (instForContext?: Instance) => {
+            const spawn = (instForContext?: Instance) => {
               const context = getEvaluationContext(dt, nextInstances, instForContext, funcParams, localVars);
-            const spawnX = Number(evaluateExpression(action.params[1], context) ?? 0);
-            const spawnY = Number(evaluateExpression(action.params[2], context) ?? 0);
-            const newInst: Instance = {
-              id: `rt-${Date.now()}-${Math.random()}`,
-              objectTypeId: spawnTypeId,
-              layerId: targetLayerId,
-              x: spawnX, y: spawnY,
-              width: objectType.defaultWidth, height: objectType.defaultHeight,
-              angle: 0, opacity: 1, visible: true, properties: {}
+              
+              // 1. Resolve Object Type (Try raw ID first, then evaluate)
+              const rawSpawnTypeId = action.params[0];
+              let objectType = project.objectTypes.find(ot => ot.id === rawSpawnTypeId);
+              if (!objectType) {
+                const evalSpawnTypeId = String(evaluateExpression(rawSpawnTypeId, context));
+                objectType = project.objectTypes.find(ot => ot.id === evalSpawnTypeId || ot.name === evalSpawnTypeId);
+                if (!objectType) {
+                  const family = project.families.find(f => f.id === evalSpawnTypeId || f.name === evalSpawnTypeId);
+                  if (family && family.objectTypeIds.length > 0) {
+                    objectType = project.objectTypes.find(ot => ot.id === family.objectTypeIds[0]);
+                  }
+                }
+              }
+              if (!objectType) return;
+
+              // 2. Resolve Layer (Try raw ID first, then evaluate)
+              const rawLayer = action.params[3];
+              let targetLayerId = '';
+              
+              if (rawLayer && layout.layers.some(l => l.id === rawLayer)) {
+                targetLayerId = rawLayer;
+              } else {
+                const evalLayer = evaluateExpression(rawLayer, context);
+                if (typeof evalLayer === 'number') {
+                  targetLayerId = layout.layers[Math.floor(evalLayer)]?.id || layout.layers[0]?.id;
+                } else if (evalLayer) {
+                  const layerStr = String(evalLayer);
+                  const layerById = layout.layers.find(l => l.id === layerStr);
+                  if (layerById) {
+                    targetLayerId = layerById.id;
+                  } else {
+                    const layerByName = layout.layers.find(l => l.name === layerStr);
+                    targetLayerId = layerByName ? layerByName.id : (layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id);
+                  }
+                } else {
+                  targetLayerId = layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id;
+                }
+              }
+
+              const spawnX = Number(evaluateExpression(action.params[1], context) ?? 0);
+              const spawnY = Number(evaluateExpression(action.params[2], context) ?? 0);
+              
+              const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
+              const initialProps: Record<string, any> = {};
+              
+              // 1. Load plugin defaults
+              pluginDef?.propertyDefinitions.forEach(p => { initialProps[p.name] = p.defaultValue; });
+              
+              // 2. Load ObjectType overrides
+              if (objectType.properties) {
+                Object.assign(initialProps, objectType.properties);
+              }
+
+              const newInstId = `rt-${Date.now()}-${Math.random()}`;
+              const newInst: Instance = {
+                id: newInstId,
+                objectTypeId: objectType.id,
+                layerId: targetLayerId,
+                x: spawnX, y: spawnY,
+                width: objectType.defaultWidth, height: objectType.defaultHeight,
+                angle: 0, opacity: 1, visible: true, properties: initialProps
+              };
+              
+              // 3. Initialize Behaviors State
+              if (!behaviorsStateRef.current[newInstId]) behaviorsStateRef.current[newInstId] = {};
+              objectType.behaviors?.forEach(behavior => {
+                behaviorsStateRef.current[newInstId][behavior.id] = { ...behavior.properties };
+              });
+
+              // 4. Initialize Physics Body
+              const physBehavior = objectType.behaviors.find(b => b.type === 'physics' && !b.disabled);
+              if (physBehavior && physicsEngineRef.current) {
+                const props = { ...physBehavior.properties, ...initialProps };
+                const body = Matter.Bodies.rectangle(
+                  spawnX + newInst.width / 2,
+                  spawnY + newInst.height / 2,
+                  newInst.width,
+                  newInst.height,
+                  {
+                    isStatic: !!props.isStatic,
+                    density: Number(props.density ?? 0.001),
+                    friction: Number(props.friction ?? 0.1),
+                    restitution: Number(props.restitution ?? 0.2),
+                    frictionAir: Number(props.frictionAir ?? 0.01),
+                    inertia: props.fixedRotation ? Infinity : undefined
+                  }
+                );
+                Matter.Body.setAngle(body, newInst.angle * (Math.PI / 180));
+                Matter.World.add(physicsEngineRef.current.world, body);
+                physicsBodiesRef.current.set(newInstId, body);
+              }
+
+              nextInstances.push(newInst);
+              addLog(`SPAWN: Created instance of "${objectType.name}" at (${spawnX.toFixed(0)}, ${spawnY.toFixed(0)}) on layer "${targetLayerId}"`, 'info');
             };
-            nextInstances.push(newInst);
-          };
 
           if (otid && currentPickedSets[otid] && currentPickedSets[otid].length > 0) {
             currentPickedSets[otid].forEach(id => {
@@ -874,6 +958,26 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
               return inst;
             }
+            case 'setPathfindingMaxSpeed': {
+              const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+              const behavior = ot?.behaviors.find(b => b.type === 'pathfinding');
+              if (behavior) {
+                if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
+                if (!behaviorsStateRef.current[inst.id][behavior.id]) behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+                behaviorsStateRef.current[inst.id][behavior.id].maxSpeed = Number(evalParam(0) ?? 200);
+              }
+              return inst;
+            }
+            case 'setPathfindingAcceleration': {
+              const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+              const behavior = ot?.behaviors.find(b => b.type === 'pathfinding');
+              if (behavior) {
+                if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
+                if (!behaviorsStateRef.current[inst.id][behavior.id]) behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+                behaviorsStateRef.current[inst.id][behavior.id].acceleration = Number(evalParam(0) ?? 600);
+              }
+              return inst;
+            }
             default: return inst;
           }
         });
@@ -952,14 +1056,14 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
           switch (behavior.type) {
             case 'bullet': {
-              const speed = Number(props.speed ?? 400);
+              const speed = Number(state.speed ?? props.speed ?? 400);
               const angleRad = updatedInst.angle * (Math.PI / 180);
               updatedInst.x += Math.cos(angleRad) * speed * dt;
               updatedInst.y += Math.sin(angleRad) * speed * dt;
               break;
             }
             case 'eight-direction': {
-              const maxSpeed = Number(props.maxSpeed ?? 200);
+              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 200);
               let dx = 0, dy = 0;
               if (keysDownRef.current.has('ArrowLeft')) dx -= 1;
               if (keysDownRef.current.has('ArrowRight')) dx += 1;
@@ -974,11 +1078,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               break;
             }
             case 'platform': {
-              const maxSpeed = Number(props.maxSpeed ?? 330);
-              const acceleration = Number(props.acceleration ?? 1500);
-              const deceleration = Number(props.deceleration ?? 1500);
-              const gravity = Number(props.gravity ?? 1500);
-              const jumpStrength = Number(props.jumpStrength ?? 650);
+              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 330);
+              const acceleration = Number(state.acceleration ?? props.acceleration ?? 1500);
+              const deceleration = Number(state.deceleration ?? props.deceleration ?? 1500);
+              const gravity = Number(state.gravity ?? props.gravity ?? 1500);
+              const jumpStrength = Number(state.jumpStrength ?? props.jumpStrength ?? 650);
 
               if (state.vx === undefined) { 
                 state.vx = 0; 
@@ -1066,7 +1170,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               break;
             }
             case 'pathfinding': {
-              const maxSpeed = Number(props.maxSpeed ?? 200);
+              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 200);
               const cellSize = Number(props.cellSide ?? 32);
               
               if (state.path === undefined) {
@@ -1342,13 +1446,27 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                                   const color = inst.properties.color || ot?.properties.color || '#ffffff';
                                   const fontSize = (inst.properties.fontSize || ot?.properties.fontSize || 12);
                                   const fontFace = inst.properties.fontFace || ot?.properties.fontFace || 'Arial';
+                                  const hAlign = inst.properties.horizontalAlign || ot?.properties.horizontalAlign || 'left';
+                                  const vAlign = inst.properties.verticalAlign || ot?.properties.verticalAlign || 'top';
+
+                                  let textAnchor: any = 'start';
+                                  let tx = 2;
+                                  if (hAlign === 'center') { textAnchor = 'middle'; tx = inst.width / 2; }
+                                  else if (hAlign === 'right') { textAnchor = 'end'; tx = inst.width - 2; }
+
+                                  let domBaseline: any = 'hanging';
+                                  let ty = 2;
+                                  if (vAlign === 'center') { domBaseline = 'central'; ty = inst.height / 2; }
+                                  else if (vAlign === 'bottom') { domBaseline = 'auto'; ty = inst.height - 2; }
+
                                   return (
                                     <text 
-                                      x={2} y={inst.height / 2} 
+                                      x={tx} y={ty} 
                                       fontSize={fontSize} 
                                       fill={color} 
                                       fontFamily={fontFace}
-                                      dominantBaseline="middle"
+                                      textAnchor={textAnchor}
+                                      dominantBaseline={domBaseline}
                                       pointerEvents="none"
                                       style={{ userSelect: 'none' }}
                                     >

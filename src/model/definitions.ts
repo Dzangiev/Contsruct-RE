@@ -1,6 +1,6 @@
 export interface ParamDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable' | 'functionName' | 'any';
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'objectType' | 'layer' | 'instanceVariable' | 'globalVariable' | 'functionName' | 'color' | 'any';
   options?: string[]; // For enum type
   defaultValue?: any;
 }
@@ -12,6 +12,7 @@ export interface PluginDefinition {
   icon: string;
   defaultWidth: number;
   defaultHeight: number;
+  propertyDefinitions: PropertyDefinition[];
 }
 
 export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
@@ -21,7 +22,10 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
     description: 'An object with an image, commonly used for characters, projectiles, and scenery.',
     icon: 'image',
     defaultWidth: 64,
-    defaultHeight: 64
+    defaultHeight: 64,
+    propertyDefinitions: [
+      { name: 'color', type: 'string', defaultValue: '#ffffff' }
+    ]
   },
   {
     kind: 'tiled-background',
@@ -29,7 +33,12 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
     description: 'An object that repeats its image in a grid. Useful for backgrounds and walls.',
     icon: 'grid',
     defaultWidth: 128,
-    defaultHeight: 128
+    defaultHeight: 128,
+    propertyDefinitions: [
+      { name: 'color', type: 'string', defaultValue: '#ffffff' },
+      { name: 'tileWidth', type: 'number', defaultValue: 32 },
+      { name: 'tileHeight', type: 'number', defaultValue: 32 }
+    ]
   },
   {
     kind: 'text',
@@ -37,15 +46,30 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
     description: 'Display text on the screen.',
     icon: 'type',
     defaultWidth: 100,
-    defaultHeight: 20
+    defaultHeight: 20,
+    propertyDefinitions: [
+      { name: 'text', type: 'string', defaultValue: 'Text' },
+      { name: 'color', type: 'string', defaultValue: '#ffffff' },
+      { name: 'fontSize', type: 'number', defaultValue: 12 },
+      { name: 'fontFace', type: 'string', defaultValue: 'Arial' },
+      { name: 'horizontalAlign', type: 'enum', options: ['left', 'center', 'right'], defaultValue: 'left' },
+      { name: 'verticalAlign', type: 'enum', options: ['top', 'center', 'bottom'], defaultValue: 'top' }
+    ]
   }
 ];
+
+export interface PropertyDefinition {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'enum';
+  options?: string[];
+  defaultValue: any;
+}
 
 export interface BehaviorDefinition {
   type: string;
   name: string;
   description: string;
-  defaultProperties: Record<string, any>;
+  propertyDefinitions: PropertyDefinition[];
 }
 
 export const BEHAVIOR_DEFINITIONS: BehaviorDefinition[] = [
@@ -53,76 +77,77 @@ export const BEHAVIOR_DEFINITIONS: BehaviorDefinition[] = [
     type: 'platform',
     name: 'Platform',
     description: 'Standard platformer character movement with gravity, jumping, and floor collisions.',
-    defaultProperties: {
-      maxSpeed: 330,
-      acceleration: 1500,
-      deceleration: 1500,
-      jumpStrength: 650,
-      gravity: 1500,
-      maxFallSpeed: 1000,
-      jumpSustain: 0.2,
-      doubleJump: false
-    }
+    propertyDefinitions: [
+      { name: 'maxSpeed', type: 'number', defaultValue: 330 },
+      { name: 'acceleration', type: 'number', defaultValue: 1500 },
+      { name: 'deceleration', type: 'number', defaultValue: 1500 },
+      { name: 'jumpStrength', type: 'number', defaultValue: 650 },
+      { name: 'gravity', type: 'number', defaultValue: 1500 },
+      { name: 'maxFallSpeed', type: 'number', defaultValue: 1000 },
+      { name: 'jumpSustain', type: 'number', defaultValue: 0.2 },
+      { name: 'doubleJump', type: 'boolean', defaultValue: false }
+    ]
   },
   {
     type: 'bullet',
     name: 'Bullet',
     description: 'Moves the object forward at a constant speed.',
-    defaultProperties: {
-      speed: 400,
-      acceleration: 0,
-      gravity: 0,
-      bounce: false,
-      step: 0
-    }
+    propertyDefinitions: [
+      { name: 'speed', type: 'number', defaultValue: 400 },
+      { name: 'acceleration', type: 'number', defaultValue: 0 },
+      { name: 'gravity', type: 'number', defaultValue: 0 },
+      { name: 'bounce', type: 'boolean', defaultValue: false }
+    ]
   },
   {
     type: 'eight-direction',
     name: '8 Direction',
     description: 'Movement in 8 directions using arrow keys.',
-    defaultProperties: {
-      maxSpeed: 200,
-      acceleration: 600,
-      deceleration: 900,
-      directions: '8-way'
-    }
+    propertyDefinitions: [
+      { name: 'maxSpeed', type: 'number', defaultValue: 200 },
+      { name: 'acceleration', type: 'number', defaultValue: 600 },
+      { name: 'deceleration', type: 'number', defaultValue: 900 },
+      { name: 'directions', type: 'enum', options: ['4-way', '8-way', 'Left/Right'], defaultValue: '8-way' }
+    ]
   },
   {
     type: 'scroll-to',
     name: 'Scroll To',
     description: 'Centers the viewport on this object during preview.',
-    defaultProperties: {}
+    propertyDefinitions: []
   },
   {
     type: 'solid',
     name: 'Solid',
     description: 'Makes the object a solid obstacle for other behaviors like Platform.',
-    defaultProperties: {}
+    propertyDefinitions: [
+      { name: 'tags', type: 'string', defaultValue: '' }
+    ]
   },
   {
     type: 'physics',
     name: 'Physics',
     description: 'Simulates realistic physics using the Matter.js engine.',
-    defaultProperties: {
-      isStatic: false,
-      density: 0.001,
-      friction: 0.1,
-      restitution: 0.2,
-      frictionAir: 0.01,
-      fixedRotation: false
-    }
+    propertyDefinitions: [
+      { name: 'isStatic', type: 'boolean', defaultValue: false },
+      { name: 'density', type: 'number', defaultValue: 0.001 },
+      { name: 'friction', type: 'number', defaultValue: 0.1 },
+      { name: 'restitution', type: 'number', defaultValue: 0.2 },
+      { name: 'frictionAir', type: 'number', defaultValue: 0.01 },
+      { name: 'fixedRotation', type: 'boolean', defaultValue: false }
+    ]
   },
   {
     type: 'pathfinding',
     name: 'Pathfinding',
     description: 'Allows the object to find and follow a path around Solid obstacles.',
-    defaultProperties: {
-      maxSpeed: 200,
-      acceleration: 600,
-      deceleration: 600,
-      rotateSpeed: 180,
-      cellSide: 32
-    }
+    propertyDefinitions: [
+      { name: 'maxSpeed', type: 'number', defaultValue: 200 },
+      { name: 'acceleration', type: 'number', defaultValue: 600 },
+      { name: 'deceleration', type: 'number', defaultValue: 600 },
+      { name: 'rotateSpeed', type: 'number', defaultValue: 180 },
+      { name: 'cellSide', type: 'number', defaultValue: 32 }
+    ]
   }
 ];
 
@@ -134,6 +159,7 @@ export interface LogicDefinition {
   category: string;
   target: 'system' | 'object' | 'both';
   requiredKind?: string | string[];
+  behaviorType?: string;
 }
 
 export const CONDITIONS: LogicDefinition[] = [
@@ -354,6 +380,15 @@ export const CONDITIONS: LogicDefinition[] = [
     params: [{ name: 'Index', type: 'number', defaultValue: 0 }],
     category: 'Picking',
     target: 'object'
+  },
+  {
+    type: 'physicsIsStatic',
+    name: 'Is static',
+    description: 'True if the object is currently set to be physically static.',
+    params: [],
+    category: 'Physics',
+    target: 'object',
+    behaviorType: 'physics'
   }
 ];
 
@@ -528,7 +563,7 @@ export const ACTIONS: LogicDefinition[] = [
     type: 'setTextColor',
     name: 'Set text color',
     description: 'Change the color of the text.',
-    params: [{ name: 'Color', type: 'string', defaultValue: '"#ffffff"' }],
+    params: [{ name: 'Color', type: 'color', defaultValue: '"#ffffff"' }],
     category: 'Text',
     target: 'object',
     requiredKind: 'text'
@@ -551,7 +586,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Force Y', type: 'number', defaultValue: -0.1 }
     ],
     category: 'Physics',
-    target: 'object'
+    target: 'object',
+    behaviorType: 'physics'
   },
   {
     type: 'setPhysicsVelocity',
@@ -562,7 +598,8 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Velocity Y', type: 'number', defaultValue: 0 }
     ],
     category: 'Physics',
-    target: 'object'
+    target: 'object',
+    behaviorType: 'physics'
   },
   {
     type: 'findPath',
@@ -573,7 +610,26 @@ export const ACTIONS: LogicDefinition[] = [
       { name: 'Target Y', type: 'number', defaultValue: 0 }
     ],
     category: 'Pathfinding',
-    target: 'object'
+    target: 'object',
+    behaviorType: 'pathfinding'
+  },
+  {
+    type: 'setPathfindingMaxSpeed',
+    name: 'Set max speed',
+    description: 'Change the maximum movement speed.',
+    params: [{ name: 'Speed', type: 'number', defaultValue: 200 }],
+    category: 'Pathfinding',
+    target: 'object',
+    behaviorType: 'pathfinding'
+  },
+  {
+    type: 'setPathfindingAcceleration',
+    name: 'Set acceleration',
+    description: 'Change the acceleration rate.',
+    params: [{ name: 'Acceleration', type: 'number', defaultValue: 600 }],
+    category: 'Pathfinding',
+    target: 'object',
+    behaviorType: 'pathfinding'
   }
 ];
 

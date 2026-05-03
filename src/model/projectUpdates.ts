@@ -1,4 +1,5 @@
 import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior, InstanceVariable, Family, ProjectFolder } from './project';
+import { PLUGIN_DEFINITIONS } from './definitions';
 import { generateId } from '../utils/id';
 
 /**
@@ -98,22 +99,15 @@ export function updateLayer(
  * Adds a new object type to the project.
  */
 export function addObjectType(project: Project, name: string, kind: ObjectTypeKind, id: string = generateId()): Project {
-  let defaultWidth = 64;
-  let defaultHeight = 64;
+  const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === kind);
+  const defaultWidth = pluginDef?.defaultWidth ?? 64;
+  const defaultHeight = pluginDef?.defaultHeight ?? 64;
   const properties: Record<string, any> = {};
 
-  if (kind === ObjectTypeKind.TiledBackground) {
-    defaultWidth = 128;
-    defaultHeight = 128;
-  } else if (kind === ObjectTypeKind.Text) {
-    defaultWidth = 120;
-    defaultHeight = 24;
-    properties.text = 'Text';
-    properties.color = '#ffffff';
-    properties.fontSize = 12;
-    properties.fontFace = 'Arial';
-    properties.horizontalAlign = 'left';
-    properties.verticalAlign = 'top';
+  if (pluginDef) {
+    pluginDef.propertyDefinitions.forEach(p => {
+      properties[p.name] = p.defaultValue;
+    });
   }
 
   const newObjectType: ObjectType = {

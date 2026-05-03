@@ -48,7 +48,12 @@ export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, on
                 {filteredBehaviors.map(b => (
                   <div 
                     key={b.type} 
-                    onClick={() => { onAdd(b.type, b.name, b.defaultProperties); setShowAddList(false); }}
+                    onClick={() => { 
+                      const defaults: Record<string, any> = {};
+                      b.propertyDefinitions.forEach(p => { defaults[p.name] = p.defaultValue; });
+                      onAdd(b.type, b.name, defaults); 
+                      setShowAddList(false); 
+                    }}
                     style={behaviorCardStyle}
                   >
                     <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>{b.name}</div>
