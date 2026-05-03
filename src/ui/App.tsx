@@ -11,6 +11,7 @@ import { SpriteEditor } from './components/SpriteEditor';
 
 import { LayersPanel } from './components/LayersPanel';
 import { SimpleModal } from './components/SimpleModal';
+import { GridSettingsDialog } from './components/GridSettingsDialog';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: string }, { hasError: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false }; }
@@ -27,8 +28,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: s
 }
 
 const App: React.FC = () => {
-  const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog } = useEditorStore();
-  const { currentTab, previewMode } = editorState;
+  const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog, setGridSettingsDialogOpen } = useEditorStore();
+  const { currentTab, previewMode, gridSettingsDialogOpen } = editorState;
 
   return (
     <div className="editor-root" style={{
@@ -161,6 +162,12 @@ const App: React.FC = () => {
           <SpriteEditor />
         </ErrorBoundary>
       )}
+
+      {/* Grid Settings Dialog */}
+      <GridSettingsDialog 
+        isOpen={gridSettingsDialogOpen} 
+        onClose={() => setGridSettingsDialogOpen(false)} 
+      />
     </div>
   );
 };

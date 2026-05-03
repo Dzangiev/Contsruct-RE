@@ -26,6 +26,7 @@ export const Viewport: React.FC = () => {
     pasteInstances,
     cutSelected,
     setGridSettings,
+    setGridSettingsDialogOpen,
     setRulerSettings
   } = useEditorStore();
   
@@ -127,7 +128,11 @@ export const Viewport: React.FC = () => {
       }
       if (e.key.toLowerCase() === 'g') {
         if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-          setGridSettings(undefined, undefined, undefined, !showGrid);
+          if (e.shiftKey) {
+            setGridSettingsDialogOpen(true);
+          } else {
+            setGridSettings(undefined, undefined, undefined, !showGrid);
+          }
         }
       }
     };
@@ -140,7 +145,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode, setGridSettingsDialogOpen, setGridSettings, showGrid]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
@@ -1113,17 +1118,8 @@ export const Viewport: React.FC = () => {
                     <span style={{ flex: 1 }}>Show Rulers</span> <span style={{ color: showRulers ? '#4caf50' : '#666' }}>{showRulers ? 'ON' : 'OFF'}</span>
                   </div>
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={async () => {
-                    const res = await useEditorStore.getState().showDialog({
-                      title: 'Grid Settings',
-                      type: 'prompt',
-                      defaultValue: `${gridSizeW},${gridSizeH}`,
-                      message: 'Enter grid width and height (e.g. 32,32):'
-                    });
-                    if (res && typeof res === 'string') {
-                      const [w, h] = res.split(',').map(Number);
-                      if (!isNaN(w) && !isNaN(h)) setGridSettings(w, h);
-                    }
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => {
+                    setGridSettingsDialogOpen(true);
                     setContextMenu(null);
                   }}>
                     <Settings size={12} style={{ marginRight: '8px', opacity: 0.7 }} />

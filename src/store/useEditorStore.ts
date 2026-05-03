@@ -69,6 +69,7 @@ interface EditorStore {
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
   setGridSettings: (gridSizeW?: number, gridSizeH?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
+  setGridSettingsDialogOpen: (isOpen: boolean) => void;
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
   
@@ -376,6 +377,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid) => {
     set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid) }));
   },
+  setGridSettingsDialogOpen: (isOpen) => set((state) => ({
+    editorState: { ...state.editorState, gridSettingsDialogOpen: isOpen }
+  })),
   setRulerSettings: (showRulers) => set((state) => ({
     editorState: editorUpdates.setRulerSettings(state.editorState, showRulers)
   })),

@@ -31,6 +31,7 @@ export interface EditorState {
   showRulers: boolean;
   mousePosition: { x: number, y: number };
   spriteEditor: { objectTypeId: string, isOpen: boolean } | null;
+  gridSettingsDialogOpen: boolean;
 }
 
 /**
@@ -62,6 +63,7 @@ export function createInitialEditorState(project: Project): EditorState {
     showRulers: false,
     mousePosition: { x: 0, y: 0 },
     spriteEditor: null,
+    gridSettingsDialogOpen: false,
   };
 }
 
