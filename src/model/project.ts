@@ -43,6 +43,7 @@ export interface Layout {
   layers: Layer[];
   instances: Instance[];
   eventSheetId: string | null;
+  folderId?: string | null;
 }
 
 export enum ObjectTypeKind {
@@ -108,6 +109,7 @@ export interface ObjectType {
   properties: Record<string, any>;
   instanceVariables: InstanceVariable[];
   behaviors: Behavior[];
+  folderId?: string | null;
 }
 
 export interface Condition {
@@ -163,6 +165,24 @@ export interface EventSheet {
   name: string;
   events: EventBlock[];
   includes: string[];
+  folderId?: string | null;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  objectTypeIds: string[];
+  instanceVariables: InstanceVariable[];
+  behaviors: Behavior[];
+  folderId?: string | null;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  type: 'objectType' | 'layout' | 'eventSheet' | 'family';
+  parentId: string | null;
+  expanded: boolean;
 }
 
 export interface Project {
@@ -170,8 +190,10 @@ export interface Project {
   settings: ProjectSettings;
   layouts: Layout[];
   objectTypes: ObjectType[];
+  families: Family[];
   eventSheets: EventSheet[];
   globalVariables: GlobalVariable[];
+  folders: ProjectFolder[];
 }
 
 export function createEmptyProject(name: string = 'New Project'): Project {
@@ -211,6 +233,7 @@ export function createEmptyProject(name: string = 'New Project'): Project {
       },
     ],
     objectTypes: [],
+    families: [],
     eventSheets: [
       {
         id: defaultEventSheetId,
@@ -220,5 +243,6 @@ export function createEmptyProject(name: string = 'New Project'): Project {
       },
     ],
     globalVariables: [],
+    folders: [],
   };
 }

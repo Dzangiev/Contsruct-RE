@@ -17,6 +17,7 @@ export interface EditorState {
   panY: number;
   placementObjectTypeId: string | null;
   selectedObjectTypeId: string | null;
+  selectedFamilyId: string | null;
   currentTab: 'layout' | 'eventSheet';
   previewMode: boolean;
   selectedEventBlockIds: string[];
@@ -55,6 +56,7 @@ export function createInitialEditorState(project: Project): EditorState {
     panY: 0,
     placementObjectTypeId: null,
     selectedObjectTypeId: null,
+    selectedFamilyId: null,
     currentTab: 'layout',
     previewMode: false,
     selectedEventBlockIds: [],
@@ -137,7 +139,20 @@ export function setSelectedObjectType(state: EditorState, objectTypeId: string |
   return {
     ...state,
     selectedObjectTypeId: objectTypeId,
+    selectedFamilyId: objectTypeId ? null : state.selectedFamilyId,
     selectedInstanceIds: objectTypeId ? [] : state.selectedInstanceIds,
+  };
+}
+
+/**
+ * Sets the currently selected family.
+ */
+export function setSelectedFamily(state: EditorState, familyId: string | null): EditorState {
+  return {
+    ...state,
+    selectedFamilyId: familyId,
+    selectedObjectTypeId: familyId ? null : state.selectedObjectTypeId,
+    selectedInstanceIds: familyId ? [] : state.selectedInstanceIds,
   };
 }
 

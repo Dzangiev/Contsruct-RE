@@ -40,6 +40,19 @@ interface EditorStore {
   updateLayout: (layoutId: string, updates: any) => void;
   updateProjectSettings: (updates: any) => void;
 
+  // Family Actions
+  addFamily: (name: string) => void;
+  removeFamily: (familyId: string) => void;
+  updateFamily: (familyId: string, updates: any) => void;
+  addFamilyObjectType: (familyId: string, objectTypeId: string) => void;
+  removeFamilyObjectType: (familyId: string, objectTypeId: string) => void;
+  addFamilyInstanceVariable: (familyId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
+  updateFamilyInstanceVariable: (familyId: string, variableId: string, updates: any) => void;
+  removeFamilyInstanceVariable: (familyId: string, variableId: string) => void;
+  addFamilyBehavior: (familyId: string, type: string, name: string, defaultProperties?: Record<string, any>) => void;
+  removeFamilyBehavior: (familyId: string, behaviorId: string) => void;
+  updateFamilyBehavior: (familyId: string, behaviorId: string, updates: any) => void;
+
   // Event Sheet Actions
   addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => string;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
@@ -62,6 +75,7 @@ interface EditorStore {
   setActiveLayer: (layerId: string) => void;
   setSelectedInstances: (instanceIds: string[]) => void;
   setSelectedObjectType: (objectTypeId: string | null) => void;
+  setSelectedFamily: (familyId: string | null) => void;
   setTool: (tool: ToolType, placementObjectTypeId?: string | null) => void;
   setView: (zoom: number, panX: number, panY: number) => void;
   setTab: (tab: 'layout' | 'eventSheet') => void;
@@ -83,6 +97,12 @@ interface EditorStore {
   pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
   pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
   pasteInstances: () => void;
+  
+  // Folder Actions
+  addFolder: (type: 'objectType' | 'layout' | 'eventSheet' | 'family', name: string, parentId?: string | null) => void;
+  updateFolder: (folderId: string, updates: any) => void;
+  removeFolder: (folderId: string) => void;
+  moveEntityToFolder: (entityType: 'objectType' | 'layout' | 'eventSheet' | 'family', entityId: string, folderId: string | null) => void;
   
   // History
   commitProject: () => void;
@@ -240,6 +260,63 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().pushHistory(next);
   },
 
+  // Family Actions
+  addFamily: (name) => {
+    const next = projectUpdates.addFamily(get().project, name);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeFamily: (familyId) => {
+    const next = projectUpdates.removeFamily(get().project, familyId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateFamily: (familyId, updates) => {
+    const next = projectUpdates.updateFamily(get().project, familyId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addFamilyObjectType: (familyId, objectTypeId) => {
+    const next = projectUpdates.addFamilyObjectType(get().project, familyId, objectTypeId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeFamilyObjectType: (familyId, objectTypeId) => {
+    const next = projectUpdates.removeFamilyObjectType(get().project, familyId, objectTypeId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addFamilyInstanceVariable: (familyId, name, type, initialValue) => {
+    const next = projectUpdates.addFamilyInstanceVariable(get().project, familyId, name, type, initialValue);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateFamilyInstanceVariable: (familyId, variableId, updates) => {
+    const next = projectUpdates.updateFamilyInstanceVariable(get().project, familyId, variableId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeFamilyInstanceVariable: (familyId, variableId) => {
+    const next = projectUpdates.removeFamilyInstanceVariable(get().project, familyId, variableId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  addFamilyBehavior: (familyId, type, name, defaultProperties) => {
+    const next = projectUpdates.addFamilyBehavior(get().project, familyId, type, name, defaultProperties);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeFamilyBehavior: (familyId, behaviorId) => {
+    const next = projectUpdates.removeFamilyBehavior(get().project, familyId, behaviorId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateFamilyBehavior: (familyId, behaviorId, updates) => {
+    const next = projectUpdates.updateFamilyBehavior(get().project, familyId, behaviorId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+
   // Event Sheet Actions
   addEventBlock: (eventSheetId, parentBlockId, type) => {
     const blockId = generateId();
@@ -355,6 +432,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   })),
   setSelectedObjectType: (objectTypeId) => set((state) => ({
     editorState: editorUpdates.setSelectedObjectType(state.editorState, objectTypeId)
+  })),
+  setSelectedFamily: (familyId) => set((state) => ({
+    editorState: editorUpdates.setSelectedFamily(state.editorState, familyId)
   })),
   setTool: (tool, placementObjectTypeId) => set((state) => ({
     editorState: editorUpdates.setTool(state.editorState, tool, placementObjectTypeId)
@@ -520,5 +600,37 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       dialogState.resolve(undefined);
       set({ dialogState: null });
     }
-  }
+  },
+
+  addFolder: (type, name, parentId = null) => {
+    set(state => {
+      const next = projectUpdates.addFolder(state.project, type, name, parentId);
+      state.pushHistory(next);
+      return { project: next };
+    });
+  },
+
+  updateFolder: (folderId, updates) => {
+    set(state => {
+      const next = projectUpdates.updateFolder(state.project, folderId, updates);
+      state.pushHistory(next);
+      return { project: next };
+    });
+  },
+
+  removeFolder: (folderId) => {
+    set(state => {
+      const next = projectUpdates.removeFolder(state.project, folderId);
+      state.pushHistory(next);
+      return { project: next };
+    });
+  },
+
+  moveEntityToFolder: (entityType, entityId, folderId) => {
+    set(state => {
+      const next = projectUpdates.moveEntityToFolder(state.project, entityType, entityId, folderId);
+      state.pushHistory(next);
+      return { project: next };
+    });
+  },
 }));

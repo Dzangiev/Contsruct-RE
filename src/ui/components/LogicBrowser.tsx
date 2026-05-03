@@ -1,7 +1,7 @@
 import React from 'react';
-import { Project, ObjectType } from '../../model/project';
+import { Project, ObjectType, Family } from '../../model/project';
 import { LogicDefinition, CONDITIONS, ACTIONS } from '../../model/definitions';
-import { Search, ChevronRight, Info, Settings, Box, Terminal, Code, Cpu, MousePointer2, Zap, Layout, Monitor } from 'lucide-react';
+import { Search, ChevronRight, Info, Settings, Box, Terminal, Code, Cpu, MousePointer2, Zap, Layout, Monitor, Users } from 'lucide-react';
 
 interface LogicBrowserProps {
   project: Project;
@@ -26,7 +26,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
   const initialOT = initialObjectTypeId ? project.objectTypes.find(ot => ot.id === initialObjectTypeId) : undefined;
   
   const [step, setStep] = React.useState<'object' | 'logic'>((initialObjectTypeId !== undefined || initialLogicTypeId !== undefined) ? 'logic' : 'object');
-  const [selectedObjectType, setSelectedObjectType] = React.useState<ObjectType | undefined>(initialOT);
+  const [selectedObjectType, setSelectedObjectType] = React.useState<any | undefined>(initialOT);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>('All');
 
@@ -77,7 +77,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
     selectedCategoryId === 'All' || item.category === selectedCategoryId
   );
 
-  const handleObjectSelect = (ot: ObjectType | undefined) => {
+  const handleObjectSelect = (ot: ObjectType | Family | undefined) => {
     setSelectedObjectType(ot);
     setStep('logic');
     setSearchTerm('');
@@ -166,6 +166,15 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
                   icon={<Box size={24} color="#2ecc71" />} 
                   onClick={() => handleObjectSelect(ot)}
                   selected={selectedObjectType?.id === ot.id}
+                />
+              ))}
+              {project.families?.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase())).map(f => (
+                <ObjectCard 
+                  key={f.id}
+                  name={f.name} 
+                  icon={<Users size={24} color="#f1c40f" />} 
+                  onClick={() => handleObjectSelect(f)}
+                  selected={selectedObjectType?.id === f.id}
                 />
               ))}
             </div>

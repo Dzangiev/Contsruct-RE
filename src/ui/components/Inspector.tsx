@@ -1,20 +1,25 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { VariableDialog } from './VariableDialog';
+import { FamilyMembersDialog } from './FamilyMembersDialog';
 
 export const Inspector: React.FC = () => {
   const { 
     project, editorState, updateInstance, updateLayer, updateObjectType, addInstanceVariable, updateInstanceVariable, removeInstanceVariable,
-    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog, openSpriteEditor
+    addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog, openSpriteEditor,
+    updateFamily, addFamilyObjectType, removeFamilyObjectType, addFamilyInstanceVariable, updateFamilyInstanceVariable, removeFamilyInstanceVariable,
+    addFamilyBehavior, updateFamilyBehavior, removeFamilyBehavior,
+    moveEntityToFolder
   } = useEditorStore();
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
   const activeLayout = project.layouts.find(l => l.id === activeLayoutId);
 
   const [showBehaviorsDialog, setShowBehaviorsDialog] = React.useState(false);
-  const [variableEditor, setVariableEditor] = React.useState<{ isOpen: boolean, variable?: any, objectTypeId: string } | null>(null);
+  const [showFamilyMembersDialog, setShowFamilyMembersDialog] = React.useState(false);
+  const [variableEditor, setVariableEditor] = React.useState<{ isOpen: boolean, variable?: any, objectTypeId?: string, familyId?: string } | null>(null);
 
   // 1. Inspect Selected Instance
   if (selectedInstanceIds.length === 1) {
@@ -22,6 +27,8 @@ export const Inspector: React.FC = () => {
     const instance = activeLayout?.instances.find(inst => inst.id === instanceId);
     if (instance) {
       const objectType = project.objectTypes?.find(ot => ot.id === instance.objectTypeId);
+      if (!objectType) return null;
+      const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
       return (
         <div className="inspector" style={inspectorStyle}>
           <div style={panelHeaderStyle}>Properties: {objectType?.name || 'Instance'}</div>
@@ -75,7 +82,7 @@ export const Inspector: React.FC = () => {
           )}
 
           {objectType?.behaviors?.map(b => (
-            <Category key={b.id} label={b.name}>
+            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
               {Object.keys(b.properties || {}).map(prop => (
                 <PropertyRow 
                   key={prop} 
@@ -87,6 +94,20 @@ export const Inspector: React.FC = () => {
               <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateBehavior(objectType.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
             </Category>
           ))}
+
+          {families.map(family => family.behaviors.map(b => (
+            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
+              {Object.keys(b.properties || {}).map(prop => (
+                <PropertyRow 
+                  key={prop} 
+                  label={prop} 
+                  value={b.properties?.[prop]} 
+                  onChange={val => updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
+                />
+              ))}
+              <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+            </Category>
+          )))}
           
           <Category 
             label="Instance Variables" 
@@ -96,6 +117,9 @@ export const Inspector: React.FC = () => {
               } 
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
+            <div style={{ padding: '4px 0', borderBottom: '1px solid #222' }}>
+               <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Object Variables</span>
+            </div>
             {objectType?.instanceVariables?.map(v => (
               <PropertyRow 
                 key={v.id} 
@@ -106,8 +130,28 @@ export const Inspector: React.FC = () => {
               />
             ))}
             {(!objectType?.instanceVariables || objectType.instanceVariables.length === 0) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No instance variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No object variables.</div>
             )}
+
+            {families.map(family => (
+              <React.Fragment key={family.id}>
+                <div style={{ padding: '4px 0', borderBottom: '1px solid #222', marginTop: '8px' }}>
+                  <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Family: {family.name}</span>
+                </div>
+                {family.instanceVariables.map(v => (
+                  <PropertyRow 
+                    key={v.id} 
+                    label={v.name} 
+                    value={instance.properties?.[v.name] ?? v.initialValue} 
+                    onChange={val => updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: val } })} 
+                    icon={<Type size={12} color="#f1c40f" />}
+                  />
+                ))}
+                {family.instanceVariables.length === 0 && (
+                  <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+                )}
+              </React.Fragment>
+            ))}
           </Category>
 
           {showBehaviorsDialog && objectType && (
@@ -122,12 +166,12 @@ export const Inspector: React.FC = () => {
             <VariableDialog 
               title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
               variable={variableEditor.variable}
-              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId)?.instanceVariables.map(v => v.name) || []}
+              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId as any)?.instanceVariables.map(v => v.name) || []}
               onSave={(updates) => {
                 if (variableEditor.variable) {
-                  updateInstanceVariable(variableEditor.objectTypeId, variableEditor.variable.id, updates);
+                  updateInstanceVariable(variableEditor.objectTypeId as any, variableEditor.variable.id, updates);
                 } else {
-                  addInstanceVariable(variableEditor.objectTypeId, updates.name, updates.type, updates.initialValue);
+                  addInstanceVariable(variableEditor.objectTypeId as any, updates.name, updates.type, updates.initialValue);
                 }
                 setVariableEditor(null);
               }}
@@ -143,6 +187,7 @@ export const Inspector: React.FC = () => {
   if (selectedObjectTypeId) {
     const objectType = project.objectTypes?.find(ot => ot.id === selectedObjectTypeId);
     if (objectType) {
+      const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
       return (
         <div className="inspector" style={inspectorStyle}>
           <div style={panelHeaderStyle}>Object Type: {objectType.name}</div>
@@ -150,6 +195,15 @@ export const Inspector: React.FC = () => {
           <Category label="General">
             <PropertyRow label="Name" value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Package size={12}/>} />
             <PropertyRow label="Kind" value={objectType.kind} readOnly />
+            <PropertyRow 
+              label="Folder" 
+              value={objectType.folderId || ''} 
+              type="select" 
+              options={['', ...project.folders.filter(f => f.type === 'objectType').map(f => f.id)]}
+              displayValues={['(None)', ...project.folders.filter(f => f.type === 'objectType').map(f => f.name)]}
+              onChange={v => moveEntityToFolder('objectType', objectType.id, v === '' ? null : String(v))} 
+              icon={<Folder size={12}/>}
+            />
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({objectType.behaviors?.length || 0})</button>
               {objectType.kind === 'sprite' && (
@@ -159,7 +213,7 @@ export const Inspector: React.FC = () => {
           </Category>
           
           {objectType.behaviors?.map(b => (
-            <Category key={b.id} label={b.name}>
+            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
               {Object.keys(b.properties || {}).map(prop => (
                 <PropertyRow 
                   key={prop} 
@@ -171,12 +225,28 @@ export const Inspector: React.FC = () => {
             </Category>
           ))}
 
+          {families.map(family => family.behaviors.map(b => (
+            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
+              {Object.keys(b.properties || {}).map(prop => (
+                <PropertyRow 
+                  key={prop} 
+                  label={prop} 
+                  value={b.properties?.[prop]} 
+                  onChange={val => updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
+                />
+              ))}
+            </Category>
+          )))}
+
           <Category 
             label="Instance Variables" 
             action={<button onClick={() => { 
               setVariableEditor({ isOpen: true, objectTypeId: objectType.id });
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
+            <div style={{ padding: '4px 0', borderBottom: '1px solid #222' }}>
+               <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Object Variables</span>
+            </div>
             {objectType.instanceVariables?.map(v => (
               <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
                 <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#555' }}><Type size={12}/></div>
@@ -234,8 +304,50 @@ export const Inspector: React.FC = () => {
               </div>
             ))}
             {(objectType.instanceVariables?.length === 0 || !objectType.instanceVariables) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No instance variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No object variables.</div>
             )}
+
+            {families.map(family => (
+              <React.Fragment key={family.id}>
+                <div style={{ padding: '4px 0', borderBottom: '1px solid #222', marginTop: '8px' }}>
+                  <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Family: {family.name}</span>
+                </div>
+                {family.instanceVariables.map(v => (
+                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
+                    <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#f1c40f' }}><Type size={12}/></div>
+                    <div style={{ width: '80px', fontSize: '11px', color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={v.name}>
+                      {v.name}
+                    </div>
+                    <input 
+                      type="text" 
+                      value={v.initialValue ?? ''} 
+                      onChange={e => {
+                        const val = v.type === 'number' ? (Number(e.target.value) || 0) : e.target.value;
+                        updateFamilyInstanceVariable(family.id, v.id, { initialValue: val });
+                      }}
+                      style={{ ...inputStyle, height: '22px' }}
+                    />
+                    <button 
+                      onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} 
+                      style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                      title="Edit family variable"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button 
+                      onClick={() => removeFamilyInstanceVariable(family.id, v.id)} 
+                      style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                      title="Remove family variable"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+                {family.instanceVariables.length === 0 && (
+                  <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+                )}
+              </React.Fragment>
+            ))}
           </Category>
 
           {showBehaviorsDialog && (
@@ -250,12 +362,106 @@ export const Inspector: React.FC = () => {
             <VariableDialog 
               title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
               variable={variableEditor.variable}
-              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId)?.instanceVariables.map(v => v.name) || []}
+              existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId as any)?.instanceVariables.map(v => v.name) || []}
               onSave={(updates) => {
                 if (variableEditor.variable) {
-                  updateInstanceVariable(variableEditor.objectTypeId, variableEditor.variable.id, updates);
+                  updateInstanceVariable(variableEditor.objectTypeId as any, variableEditor.variable.id, updates);
                 } else {
-                  addInstanceVariable(variableEditor.objectTypeId, updates.name, updates.type, updates.initialValue);
+                  addInstanceVariable(variableEditor.objectTypeId as any, updates.name, updates.type, updates.initialValue);
+                }
+                setVariableEditor(null);
+              }}
+              onCancel={() => setVariableEditor(null)}
+            />
+          )}
+        </div>
+      );
+    }
+  }
+
+  // 2.5. Inspect Selected Family
+  if (editorState.selectedFamilyId) {
+    const family = project.families.find(f => f.id === editorState.selectedFamilyId);
+    if (family) {
+      return (
+        <div className="inspector" style={inspectorStyle}>
+          <div style={panelHeaderStyle}>Family: {family.name}</div>
+          
+          <Category label="General">
+            <PropertyRow label="Name" value={family.name} onChange={v => updateFamily(family.id, { name: String(v) })} icon={<Users size={12}/>} />
+            <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button onClick={() => setShowFamilyMembersDialog(true)} style={linkButtonStyle}>Manage Members ({family.objectTypeIds.length})</button>
+              <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({family.behaviors?.length || 0})</button>
+            </div>
+          </Category>
+
+          {family.behaviors?.map(b => (
+            <Category key={b.id} label={b.name}>
+              {Object.keys(b.properties || {}).map(prop => (
+                <PropertyRow 
+                  key={prop} 
+                  label={prop} 
+                  value={b.properties?.[prop]} 
+                  onChange={val => updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [prop]: val } })} 
+                />
+              ))}
+              <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+            </Category>
+          ))}
+
+          <Category 
+            label="Family Variables" 
+            action={<button onClick={() => setVariableEditor({ isOpen: true, familyId: family.id })} style={miniButtonStyle}><Plus size={12} /></button>}
+          >
+            {family.instanceVariables?.map(v => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
+                <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#555' }}><Type size={12}/></div>
+                <div style={{ width: '80px', fontSize: '11px', color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={v.name}>
+                  {v.name}
+                </div>
+                <input 
+                  type="text" 
+                  value={v.initialValue ?? ''} 
+                  onChange={e => {
+                    const val = v.type === 'number' ? (Number(e.target.value) || 0) : e.target.value;
+                    updateFamilyInstanceVariable(family.id, v.id, { initialValue: val });
+                  }}
+                  style={{ ...inputStyle, height: '22px' }}
+                />
+                <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                  <Edit2 size={12} />
+                </button>
+                <button onClick={() => removeFamilyInstanceVariable(family.id, v.id)} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            {(family.instanceVariables?.length === 0 || !family.instanceVariables) && (
+              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+            )}
+          </Category>
+
+          {showBehaviorsDialog && (
+            <BehaviorsDialog 
+              objectType={{ ...family, kind: 'plugin' } as any} // Mock object type
+              onAdd={(type, name, defaults) => addFamilyBehavior(family.id, type, name, defaults)}
+              onRemove={id => removeFamilyBehavior(family.id, id)}
+              onClose={() => setShowBehaviorsDialog(false)}
+            />
+          )}
+          {showFamilyMembersDialog && (
+            <FamilyMembersDialog family={family} onClose={() => setShowFamilyMembersDialog(false)} />
+          )}
+          {variableEditor?.isOpen && (
+            <VariableDialog 
+              title={variableEditor.variable ? "Edit Family Variable" : "New Family Variable"}
+              variable={variableEditor.variable}
+              existingNames={family.instanceVariables.map(v => v.name)}
+              onSave={(updates) => {
+                if (variableEditor.variable) {
+                  updateFamilyInstanceVariable(family.id, variableEditor.variable.id, updates);
+                } else {
+                  addFamilyInstanceVariable(family.id, updates.name, updates.type, updates.initialValue);
                 }
                 setVariableEditor(null);
               }}
@@ -293,6 +499,15 @@ export const Inspector: React.FC = () => {
           <PropertyRow label="Name" value={activeLayout.name} onChange={v => updateLayout(activeLayout.id, { name: String(v) })} />
           <PropertyRow label="Width" value={activeLayout.width} onChange={v => updateLayout(activeLayout.id, { width: Number(v) })} type="number" icon={<Hash size={12}/>} />
           <PropertyRow label="Height" value={activeLayout.height} onChange={v => updateLayout(activeLayout.id, { height: Number(v) })} type="number" icon={<Hash size={12}/>} />
+          <PropertyRow 
+            label="Folder" 
+            value={activeLayout.folderId || ''} 
+            type="select" 
+            options={['', ...project.folders.filter(f => f.type === 'layout').map(f => f.id)]}
+            displayValues={['(None)', ...project.folders.filter(f => f.type === 'layout').map(f => f.name)]}
+            onChange={v => moveEntityToFolder('layout', activeLayout.id, v === '' ? null : String(v))} 
+            icon={<Folder size={12}/>}
+          />
           <PropertyRow label="Event Sheet" value={project.eventSheets.find(es => es.id === activeLayout.eventSheetId)?.name || 'None'} readOnly />
         </Category>
       )}
@@ -345,9 +560,10 @@ const PropertyRow: React.FC<{
   readOnly?: boolean, 
   type?: 'text' | 'number' | 'select' | 'color',
   options?: string[],
+  displayValues?: string[],
   step?: number,
   icon?: React.ReactNode
-}> = ({ label, value, onChange, readOnly, type = 'text', options = [], step = 1, icon }) => {
+}> = ({ label, value, onChange, readOnly, type = 'text', options = [], displayValues = [], step = 1, icon }) => {
   return (
     <div 
       style={{ 
@@ -387,7 +603,7 @@ const PropertyRow: React.FC<{
             onChange={e => onChange?.(e.target.value)} 
             style={{ ...inputStyle, padding: '1px 4px' }}
           >
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {options.map((opt, i) => <option key={opt} value={opt}>{displayValues[i] || opt}</option>)}
           </select>
         ) : type === 'color' ? (
           <div style={{ display: 'flex', gap: '4px', width: '100%' }}>

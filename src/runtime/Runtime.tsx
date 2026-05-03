@@ -167,12 +167,26 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     const getEvaluationContext = (dt: number, instances: Instance[], currentInstance?: Instance, funcParams?: any[], localVars?: Record<string, any>): EvaluationContext => {
       const objects: Record<string, any> = {};
+      // 1. Object Types
       project.objectTypes.forEach(ot => {
         const insts = instances.filter(i => i.objectTypeId === ot.id);
         if (insts.length > 0) {
           // If we have a current instance of this type, use it, otherwise use the first one
           const target = (currentInstance && currentInstance.objectTypeId === ot.id) ? currentInstance : insts[0];
           objects[ot.name] = {
+            ...target,
+            instanceVariables: target.properties
+          };
+        }
+      });
+
+      // 2. Families
+      project.families.forEach(f => {
+        const insts = instances.filter(i => f.objectTypeIds.includes(i.objectTypeId));
+        if (insts.length > 0) {
+          // If current instance belongs to this family, use it, otherwise use the first one
+          const target = (currentInstance && f.objectTypeIds.includes(currentInstance.objectTypeId)) ? currentInstance : insts[0];
+          objects[f.name] = {
             ...target,
             instanceVariables: target.properties
           };
@@ -229,10 +243,14 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           case 'pointerPressedOnObject': return pointerPressedRef.current && isUnderPointer();
           case 'pointerReleasedOnObject': return pointerReleasedRef.current && isUnderPointer();
           case 'isOverlapping': {
-            const otherTypeId = condition.params[0];
-            if (!otherTypeId) return false;
-            const others = allInstances.filter(o => o.objectTypeId === otherTypeId);
+            const otherId = condition.params[0];
+            if (!otherId) return false;
+            const family = project.families.find(f => f.id === otherId);
+            const others = family 
+              ? allInstances.filter(o => family.objectTypeIds.includes(o.objectTypeId))
+              : allInstances.filter(o => o.objectTypeId === otherId);
             return others.some(o => {
+              if (i.id === o.id) return false;
               return i.x < o.x + o.width &&
                      i.x + i.width > o.x &&
                      i.y < o.y + o.height &&
@@ -240,10 +258,14 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             });
           }
           case 'onCollision': {
-            const otherTypeId = condition.params[0];
-            if (!otherTypeId) return false;
-            const others = allInstances.filter(o => o.objectTypeId === otherTypeId);
+            const otherId = condition.params[0];
+            if (!otherId) return false;
+            const family = project.families.find(f => f.id === otherId);
+            const others = family 
+              ? allInstances.filter(o => family.objectTypeIds.includes(o.objectTypeId))
+              : allInstances.filter(o => o.objectTypeId === otherId);
             return others.some(o => {
+              if (i.id === o.id) return false;
               const isOverlapping = i.x < o.x + o.width &&
                                     i.x + i.width > o.x &&
                                     i.y < o.y + o.height &&
@@ -352,7 +374,12 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         if (!currentPickedSets[otid]) {
-          currentPickedSets[otid] = instances.filter(i => i.objectTypeId === otid).map(i => i.id);
+          const family = project.families.find(f => f.id === otid);
+          if (family) {
+            currentPickedSets[otid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
+          } else {
+            currentPickedSets[otid] = instances.filter(i => i.objectTypeId === otid).map(i => i.id);
+          }
         }
 
         const pickedInstances = instances.filter(i => currentPickedSets[otid].includes(i.id));
@@ -451,7 +478,14 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         }
 
         let pickedIds = currentPickedSets[otid!];
-        if (!pickedIds) pickedIds = nextInstances.filter(i => i.objectTypeId === otid).map(i => i.id);
+        if (!pickedIds) {
+          const family = project.families.find(f => f.id === otid);
+          if (family) {
+            pickedIds = nextInstances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
+          } else {
+            pickedIds = nextInstances.filter(i => i.objectTypeId === otid).map(i => i.id);
+          }
+        }
 
         if (action.type === 'destroy') {
           const count = pickedIds.length;

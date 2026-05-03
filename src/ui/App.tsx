@@ -43,13 +43,17 @@ const App: React.FC = () => {
       flexDirection: 'column'
     }}>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-        <div style={{ width: '250px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1a1a1a', backgroundColor: '#2d2d2d' }}>
-          <ErrorBoundary name="ProjectExplorer">
-            <ProjectExplorer />
-          </ErrorBoundary>
-          <ErrorBoundary name="LayersPanel">
-            <LayersPanel />
-          </ErrorBoundary>
+        <div style={{ width: '260px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1a1a1a', backgroundColor: '#1e1e1e', height: '100%' }}>
+          <div style={{ flex: 7, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1a1a1a' }}>
+            <ErrorBoundary name="ProjectExplorer">
+              <ProjectExplorer />
+            </ErrorBoundary>
+          </div>
+          <div style={{ flex: 3, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: '#252526' }}>
+            <ErrorBoundary name="LayersPanel">
+              <LayersPanel />
+            </ErrorBoundary>
+          </div>
         </div>
         
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#333', overflow: 'hidden' }}>

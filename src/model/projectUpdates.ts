@@ -1,4 +1,4 @@
-import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior, InstanceVariable } from './project';
+import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior, InstanceVariable, Family, ProjectFolder } from './project';
 import { generateId } from '../utils/id';
 
 /**
@@ -520,4 +520,260 @@ export function updateProjectSettings(
     ...project,
     settings: { ...project.settings, ...updates },
   };
+}
+/**
+ * Adds a new family to the project.
+ */
+export function addFamily(project: Project, name: string): Project {
+  const newFamily: Family = {
+    id: generateId(),
+    name,
+    objectTypeIds: [],
+    instanceVariables: [],
+    behaviors: [],
+  };
+  return {
+    ...project,
+    families: [...project.families, newFamily],
+  };
+}
+
+/**
+ * Removes a family from the project.
+ */
+export function removeFamily(project: Project, familyId: string): Project {
+  return {
+    ...project,
+    families: project.families.filter(f => f.id !== familyId),
+  };
+}
+
+/**
+ * Updates properties of a family.
+ */
+export function updateFamily(project: Project, familyId: string, updates: Partial<Omit<Family, 'id'>>): Project {
+  return {
+    ...project,
+    families: project.families.map(f => f.id === familyId ? { ...f, ...updates } : f),
+  };
+}
+
+/**
+ * Adds an object type to a family.
+ */
+export function addFamilyObjectType(project: Project, familyId: string, objectTypeId: string): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      if (f.objectTypeIds.includes(objectTypeId)) return f;
+      return { ...f, objectTypeIds: [...f.objectTypeIds, objectTypeId] };
+    }),
+  };
+}
+
+/**
+ * Removes an object type from a family.
+ */
+export function removeFamilyObjectType(project: Project, familyId: string, objectTypeId: string): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return { ...f, objectTypeIds: f.objectTypeIds.filter(id => id !== objectTypeId) };
+    }),
+  };
+}
+
+/**
+ * Adds an instance variable to a family.
+ */
+export function addFamilyInstanceVariable(
+  project: Project,
+  familyId: string,
+  name: string,
+  type: 'number' | 'string' | 'boolean',
+  initialValue: any
+): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        instanceVariables: [
+          ...f.instanceVariables,
+          { id: generateId(), name, type, initialValue }
+        ]
+      };
+    })
+  };
+}
+
+/**
+ * Updates a family instance variable.
+ */
+export function updateFamilyInstanceVariable(
+  project: Project,
+  familyId: string,
+  variableId: string,
+  updates: Partial<Omit<InstanceVariable, 'id'>>
+): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        instanceVariables: f.instanceVariables.map(v => v.id === variableId ? { ...v, ...updates } : v)
+      };
+    })
+  };
+}
+
+/**
+ * Removes an instance variable from a family.
+ */
+export function removeFamilyInstanceVariable(project: Project, familyId: string, variableId: string): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        instanceVariables: f.instanceVariables.filter(v => v.id !== variableId)
+      };
+    })
+  };
+}
+
+/**
+ * Adds a behavior to a family.
+ */
+export function addFamilyBehavior(
+  project: Project,
+  familyId: string,
+  type: string,
+  name: string,
+  defaultProperties: Record<string, any> = {}
+): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        behaviors: [
+          ...f.behaviors,
+          { id: generateId(), type, name, properties: { ...defaultProperties }, disabled: false }
+        ]
+      };
+    })
+  };
+}
+
+/**
+ * Updates a family behavior.
+ */
+export function updateFamilyBehavior(
+  project: Project,
+  familyId: string,
+  behaviorId: string,
+  updates: Partial<Omit<Behavior, 'id' | 'type'>>
+): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        behaviors: f.behaviors.map(b => b.id === behaviorId ? { ...b, ...updates } : b)
+      };
+    })
+  };
+}
+
+/**
+ * Removes a behavior from a family.
+ */
+export function removeFamilyBehavior(project: Project, familyId: string, behaviorId: string): Project {
+  return {
+    ...project,
+    families: project.families.map(f => {
+      if (f.id !== familyId) return f;
+      return {
+        ...f,
+        behaviors: f.behaviors.filter(b => b.id !== behaviorId)
+      };
+    })
+  };
+}
+
+/**
+ * Adds a new folder to the project.
+ */
+export function addFolder(project: Project, type: 'objectType' | 'layout' | 'eventSheet' | 'family', name: string, parentId: string | null = null): Project {
+  const folder: ProjectFolder = {
+    id: generateId(),
+    name,
+    type,
+    parentId,
+    expanded: true
+  };
+  return {
+    ...project,
+    folders: [...project.folders, folder]
+  };
+}
+
+/**
+ * Updates a folder.
+ */
+export function updateFolder(project: Project, folderId: string, updates: Partial<ProjectFolder>): Project {
+  return {
+    ...project,
+    folders: project.folders.map(f => f.id === folderId ? { ...f, ...updates } : f)
+  };
+}
+
+/**
+ * Removes a folder and moves its contents to the parent folder (or root).
+ */
+export function removeFolder(project: Project, folderId: string): Project {
+  const folder = project.folders.find(f => f.id === folderId);
+  if (!folder) return project;
+
+  const parentId = folder.parentId;
+
+  return {
+    ...project,
+    layouts: project.layouts.map(l => l.folderId === folderId ? { ...l, folderId: parentId } : l),
+    objectTypes: project.objectTypes.map(ot => ot.folderId === folderId ? { ...ot, folderId: parentId } : ot),
+    eventSheets: project.eventSheets.map(es => es.folderId === folderId ? { ...es, folderId: parentId } : es),
+    families: project.families.map(f => f.folderId === folderId ? { ...f, folderId: parentId } : f),
+    folders: project.folders.filter(f => f.id !== folderId).map(f => f.parentId === folderId ? { ...f, parentId } : f)
+  };
+}
+
+/**
+ * Moves an entity into a folder.
+ */
+export function moveEntityToFolder(
+  project: Project, 
+  entityType: 'objectType' | 'layout' | 'eventSheet' | 'family', 
+  entityId: string, 
+  folderId: string | null
+): Project {
+  switch (entityType) {
+    case 'layout':
+      return { ...project, layouts: project.layouts.map(l => l.id === entityId ? { ...l, folderId } : l) };
+    case 'objectType':
+      return { ...project, objectTypes: project.objectTypes.map(ot => ot.id === entityId ? { ...ot, folderId } : ot) };
+    case 'eventSheet':
+      return { ...project, eventSheets: project.eventSheets.map(es => es.id === entityId ? { ...es, folderId } : es) };
+    case 'family':
+      return { ...project, families: project.families.map(f => f.id === entityId ? { ...f, folderId } : f) };
+    default:
+      return project;
+  }
 }

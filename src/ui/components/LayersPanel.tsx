@@ -24,7 +24,7 @@ export const LayersPanel: React.FC = () => {
   } = useEditorStore();
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
-  if (!activeLayout) return null;
+  if (!activeLayout) return <div style={{ ...panelStyle, padding: '20px', color: '#666', fontSize: '11px', backgroundColor: '#1e1e1e' }}>No active layout</div>;
 
   return (
     <div style={panelStyle}>
@@ -109,7 +109,7 @@ export const LayersPanel: React.FC = () => {
 };
 
 const panelStyle: React.CSSProperties = {
-  height: '200px',
+  height: '100%',
   backgroundColor: '#1e1e1e',
   borderTop: '1px solid #333',
   display: 'flex',

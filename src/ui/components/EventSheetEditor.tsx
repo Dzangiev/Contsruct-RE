@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { EventBlock, Project, ObjectType, InstanceVariable, Condition, Action } from '../../model/project';
-import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable, Palette, FilePlus, Zap, Bookmark, BookmarkPlus, Ghost, MousePointer, MoreVertical, Edit2, Monitor, FileText } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable, Palette, FilePlus, Zap, Bookmark, BookmarkPlus, Ghost, MousePointer, MoreVertical, Edit2, Monitor, FileText, Users, Layout } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
 import { getAllVariableNames } from '../../model/eventUpdates';
@@ -1244,9 +1244,18 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
     ].filter((v, i, a) => a.findIndex(t => t.name === v.name) === i), 
     ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object', category: 'Objects', icon: <Box size={12} color="#2ecc71" /> })), 
     ...project.objectTypes.flatMap((ot: any) => ot.instanceVariables.map((v: any) => ({ name: `${ot.name}.${v.name}`, type: 'instance-variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))), 
+    ...project.families.map((f: any) => ({ name: f.name, type: 'family', category: 'Families', icon: <Users size={12} color="#f1c40f" /> })),
+    ...project.families.flatMap((f: any) => f.instanceVariables.map((v: any) => ({ name: `${f.name}.${v.name}`, type: 'instance-variable', category: 'Family Variables', icon: <Terminal size={12} color="#f1c40f" /> }))),
+    ...project.layouts.map((l: any) => ({ name: `LayoutName("${l.name}")`, type: 'layout', category: 'Layouts', icon: <Layout size={12} color="#3498db" /> })),
     { name: 'dt', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> }, 
+    { name: 'fps', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> },
     { name: 'time', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> },
-    { name: 'random(0, 100)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'random(max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'random(min, max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'abs(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'floor(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'ceil(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'clamp(x, min, max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
     { name: 'Function.ReturnValue', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
     { name: 'Function.Param(0)', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
     ...(() => {
