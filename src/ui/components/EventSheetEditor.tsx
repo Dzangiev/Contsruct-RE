@@ -1102,6 +1102,7 @@ const FunctionEditor: React.FC<FunctionEditorProps> = ({ block, onSave, onCancel
   const [name, setName] = React.useState(block.functionName || '');
   const [description, setDescription] = React.useState(block.functionDescription || '');
   const [returnType, setReturnType] = React.useState(block.functionReturnType || 'none');
+  const [passPicking, setPassPicking] = React.useState(block.functionPassPicking || false);
   const [params, setParams] = React.useState(block.functionParams || []);
 
   const addParam = () => {
@@ -1161,6 +1162,19 @@ const FunctionEditor: React.FC<FunctionEditorProps> = ({ block, onSave, onCancel
             </select>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', backgroundColor: '#1e1e1e', borderRadius: '6px', border: '1px solid #333' }}>
+            <input 
+              type="checkbox" 
+              checked={passPicking} 
+              onChange={e => setPassPicking(e.target.checked)} 
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>Pass Picking</div>
+              <div style={{ fontSize: '11px', color: '#666' }}>If enabled, the function inherits picked objects from the caller.</div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Parameters</label>
@@ -1200,7 +1214,7 @@ const FunctionEditor: React.FC<FunctionEditorProps> = ({ block, onSave, onCancel
         </div>
 
         <div style={modalFooterStyle}>
-          <button onClick={() => onSave({ functionName: name, functionDescription: description, functionReturnType: returnType, functionParams: params })} style={{ ...saveButtonStyle, backgroundColor: '#9b59b6' }}>Save Changes</button>
+          <button onClick={() => onSave({ functionName: name, functionDescription: description, functionReturnType: returnType, functionParams: params, functionPassPicking: passPicking })} style={{ ...saveButtonStyle, backgroundColor: '#9b59b6' }}>Save Changes</button>
           <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
         </div>
       </div>
@@ -1252,7 +1266,22 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, def, initialPa
     ...project.objectTypes.flatMap((ot: any) => ot.instanceVariables.map((v: any) => ({ name: `${ot.name}.${v.name}`, type: 'instance-variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))), 
     { name: 'dt', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> }, 
     { name: 'time', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> },
-    { name: 'random(0, 100)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> }
+    { name: 'random(0, 100)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'Function.ReturnValue', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
+    { name: 'Function.Param(0)', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
+    ...(() => {
+      const names: string[] = [];
+      project.eventSheets.forEach(es => {
+        const find = (blocks: EventBlock[]) => {
+          blocks.forEach(b => {
+            if (b.type === 'function' && b.functionName) names.push(b.functionName);
+            find(b.children);
+          });
+        };
+        find(es.events);
+      });
+      return names.map(n => ({ name: `Function.Call("${n}")`, type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> }));
+    })()
   ].filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) || i.category.toLowerCase().includes(filter.toLowerCase()));
 
   const categories = Array.from(new Set(assistantItems.map(i => i.category)));

@@ -1,6 +1,6 @@
 export interface ParamDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable' | 'functionName';
+  type: 'string' | 'number' | 'boolean' | 'objectType' | 'layer' | 'enum' | 'globalVariable' | 'instanceVariable' | 'functionName' | 'any';
   options?: string[]; // For enum type
   defaultValue?: any;
 }

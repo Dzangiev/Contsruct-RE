@@ -13,6 +13,8 @@ export interface EvaluationContext {
     pointerY: number;
   };
   functionParams?: any[];
+  returnValue?: any;
+  localVariables?: Record<string, any>;
 }
 
 export function evaluateExpression(expr: any, context: EvaluationContext): any {
@@ -95,7 +97,12 @@ export function evaluateExpression(expr: any, context: EvaluationContext): any {
     }
   }
 
-  // 5. Global Variables
+  // 5. Local Variables
+  if (context.localVariables && trimmed in context.localVariables) {
+    return context.localVariables[trimmed];
+  }
+
+  // 6. Global Variables
   if (trimmed in context.variables) {
     return context.variables[trimmed];
   }
@@ -105,6 +112,10 @@ export function evaluateExpression(expr: any, context: EvaluationContext): any {
   if (funcParamMatch) {
     const index = parseInt(funcParamMatch[1]!);
     return context.functionParams ? context.functionParams[index] : 0;
+  }
+
+  if (trimmed.toLowerCase() === 'function.returnvalue') {
+    return context.returnValue !== undefined ? context.returnValue : 0;
   }
 
   // 7. System keywords

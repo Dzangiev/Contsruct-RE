@@ -78,6 +78,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const behaviorsStateRef = React.useRef<Record<string, Record<string, any>>>({});
+  const lastReturnValueRef = React.useRef<any>(0);
+  const staticVariablesRef = React.useRef<Record<string, any>>({});
 
   React.useEffect(() => {
     addLog(`Runtime initialized for layout: ${layout?.name}`, 'info');
@@ -140,7 +142,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     let animationFrameId: number;
 
-    const getEvaluationContext = (dt: number, instances: Instance[], currentInstance?: Instance, funcParams?: any[]): EvaluationContext => {
+    const getEvaluationContext = (dt: number, instances: Instance[], currentInstance?: Instance, funcParams?: any[], localVars?: Record<string, any>): EvaluationContext => {
       const objects: Record<string, any> = {};
       project.objectTypes.forEach(ot => {
         const insts = instances.filter(i => i.objectTypeId === ot.id);
@@ -163,7 +165,9 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           pointerX: pointerPosRef.current.x,
           pointerY: pointerPosRef.current.y
         },
-        functionParams: funcParams
+        functionParams: funcParams,
+        returnValue: lastReturnValueRef.current,
+        localVariables: localVars
       };
     };
 
@@ -263,9 +267,26 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         : currentPicked.filter(i => checkInstance(i));
     };
 
-    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[]): { instances: Instance[], result: boolean } => {
+    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[], localVars: Record<string, any> = {}, localVarsMeta: Record<string, { blockId: string, isStatic: boolean }> = {}): { instances: Instance[], result: boolean } => {
       if (block.disabled) return { instances, result: false };
-      if (block.type === 'function' && !isExplicitCall) return { instances, result: false }; // Only execute functions if explicitly called
+      if (block.type === 'function' && !isExplicitCall) return { instances, result: false };
+
+      if (block.type === 'variable' && block.variable) {
+        const varName = block.variable.name;
+        localVarsMeta[varName] = { blockId: block.id, isStatic: !!block.variable.isStatic };
+        
+        if (block.variable.isStatic) {
+          if (!(block.id in staticVariablesRef.current)) {
+            const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+            staticVariablesRef.current[block.id] = evaluateExpression(block.variable.initialValue, context);
+          }
+          localVars[varName] = staticVariablesRef.current[block.id];
+        } else {
+          const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+          localVars[varName] = evaluateExpression(block.variable.initialValue, context);
+        }
+        return { instances, result: true };
+      }
 
       let currentPickedSets: PickedSets = { ...parentPickedSets };
       let allPass = true;
@@ -274,7 +295,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         const otid = condition.targetObjectTypeId;
         if (!otid) {
           let result = true;
-          const context = getEvaluationContext(dt, instances, undefined, funcParams);
+          const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
           switch (condition.type) {
             case 'always': result = true; break;
             case 'onStartOfLayout': result = !hasStartedRef.current; break;
@@ -326,10 +347,10 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       block.actions.forEach(action => {
         const otid = action.targetObjectTypeId;
         
-        const context = getEvaluationContext(dt, nextInstances, undefined, funcParams);
+        const context = getEvaluationContext(dt, nextInstances, undefined, funcParams, localVars);
         const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
-        const isSystemAction = !otid || action.type === 'callFunction' || action.type === 'setVariable' || action.type === 'addVariable' || action.type === 'log';
+        const isSystemAction = !otid || action.type === 'callFunction' || action.type === 'setReturnValue' || action.type === 'setVariable' || action.type === 'addVariable' || action.type === 'log';
         if (!isSystemAction && !otid) return;
 
         if (action.type === 'log') {
@@ -356,7 +377,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               blocks.forEach(b => {
                 if (b.type === 'function' && b.functionName?.trim() === evaluatedName) {
                   addLog(`Found function "${evaluatedName}" in sheet "${es.name}", executing...`, 'info');
-                  const res = processBlock(b, nextInstances, {}, dt, true, true, callParams); // Explicit call with params
+                  const initialPicked = b.functionPassPicking ? currentPickedSets : {};
+                  const res = processBlock(b, nextInstances, initialPicked, dt, true, true, callParams, {}, {}); 
                   nextInstances = res.instances;
                   foundCount++;
                 }
@@ -371,6 +393,13 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           } else {
             addLog(`Function "${evaluatedName}" executed ${foundCount} time(s).`, 'info');
           }
+          return;
+        }
+
+        if (action.type === 'setReturnValue') {
+          const val = evaluateExpression(action.params[0], context);
+          lastReturnValueRef.current = val;
+          addLog(`SET RETURN VALUE: ${val}`, 'info');
           return;
         }
 
@@ -393,7 +422,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           const targetLayerId = action.params[3] || layout.layers.find(l => l.visible && !l.locked)?.id || layout.layers[0]?.id;
 
           const spawn = (instForContext?: Instance) => {
-            const context = getEvaluationContext(dt, nextInstances, instForContext);
+              const context = getEvaluationContext(dt, nextInstances, instForContext, funcParams, localVars);
             const spawnX = Number(evaluateExpression(action.params[1], context) ?? 0);
             const spawnY = Number(evaluateExpression(action.params[2], context) ?? 0);
             const newInst: Instance = {
@@ -418,7 +447,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
         nextInstances = nextInstances.map(inst => {
           if (!pickedIds.includes(inst.id)) return inst;
-          const context = getEvaluationContext(dt, nextInstances, inst);
+          const context = getEvaluationContext(dt, nextInstances, inst, funcParams, localVars);
           const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
           switch (action.type) {
@@ -443,13 +472,25 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             case 'setVariable': {
               const varName = action.params[0];
               const val = evaluateExpression(action.params[1], context);
-              runtimeVariablesRef.current[varName] = val;
+              if (localVars && varName in localVars) {
+                localVars[varName] = val;
+                const meta = localVarsMeta[varName];
+                if (meta?.isStatic) staticVariablesRef.current[meta.blockId] = val;
+              } else {
+                runtimeVariablesRef.current[varName] = val;
+              }
               return inst;
             }
             case 'addVariable': {
               const varName = action.params[0];
               const val = evaluateExpression(action.params[1], context);
-              runtimeVariablesRef.current[varName] = (runtimeVariablesRef.current[varName] || 0) + Number(val);
+              if (localVars && varName in localVars) {
+                localVars[varName] = (Number(localVars[varName]) || 0) + Number(val);
+                const meta = localVarsMeta[varName];
+                if (meta?.isStatic) staticVariablesRef.current[meta.blockId] = localVars[varName];
+              } else {
+                runtimeVariablesRef.current[varName] = (runtimeVariablesRef.current[varName] || 0) + Number(val);
+              }
               return inst;
             }
             case 'setText': return { ...inst, properties: { ...inst.properties, text: String(evalParam(0)) } };
@@ -463,10 +504,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       let currentResult = allPass;
       block.children.forEach(child => {
-        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult, isExplicitCall, funcParams);
+        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult, isExplicitCall, funcParams, localVars, localVarsMeta);
         nextInstances = childRes.instances;
-        // Sub-events don't necessarily update the 'result' of the parent for the next sibling, 
-        // but they might in some cases. In C3, 'else' applies to the previous sibling at the same level.
       });
 
       return { instances: nextInstances, result: allPass };
@@ -632,7 +671,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       // 2. Process Event Sheet
       let lastRes = true;
       eventSheet.events.forEach(block => {
-        const blockRes = processBlock(block, nextInstances, {}, dt, lastRes);
+        const blockRes = processBlock(block, nextInstances, {}, dt, lastRes, false, undefined, {}, {});
         nextInstances = blockRes.instances;
         lastRes = blockRes.result;
       });
