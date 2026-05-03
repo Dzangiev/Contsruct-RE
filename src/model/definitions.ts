@@ -189,6 +189,23 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'Pointer',
     target: 'system'
   },
+  // Picking (System)
+  {
+    type: 'pickAll',
+    name: 'Pick all',
+    description: 'Resets the selection for an object type to all available instances.',
+    params: [{ name: 'Object Type', type: 'objectType' }],
+    category: 'Picking',
+    target: 'system'
+  },
+  {
+    type: 'pickRandom',
+    name: 'Pick random (System)',
+    description: 'Picks one random instance of an object type from all available instances.',
+    params: [{ name: 'Object Type', type: 'objectType' }],
+    category: 'Picking',
+    target: 'system'
+  },
   // Object Conditions
   {
     type: 'isVisible',
@@ -265,6 +282,53 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'Text',
     target: 'object',
     requiredKind: 'text'
+  },
+  // Picking (Object)
+  {
+    type: 'pickRandom',
+    name: 'Pick random',
+    description: 'Picks one random instance from the current selection of this object type.',
+    params: [],
+    category: 'Picking',
+    target: 'object'
+  },
+  {
+    type: 'pickNearest',
+    name: 'Pick nearest',
+    description: 'Picks the instance of this object type nearest to a specific position.',
+    params: [
+      { name: 'X', type: 'number', defaultValue: 0 },
+      { name: 'Y', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Picking',
+    target: 'object'
+  },
+  {
+    type: 'pickFarthest',
+    name: 'Pick farthest',
+    description: 'Picks the instance of this object type farthest from a specific position.',
+    params: [
+      { name: 'X', type: 'number', defaultValue: 0 },
+      { name: 'Y', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Picking',
+    target: 'object'
+  },
+  {
+    type: 'pickByUID',
+    name: 'Pick by unique ID',
+    description: 'Picks the instance with a specific unique ID (string).',
+    params: [{ name: 'UID', type: 'string', defaultValue: '""' }],
+    category: 'Picking',
+    target: 'object'
+  },
+  {
+    type: 'pickByIndex',
+    name: 'Pick by index',
+    description: 'Picks an instance by its zero-based index in the current selection.',
+    params: [{ name: 'Index', type: 'number', defaultValue: 0 }],
+    category: 'Picking',
+    target: 'object'
   }
 ];
 

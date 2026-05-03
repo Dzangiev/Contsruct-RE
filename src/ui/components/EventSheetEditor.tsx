@@ -886,7 +886,15 @@ const LogicItemContent: React.FC<{
             <span style={{ color: '#ccc', fontWeight: 500 }}><HighlightText text={def.name} highlight={searchTerm} /></span>
             {p.length > 0 && (
               <span style={{ color: '#f1c40f', fontSize: '10px', fontWeight: 700 }}>
-                ({p.map((val: any) => (typeof val === 'string' && val.length > 15 ? val.substring(0, 12) + '...' : val)).join(', ')})
+                ({p.map((val: any) => {
+                  // Resolve Object Names
+                  const targetOt = project.objectTypes.find(o => o.id === val);
+                  if (targetOt) return targetOt.name;
+                  const targetFamily = project.families.find(f => f.id === val);
+                  if (targetFamily) return targetFamily.name;
+                  
+                  return typeof val === 'string' && val.length > 15 ? val.substring(0, 12) + '...' : val;
+                }).join(', ')})
               </span>
             )}
           </div>
@@ -1422,7 +1430,14 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
                     onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }}
                     style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}
                   >
-                    {project.objectTypes.map(ot => <option key={ot.id} value={ot.id}>{ot.name}</option>)}
+                    <optgroup label="Object Types">
+                      {project.objectTypes.map(ot => <option key={ot.id} value={ot.id}>{ot.name}</option>)}
+                    </optgroup>
+                    {project.families && project.families.length > 0 && (
+                      <optgroup label="Families">
+                        {project.families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </optgroup>
+                    )}
                   </select>
                 ) : (
                   <input 

@@ -303,13 +303,78 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               default: return false;
             }
           }
+          case 'pickRandom': {
+            return true; // Logic handled in bulk after filtering
+          }
+          case 'pickNearest': {
+            return true; // Logic handled in bulk after filtering
+          }
+          case 'pickFarthest': {
+            return true; // Logic handled in bulk after filtering
+          }
+          case 'pickByUID': {
+            const targetId = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], i)));
+            return i.id === targetId;
+          }
+          case 'pickByIndex': {
+            return true; // Logic handled in bulk
+          }
           default: return true;
         }
       };
 
-      return condition.inverted 
+      const baseFiltered = condition.inverted 
         ? currentPicked.filter(i => !checkInstance(i)) 
         : currentPicked.filter(i => checkInstance(i));
+
+      if (baseFiltered.length === 0) return [];
+
+      // Post-process for "Pick Single" type conditions
+      switch (condition.type) {
+        case 'pickRandom': {
+          const idx = Math.floor(Math.random() * baseFiltered.length);
+          return [baseFiltered[idx]];
+        }
+        case 'pickByIndex': {
+          const context = getEvaluationContext(dt, allInstances);
+          const targetIdx = Math.floor(Number(evaluateExpression(condition.params[0], context) ?? 0));
+          if (targetIdx >= 0 && targetIdx < baseFiltered.length) {
+            return [baseFiltered[targetIdx]];
+          }
+          return [];
+        }
+        case 'pickNearest': {
+          const context = getEvaluationContext(dt, allInstances);
+          const tx = Number(evaluateExpression(condition.params[0], context) ?? 0);
+          const ty = Number(evaluateExpression(condition.params[1], context) ?? 0);
+          let nearest = baseFiltered[0];
+          let minDist = Math.pow(nearest.x - tx, 2) + Math.pow(nearest.y - ty, 2);
+          for (let j = 1; j < baseFiltered.length; j++) {
+            const dist = Math.pow(baseFiltered[j].x - tx, 2) + Math.pow(baseFiltered[j].y - ty, 2);
+            if (dist < minDist) {
+              minDist = dist;
+              nearest = baseFiltered[j];
+            }
+          }
+          return [nearest];
+        }
+        case 'pickFarthest': {
+          const context = getEvaluationContext(dt, allInstances);
+          const tx = Number(evaluateExpression(condition.params[0], context) ?? 0);
+          const ty = Number(evaluateExpression(condition.params[1], context) ?? 0);
+          let farthest = baseFiltered[0];
+          let maxDist = Math.pow(farthest.x - tx, 2) + Math.pow(farthest.y - ty, 2);
+          for (let j = 1; j < baseFiltered.length; j++) {
+            const dist = Math.pow(baseFiltered[j].x - tx, 2) + Math.pow(baseFiltered[j].y - ty, 2);
+            if (dist > maxDist) {
+              maxDist = dist;
+              farthest = baseFiltered[j];
+            }
+          }
+          return [farthest];
+        }
+        default: return baseFiltered;
+      }
     };
 
     const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[], localVars: Record<string, any> = {}, localVarsMeta: Record<string, { blockId: string, isStatic: boolean }> = {}, depth: number = 0): { instances: Instance[], result: boolean } => {
@@ -367,6 +432,32 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             case 'pointerDown': result = pointerDownRef.current; break;
             case 'pointerPressed': result = pointerPressedRef.current; break;
             case 'pointerReleased': result = pointerReleasedRef.current; break;
+            case 'pickAll': {
+              const pickOtid = condition.params[0];
+              if (pickOtid) {
+                const family = project.families.find(f => f.id === pickOtid);
+                if (family) {
+                  currentPickedSets[pickOtid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
+                } else {
+                  currentPickedSets[pickOtid] = instances.filter(i => i.objectTypeId === pickOtid).map(i => i.id);
+                }
+                result = currentPickedSets[pickOtid].length > 0;
+              } else result = false;
+              break;
+            }
+            case 'pickRandom': {
+               // System variant of pick random (e.g. System -> Pick random Sprite)
+               const pickOtid = condition.params[0];
+               if (pickOtid && instances.length > 0) {
+                 const typeInsts = instances.filter(i => i.objectTypeId === pickOtid);
+                 if (typeInsts.length > 0) {
+                    const rand = typeInsts[Math.floor(Math.random() * typeInsts.length)];
+                    currentPickedSets[pickOtid] = [rand.id];
+                    result = true;
+                 } else result = false;
+               } else result = false;
+               break;
+            }
           }
           if (condition.inverted) result = !result;
           if (!result) { allPass = false; break; }
