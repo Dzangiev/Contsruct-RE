@@ -334,7 +334,18 @@ export const ACTIONS: LogicDefinition[] = [
   {
     type: 'addVariable',
     name: 'Add to variable',
-    description: 'Add a value to a global variable.',
+    description: 'Add a value to a global or local variable.',
+    params: [
+      { name: 'Variable', type: 'globalVariable', defaultValue: '' },
+      { name: 'Value', type: 'number', defaultValue: 1 }
+    ],
+    category: 'System',
+    target: 'system'
+  },
+  {
+    type: 'subtractVariable',
+    name: 'Subtract from variable',
+    description: 'Subtract a value from a global or local variable.',
     params: [
       { name: 'Variable', type: 'globalVariable', defaultValue: '' },
       { name: 'Value', type: 'number', defaultValue: 1 }

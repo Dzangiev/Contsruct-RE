@@ -4,6 +4,7 @@ import { EventBlock, Project, ObjectType, InstanceVariable, Condition, Action } 
 import { Plus, Trash2, Eye, EyeOff, Search, Copy, Scissors, Clipboard, ChevronUp, ChevronDown, List, Settings, Info, Undo, Redo, Maximize2, Minimize2, Terminal, Code, Box, Layers, MousePointer2, GitBranch, Replace, AlertCircle, Variable, Palette, FilePlus, Zap, Bookmark, BookmarkPlus, Ghost, MousePointer, MoreVertical, Edit2, Monitor, FileText } from 'lucide-react';
 import { LogicBrowser } from './LogicBrowser';
 import { findConditionDefinition, findActionDefinition, LogicDefinition } from '../../model/definitions';
+import { getAllVariableNames } from '../../model/eventUpdates';
 
 const HighlightText: React.FC<{ text: string, highlight: string }> = ({ text, highlight }) => {
   if (!highlight.trim()) return <span>{text}</span>;
@@ -19,6 +20,71 @@ const HighlightText: React.FC<{ text: string, highlight: string }> = ({ text, hi
 };
 
 
+/**
+ * Finds all variables in scope for a specific block.
+ */
+function getInScopeVariables(project: Project, eventSheetId: string, blockId: string) {
+  const sheet = project.eventSheets.find(es => es.id === eventSheetId);
+  if (!sheet) return { globals: project.globalVariables, locals: [] };
+
+  const globals = [...project.globalVariables];
+  const locals: any[] = [];
+
+  // 1. Add all root-level variables from ALL sheets (these are effectively global)
+  project.eventSheets.forEach(es => {
+    es.events.forEach(b => {
+      if (b.type === 'variable' && b.variable) {
+        if (!globals.some(g => g.id === b.variable?.id)) {
+          globals.push(b.variable);
+        }
+      }
+    });
+  });
+
+  // Path-based search to collect variables in scope
+  const collectInScope = (blocks: EventBlock[], targetId: string): boolean => {
+    for (const b of blocks) {
+      if (b.id === targetId) {
+        // Target found. Add variables defined at the top of this block
+        b.children.forEach(child => {
+          if (child.type === 'variable' && child.variable) {
+            locals.push(child.variable);
+          }
+        });
+        return true;
+      }
+
+      if (b.type === 'variable' && b.variable) {
+        locals.push(b.variable);
+      }
+
+      if (collectInScope(b.children, targetId)) return true;
+
+      // If we finished this branch and didn't find the target, 
+      // remove variables from this branch/block from scope.
+      if (b.type === 'variable' && b.variable) {
+        const idx = locals.findIndex(v => v.id === b.variable?.id);
+        if (idx !== -1) locals.splice(idx, 1);
+      }
+      
+      const clearChildren = (list: EventBlock[]) => {
+        list.forEach(child => {
+          if (child.type === 'variable' && child.variable) {
+            const idx = locals.findIndex(v => v.id === child.variable?.id);
+            if (idx !== -1) locals.splice(idx, 1);
+          }
+          clearChildren(child.children);
+        });
+      };
+      clearChildren(b.children);
+    }
+    return false;
+  };
+
+  collectInScope(sheet.events, blockId);
+
+  return { globals, locals };
+}
 
 export const EventSheetEditor: React.FC = () => {
   const { 
@@ -66,6 +132,17 @@ export const EventSheetEditor: React.FC = () => {
       list.forEach(b => { if (b.type === 'group') updateEventBlock(eventSheet.id, b.id, { groupExpanded: expand }); updateRecursive(b.children); });
     };
     updateRecursive(eventSheet.events);
+  };
+
+  const onAddVariable = (parentId: string | null = null) => {
+    if (!eventSheet) return;
+    const blockId = addEventBlock(eventSheet.id, parentId, 'variable');
+    setVariableEditorState({ 
+      isOpen: true, 
+      eventSheetId: eventSheet.id, 
+      blockId, 
+      variable: { name: '', type: 'number', initialValue: 0 } 
+    });
   };
 
   const findBlockRecursive = (list: EventBlock[], id: string): EventBlock | undefined => {
@@ -116,7 +193,7 @@ export const EventSheetEditor: React.FC = () => {
       }
       if (e.key === 's' && !e.ctrlKey) { if (selectedBlockId) addEventBlock(eventSheet.id, selectedBlockId, 'event'); }
       if (e.key === 'g' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'group'); }
-      if (e.key === 'v' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'variable'); }
+      if (e.key === 'v' && !e.ctrlKey) { onAddVariable(selectedBlockId || null); }
       if (e.key === 'c' && !e.ctrlKey && !e.shiftKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'comment'); }
       if (e.key === 'f' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'function'); }
       if (e.key === 'd' && !e.ctrlKey) {
@@ -259,7 +336,7 @@ export const EventSheetEditor: React.FC = () => {
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'function'); }} style={toolbarButtonStyle} title="Add Function (F)"><Zap size={14} /> Function</button>
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'include'); }} style={toolbarButtonStyle} title="Include Sheet"><FilePlus size={14} /> Include</button>
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'group'); }} style={toolbarButtonStyle} title="Add Group (G)"> Group</button>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'variable'); }} style={toolbarButtonStyle} title="Add Variable (V)"> Var</button>
+          <button onClick={(e) => { e.stopPropagation(); onAddVariable(); }} style={toolbarButtonStyle} title="Add Variable (V)"> Var</button>
         </div>
       </div>
 
@@ -402,6 +479,8 @@ export const EventSheetEditor: React.FC = () => {
         <ParamEditor 
           project={project} 
           mode={paramEditorState.mode}
+          eventSheetId={paramEditorState.eventSheetId}
+          blockId={paramEditorState.blockId}
           def={paramEditorState.def} 
           initialParams={paramEditorState.params} 
           targetObjectTypeId={paramEditorState.targetObjectTypeId} 
@@ -447,7 +526,7 @@ export const EventSheetEditor: React.FC = () => {
           onCancel={() => setVariableEditorState(null)}
         />
       )}
-      {contextMenu && <ContextMenu project={project} x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} logicItemId={contextMenu.logicItemId} eventSheetId={eventSheet.id} onClose={() => setContextMenu(null)} />}
+      {contextMenu && <ContextMenu project={project} x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} logicItemId={contextMenu.logicItemId} eventSheetId={eventSheet.id} onAddVariable={onAddVariable} onClose={() => setContextMenu(null)} />}
     </div>
   );
 };
@@ -469,6 +548,15 @@ const VariableEditor: React.FC<{
     e?.preventDefault();
     if (!name.trim()) return setError('Name cannot be empty');
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return setError('Invalid variable name (start with letter, no spaces)');
+    
+    const project = useEditorStore.getState().project;
+    const existing = getAllVariableNames(project);
+    
+    // If the name changed and it already exists in the project
+    if (name !== variable.name && existing.includes(name)) {
+      return setError('A variable with this name already exists');
+    }
+
     onSave({ name, type, initialValue, description, isStatic, isConstant });
   };
 
@@ -1039,7 +1127,7 @@ const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: st
   );
 };
 
-const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: string | null, logicItemId: string | null | undefined, eventSheetId: string, onClose: any }> = ({ project, x, y, blockId, logicItemId, eventSheetId, onClose }) => {
+const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: string | null, logicItemId: string | null | undefined, eventSheetId: string, onAddVariable: (parentId?: string | null) => void, onClose: any }> = ({ project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onClose }) => {
   const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem } = useEditorStore();
   const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
 
@@ -1064,6 +1152,7 @@ const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: s
       ) : blockId ? (
         <>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> Add sub-event (S)</div>
+          <div style={contextItemStyle} onClick={() => { onAddVariable(blockId); onClose(); }}><Variable size={14} /> Add local variable (V)</div>
           <div style={contextItemStyle} onClick={() => { updateEventBlock(eventSheetId, blockId, { disabled: !currentBlock?.disabled }); onClose(); }}><EyeOff size={14} /> {currentBlock?.disabled ? 'Enable' : 'Disable (D)'}</div>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); addCondition(eventSheetId, 'LAST', 'else', []); onClose(); }}><GitBranch size={14} /> Add Else (X)</div>
           <div style={contextDividerStyle} />
@@ -1225,6 +1314,8 @@ const FunctionEditor: React.FC<FunctionEditorProps> = ({ block, onSave, onCancel
 interface ParamEditorProps {
   project: Project;
   mode: 'condition' | 'action';
+  eventSheetId: string;
+  blockId: string;
   def: LogicDefinition;
   initialParams: any[];
   targetObjectTypeId?: string;
@@ -1233,7 +1324,7 @@ interface ParamEditorProps {
   onCancel: () => void;
 }
 
-const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, def, initialParams, targetObjectTypeId, onSave, onBack, onCancel }) => {
+const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, blockId, def, initialParams, targetObjectTypeId, onSave, onBack, onCancel }) => {
   const [params, setParams] = React.useState([...initialParams]);
 
   React.useEffect(() => {
@@ -1260,8 +1351,13 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, def, initialPa
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const [filter, setFilter] = React.useState('');
 
+  const { globals: inScopeGlobals, locals: inScopeLocals } = getInScopeVariables(project, eventSheetId, blockId);
+
   const assistantItems = [
-    ...project.globalVariables.map((v: any) => ({ name: v.name, type: 'variable', category: 'Global Variables', icon: <Variable size={12} color="#3498db" /> })), 
+    ...[
+      ...inScopeGlobals.map((v: any) => ({ name: v.name, type: 'variable', category: 'Global Variables', icon: <Variable size={12} color="#3498db" /> })),
+      ...inScopeLocals.map((v: any) => ({ name: v.name, type: 'variable', category: 'Local Variables', icon: <Variable size={12} color="#e67e22" /> }))
+    ].filter((v, i, a) => a.findIndex(t => t.name === v.name) === i), 
     ...project.objectTypes.map((ot: any) => ({ name: ot.name, type: 'object', category: 'Objects', icon: <Box size={12} color="#2ecc71" /> })), 
     ...project.objectTypes.flatMap((ot: any) => ot.instanceVariables.map((v: any) => ({ name: `${ot.name}.${v.name}`, type: 'instance-variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))), 
     { name: 'dt', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> }, 
@@ -1385,8 +1481,33 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, def, initialPa
                     onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }}
                     style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}
                   >
-                    {project.globalVariables.length === 0 && <option value="">No global variables</option>}
-                    {project.globalVariables.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+                    {(() => {
+                      const isModifyingAction = def.type === 'setVariable' || def.type === 'addVariable' || def.type === 'subtractVariable';
+                      const globals = inScopeGlobals
+                        .filter(v => !isModifyingAction || !v.isConstant)
+                        .map(v => v.name);
+                      const locals = inScopeLocals
+                        .filter(v => !isModifyingAction || !v.isConstant)
+                        .map(v => v.name);
+
+                      const allVars = [...new Set([...globals, ...locals])];
+                      
+                      if (allVars.length === 0) return <option value="">No variables in scope</option>;
+                      return (
+                        <>
+                          {globals.length > 0 && (
+                            <optgroup label="Global Variables">
+                              {globals.map(name => <option key={`g-${name}`} value={name}>{name}</option>)}
+                            </optgroup>
+                          )}
+                          {locals.length > 0 && (
+                            <optgroup label="Local Variables">
+                              {[...new Set(locals)].map(name => <option key={`l-${name}`} value={name}>{name}</option>)}
+                            </optgroup>
+                          )}
+                        </>
+                      );
+                    })()}
                   </select>
                 ) : pDef.type === 'instanceVariable' ? (
                   <select 

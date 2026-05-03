@@ -53,9 +53,20 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   
   React.useEffect(() => {
     const vars: Record<string, any> = {};
+    // 1. Project-level globals
     project.globalVariables.forEach(v => { vars[v.name] = v.initialValue; });
+    
+    // 2. Sheet-level globals (depth 0 variable blocks)
+    project.eventSheets.forEach(es => {
+      es.events.forEach(block => {
+        if (block.type === 'variable' && block.variable) {
+          vars[block.variable.name] = block.variable.initialValue;
+        }
+      });
+    });
+    
     runtimeVariablesRef.current = vars;
-  }, [project.globalVariables]);
+  }, [project.globalVariables, project.eventSheets]);
 
   const hasStartedRef = React.useRef(false);
 
@@ -267,11 +278,13 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         : currentPicked.filter(i => checkInstance(i));
     };
 
-    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[], localVars: Record<string, any> = {}, localVarsMeta: Record<string, { blockId: string, isStatic: boolean }> = {}): { instances: Instance[], result: boolean } => {
+    const processBlock = (block: EventBlock, instances: Instance[], parentPickedSets: PickedSets, dt: number, lastEventResult: boolean, isExplicitCall: boolean = false, funcParams?: any[], localVars: Record<string, any> = {}, localVarsMeta: Record<string, { blockId: string, isStatic: boolean }> = {}, depth: number = 0): { instances: Instance[], result: boolean } => {
       if (block.disabled) return { instances, result: false };
       if (block.type === 'function' && !isExplicitCall) return { instances, result: false };
 
       if (block.type === 'variable' && block.variable) {
+        if (depth === 0) return { instances, result: true }; // Global variables handled at start
+        
         const varName = block.variable.name;
         localVarsMeta[varName] = { blockId: block.id, isStatic: !!block.variable.isStatic };
         
@@ -344,6 +357,28 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       let nextInstances = [...instances];
 
+      // Pre-initialize local variables defined in this block's children
+      // so they are available to the block's own actions
+      if (block.children) {
+        block.children.forEach(child => {
+          if (child.type === 'variable' && child.variable) {
+            const varName = child.variable.name;
+            const context = getEvaluationContext(dt, nextInstances, undefined, funcParams, localVars);
+            
+            localVarsMeta[varName] = { blockId: child.id, isStatic: !!child.variable.isStatic };
+            
+            if (child.variable.isStatic) {
+              if (!(child.id in staticVariablesRef.current)) {
+                staticVariablesRef.current[child.id] = evaluateExpression(child.variable.initialValue, context);
+              }
+              localVars[varName] = staticVariablesRef.current[child.id];
+            } else {
+              localVars[varName] = evaluateExpression(child.variable.initialValue, context);
+            }
+          }
+        });
+      }
+
       block.actions.forEach(action => {
         const otid = action.targetObjectTypeId;
         
@@ -378,7 +413,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 if (b.type === 'function' && b.functionName?.trim() === evaluatedName) {
                   addLog(`Found function "${evaluatedName}" in sheet "${es.name}", executing...`, 'info');
                   const initialPicked = b.functionPassPicking ? currentPickedSets : {};
-                  const res = processBlock(b, nextInstances, initialPicked, dt, true, true, callParams, {}, {}); 
+                  const res = processBlock(b, nextInstances, initialPicked, dt, true, true, callParams, {}, {}, 0); // Reset depth for function call
                   nextInstances = res.instances;
                   foundCount++;
                 }
@@ -493,6 +528,18 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
               return inst;
             }
+            case 'subtractVariable': {
+              const varName = action.params[0];
+              const val = evaluateExpression(action.params[1], context);
+              if (localVars && varName in localVars) {
+                localVars[varName] = (Number(localVars[varName]) || 0) - Number(val);
+                const meta = localVarsMeta[varName];
+                if (meta?.isStatic) staticVariablesRef.current[meta.blockId] = localVars[varName];
+              } else {
+                runtimeVariablesRef.current[varName] = (runtimeVariablesRef.current[varName] || 0) - Number(val);
+              }
+              return inst;
+            }
             case 'setText': return { ...inst, properties: { ...inst.properties, text: String(evalParam(0)) } };
             case 'appendText': return { ...inst, properties: { ...inst.properties, text: (inst.properties.text || '') + String(evalParam(0)) } };
             case 'setTextColor': return { ...inst, properties: { ...inst.properties, color: String(evalParam(0)) } };
@@ -504,7 +551,9 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       let currentResult = allPass;
       block.children.forEach(child => {
-        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult, isExplicitCall, funcParams, localVars, localVarsMeta);
+        // Skip variable blocks as they were already initialized above
+        if (child.type === 'variable') return;
+        const childRes = processBlock(child, nextInstances, currentPickedSets, dt, currentResult, isExplicitCall, funcParams, localVars, localVarsMeta, depth + 1);
         nextInstances = childRes.instances;
       });
 
@@ -671,7 +720,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       // 2. Process Event Sheet
       let lastRes = true;
       eventSheet.events.forEach(block => {
-        const blockRes = processBlock(block, nextInstances, {}, dt, lastRes, false, undefined, {}, {});
+        const blockRes = processBlock(block, nextInstances, {}, dt, lastRes, false, undefined, {}, {}, 0);
         nextInstances = blockRes.instances;
         lastRes = blockRes.result;
       });

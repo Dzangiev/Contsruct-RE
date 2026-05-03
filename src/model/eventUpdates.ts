@@ -27,15 +27,52 @@ function removeFromTree(blocks: EventBlock[], id: string): EventBlock[] {
 }
 
 /**
+ * Helper to get all variable names in the project.
+ */
+export function getAllVariableNames(project: Project): string[] {
+  const names = project.globalVariables.map(v => v.name);
+  project.eventSheets.forEach(es => {
+    const find = (blocks: EventBlock[]) => {
+      blocks.forEach(b => {
+        if (b.type === 'variable' && b.variable) {
+          // If it's already in names (because it's root-level), don't add again
+          if (!names.includes(b.variable.name)) {
+            names.push(b.variable.name);
+          }
+        }
+        find(b.children);
+      });
+    };
+    find(es.events);
+  });
+  return names;
+}
+
+/**
+ * Helper to generate a unique variable name.
+ */
+export function getUniqueVariableName(project: Project, baseName: string): string {
+  const names = getAllVariableNames(project);
+  let name = baseName;
+  let counter = 1;
+  while (names.includes(name)) {
+    name = `${baseName}${counter}`;
+    counter++;
+  }
+  return name;
+}
+
+/**
  * Adds a new event block to an event sheet.
  */
 export function addEventBlock(
   project: Project, 
   eventSheetId: string, 
   parentBlockId: string | null, 
-  type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include'
+  type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include',
+  id?: string
 ): Project {
-  const blockId = generateId();
+  const blockId = id || generateId();
   const newBlock: EventBlock = {
     id: blockId,
     type,
@@ -51,15 +88,18 @@ export function addEventBlock(
     const varId = generateId();
     newBlock.variable = {
       id: varId,
-      name: 'Variable' + (project.globalVariables.length + 1),
+      name: getUniqueVariableName(project, 'Variable'),
       type: 'number',
       initialValue: 0,
       comment: ''
     };
-    updatedProject = {
-      ...project,
-      globalVariables: [...project.globalVariables, newBlock.variable]
-    };
+    // Only add to globalVariables if it's a root-level block
+    if (parentBlockId === null) {
+      updatedProject = {
+        ...project,
+        globalVariables: [...project.globalVariables, newBlock.variable]
+      };
+    }
   } else if (type === 'function') {
     newBlock.functionName = 'Function' + (generateId().substring(0, 4));
     newBlock.functionDescription = '';
@@ -80,10 +120,13 @@ export function addEventBlock(
       }
       return {
         ...es,
-        events: updateInTree(es.events, parentBlockId, p => ({
-          ...p,
-          children: [...p.children, newBlock]
-        }))
+        events: updateInTree(es.events, parentBlockId, p => {
+          // If it's a variable, prepend it to children (like Construct 3)
+          if (type === 'variable') {
+            return { ...p, children: [newBlock, ...p.children] };
+          }
+          return { ...p, children: [...p.children, newBlock] };
+        })
       };
     })
   };
@@ -98,9 +141,47 @@ export function updateEventBlock(
   blockId: string,
   updates: Partial<Omit<EventBlock, 'id' | 'conditions' | 'actions' | 'children'>>
 ): Project {
+  let updatedProject = project;
+
+  // If we are updating a variable name, we might need to sync with globalVariables
+  if (updates.variable && updates.variable.name) {
+    const newName = updates.variable.name;
+    const existing = getAllVariableNames(project);
+    
+    // Find the original block to get its variable ID
+    const es = project.eventSheets.find(s => s.id === eventSheetId);
+    const findB = (list: EventBlock[]): EventBlock | undefined => {
+      for (const b of list) {
+        if (b.id === blockId) return b;
+        const f = findB(b.children);
+        if (f) return f;
+      }
+    };
+    const originalBlock = es ? findB(es.events) : undefined;
+    
+    if (originalBlock?.variable) {
+      const varId = originalBlock.variable.id;
+      const oldName = originalBlock.variable.name;
+
+      // Enforce uniqueness if name changed
+      if (newName !== oldName && existing.includes(newName)) {
+        // Name already taken, revert to old name or modify to be unique
+        updates.variable.name = getUniqueVariableName(project, newName);
+      }
+
+      // Sync with globalVariables if it's a root block
+      updatedProject = {
+        ...project,
+        globalVariables: project.globalVariables.map(v => 
+          v.id === varId ? { ...v, ...updates.variable } : v
+        )
+      };
+    }
+  }
+
   return {
-    ...project,
-    eventSheets: project.eventSheets.map(es => {
+    ...updatedProject,
+    eventSheets: updatedProject.eventSheets.map(es => {
       if (es.id !== eventSheetId) return es;
       return {
         ...es,
@@ -133,6 +214,7 @@ export function removeEventBlock(
   
   let updatedProject = project;
   if (blockToRemove?.type === 'variable' && blockToRemove.variable) {
+    // Only remove from globalVariables if it was actually there (root-level)
     updatedProject = {
       ...project,
       globalVariables: project.globalVariables.filter(v => v.id !== blockToRemove.variable?.id)
@@ -450,10 +532,28 @@ export function moveEventBlock(
     events: insert(sheetWithoutBlock.events)
   };
 
-  return {
+  // 3. Handle Variable scoping changes (Global <-> Local)
+  let finalProject = {
     ...project,
     eventSheets: project.eventSheets.map(es => es.id === eventSheetId ? updatedSheet : es)
   };
+
+  if (blockToMove.type === 'variable' && blockToMove.variable) {
+    const wasRoot = eventSheet.events.some(b => b.id === blockId);
+    const isRoot = targetParentId === null;
+
+    if (wasRoot && !isRoot) {
+      // Moved from Global to Local: remove from global pool
+      finalProject.globalVariables = finalProject.globalVariables.filter(v => v.id !== blockToMove.variable?.id);
+    } else if (!wasRoot && isRoot) {
+      // Moved from Local to Global: add to global pool if not already there
+      if (!finalProject.globalVariables.some(v => v.id === blockToMove.variable?.id)) {
+        finalProject.globalVariables = [...finalProject.globalVariables, blockToMove.variable];
+      }
+    }
+  }
+
+  return finalProject;
 }
 /**
  * Clones an event block with new IDs recursively.
@@ -486,15 +586,17 @@ export function pasteEventBlocks(
   const cloned = blocks.map(b => cloneEventBlock(b));
   let updatedProject = project;
 
-  // If any cloned blocks have variables, add them to global variables
-  cloned.forEach(b => {
-    if (b.variable) {
-      updatedProject = {
-        ...updatedProject,
-        globalVariables: [...updatedProject.globalVariables, b.variable]
-      };
-    }
-  });
+  // If any cloned blocks are at the root and have variables, add them to global variables
+  if (targetParentId === null) {
+    cloned.forEach(b => {
+      if (b.type === 'variable' && b.variable) {
+        updatedProject = {
+          ...updatedProject,
+          globalVariables: [...updatedProject.globalVariables, b.variable]
+        };
+      }
+    });
+  }
 
   return {
     ...updatedProject,

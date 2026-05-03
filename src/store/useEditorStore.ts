@@ -40,7 +40,7 @@ interface EditorStore {
   updateProjectSettings: (updates: any) => void;
 
   // Event Sheet Actions
-  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => void;
+  addEventBlock: (eventSheetId: string, parentBlockId: string | null, type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include') => string;
   updateEventBlock: (eventSheetId: string, blockId: string, updates: any) => void;
   removeEventBlock: (eventSheetId: string, blockId: string) => void;
   moveEventBlock: (eventSheetId: string, blockId: string, targetParentId: string | null, targetIndex: number, afterBlockId?: string, beforeBlockId?: string) => void;
@@ -228,9 +228,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   // Event Sheet Actions
   addEventBlock: (eventSheetId, parentBlockId, type) => {
-    const next = eventUpdates.addEventBlock(get().project, eventSheetId, parentBlockId, type);
+    const blockId = generateId();
+    const next = eventUpdates.addEventBlock(get().project, eventSheetId, parentBlockId, type, blockId);
     set({ project: next });
     get().pushHistory(next);
+    return blockId;
   },
   updateEventBlock: (eventSheetId, blockId, updates) => {
     const next = eventUpdates.updateEventBlock(get().project, eventSheetId, blockId, updates);
