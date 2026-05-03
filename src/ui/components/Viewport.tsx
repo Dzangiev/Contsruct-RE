@@ -44,7 +44,7 @@ export const Viewport: React.FC = () => {
   const [insertDialogPos, setInsertDialogPos] = React.useState<{ x: number, y: number } | null>(null);
   const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
-  const { zoom, panX, panY, selectedInstanceIds, tool, gridSizeW, gridSizeH, snapToGrid, showGrid, showRulers } = editorState;
+  const { zoom, panX, panY, selectedInstanceIds, tool, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, snapToGrid, showGrid, showRulers } = editorState;
 
   // Global key handlers
   React.useEffect(() => {
@@ -145,7 +145,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode, setGridSettingsDialogOpen, setGridSettings, showGrid]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode, setGridSettingsDialogOpen, setGridSettings, showGrid]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
@@ -185,68 +185,72 @@ export const Viewport: React.FC = () => {
       
       const activeSnaps: { x?: number, y?: number }[] = [];
       
-      initialPositions.forEach((pos, id) => {
-        if (activeLayout) {
-          let newX = pos.x + dx;
-          let newY = pos.y + dy;
-          
-          if (e.shiftKey) {
-            // Constrain to axis
-            if (Math.abs(dx) > Math.abs(dy)) newY = pos.y;
-            else newX = pos.x;
-          }
+      // Use the first selected instance as a reference for snapping to avoid clumping
+      const refId = Array.from(initialPositions.keys())[0];
+      const refPos = initialPositions.get(refId);
+      
+      if (activeLayout && refId && refPos) {
+        let targetX = refPos.x + dx;
+        let targetY = refPos.y + dy;
+        
+        if (e.shiftKey) {
+          if (Math.abs(dx) > Math.abs(dy)) targetY = refPos.y;
+          else targetX = refPos.x;
+        }
 
-          if (snapToGrid) {
-            newX = Math.round(newX / gridSizeW) * gridSizeW;
-            newY = Math.round(newY / gridSizeH) * gridSizeH;
-          }
+        if (snapToGrid) {
+          targetX = Math.round((targetX - gridOffsetX) / gridSizeW) * gridSizeW + gridOffsetX;
+          targetY = Math.round((targetY - gridOffsetY) / gridSizeH) * gridSizeH + gridOffsetY;
+        }
 
-          // Smart Guides (Object Snapping)
-          const snapThreshold = 10 / zoom;
-          const inst = activeLayout.instances.find(i => i.id === id);
-          if (inst) {
-            const others = [
-              ...activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id)),
-              // Also snap to Layout boundaries
-              { x: 0, y: 0, width: activeLayout.width, height: activeLayout.height, isLayout: true },
-              // Also snap to Viewport Window
-              { x: 0, y: 0, width: project.settings.viewportWidth, height: project.settings.viewportHeight, isViewport: true }
-            ];
+        // Smart Guides (Object Snapping) - only apply if not already snapped to grid or as refinement
+        const snapThreshold = 10 / zoom;
+        const refInst = activeLayout.instances.find(i => i.id === refId);
+        
+        if (refInst) {
+          const others = [
+            ...activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id)),
+            { x: 0, y: 0, width: activeLayout.width, height: activeLayout.height, isLayout: true },
+            { x: 0, y: 0, width: project.settings.viewportWidth, height: project.settings.viewportHeight, isViewport: true }
+          ];
 
-            others.forEach(other => {
-              // X snaps (Left, Center, Right)
-              const otherEdgesX = [other.x, other.x + other.width / 2, other.x + other.width];
-              const myEdgesX = [newX, newX + inst.width / 2, newX + inst.width];
-              
-              myEdgesX.forEach((myX, myIdx) => {
-                otherEdgesX.forEach((othX, othIdx) => {
-                  if (Math.abs(myX - othX) < snapThreshold) {
-                    const offset = othX - myX;
-                    newX += offset;
-                    activeSnaps.push({ x: othX });
-                  }
-                });
-              });
-
-              // Y snaps (Top, Center, Bottom)
-              const otherEdgesY = [other.y, other.y + other.height / 2, other.y + other.height];
-              const myEdgesY = [newY, newY + inst.height / 2, newY + inst.height];
-              
-              myEdgesY.forEach((myY, myIdx) => {
-                otherEdgesY.forEach((othY, othIdx) => {
-                  if (Math.abs(myY - othY) < snapThreshold) {
-                    const offset = othY - myY;
-                    newY += offset;
-                    activeSnaps.push({ y: othY });
-                  }
-                });
+          others.forEach(other => {
+            const otherEdgesX = [other.x, other.x + other.width / 2, other.x + other.width];
+            const myEdgesX = [targetX, targetX + refInst.width / 2, targetX + refInst.width];
+            
+            myEdgesX.forEach((myX) => {
+              otherEdgesX.forEach((othX) => {
+                if (Math.abs(myX - othX) < snapThreshold) {
+                  targetX += (othX - myX);
+                  activeSnaps.push({ x: othX });
+                }
               });
             });
-          }
 
-          updateInstanceSilently(activeLayout.id, id, { x: Math.round(newX), y: Math.round(newY) });
+            const otherEdgesY = [other.y, other.y + other.height / 2, other.y + other.height];
+            const myEdgesY = [targetY, targetY + refInst.height / 2, targetY + refInst.height];
+            
+            myEdgesY.forEach((myY) => {
+              otherEdgesY.forEach((othY) => {
+                if (Math.abs(myY - othY) < snapThreshold) {
+                  targetY += (othY - myY);
+                  activeSnaps.push({ y: othY });
+                }
+              });
+            });
+          });
         }
-      });
+
+        const snappedDeltaX = targetX - refPos.x;
+        const snappedDeltaY = targetY - refPos.y;
+
+        initialPositions.forEach((pos, id) => {
+          updateInstanceSilently(activeLayout.id, id, { 
+            x: Math.round(pos.x + snappedDeltaX), 
+            y: Math.round(pos.y + snappedDeltaY) 
+          });
+        });
+      }
       setSnapLines(activeSnaps);
     };
     const handleMouseUp = () => {
@@ -400,16 +404,19 @@ export const Viewport: React.FC = () => {
       }
 
       // Group Resizing
-      const dx = mouseX - stationaryPoint.x;
-      const dy = mouseY - stationaryPoint.y;
-      
-      let scaleX = 1;
-      let scaleY = 1;
+      let currentMouseX = mouseX;
+      let currentMouseY = mouseY;
 
-      if (handle.includes('r')) scaleX = dx / initialAABB.w;
-      if (handle.includes('l')) scaleX = -dx / initialAABB.w;
-      if (handle.includes('b')) scaleY = dy / initialAABB.h;
-      if (handle.includes('t')) scaleY = -dy / initialAABB.h;
+      if (snapToGrid) {
+        currentMouseX = Math.round((currentMouseX - gridOffsetX) / gridSizeW) * gridSizeW + gridOffsetX;
+        currentMouseY = Math.round((currentMouseY - gridOffsetY) / gridSizeH) * gridSizeH + gridOffsetY;
+      }
+
+      const dx = currentMouseX - stationaryPoint.x;
+      const dy = currentMouseY - stationaryPoint.y;
+      
+      let scaleX = Math.abs(dx / initialAABB.w);
+      let scaleY = Math.abs(dy / initialAABB.h);
 
       scaleX = Math.max(0.01, scaleX);
       scaleY = Math.max(0.01, scaleY);
@@ -420,6 +427,11 @@ export const Viewport: React.FC = () => {
         scaleY = uniformScale;
       }
 
+      const currentAABBW = initialAABB.w * scaleX;
+      const currentAABBH = initialAABB.h * scaleY;
+      const currentAABBX = handle.includes('l') ? stationaryPoint.x - currentAABBW : initialAABB.x;
+      const currentAABBY = handle.includes('t') ? stationaryPoint.y - currentAABBH : initialAABB.y;
+
       ids.forEach(id => {
         const init = initialInstances.get(id);
         if (!init) return;
@@ -429,28 +441,11 @@ export const Viewport: React.FC = () => {
         const offsetW = init.w / initialAABB.w;
         const offsetH = init.h / initialAABB.h;
 
-        const currentAABBW = initialAABB.w * scaleX;
-        const currentAABBH = initialAABB.h * scaleY;
-        const currentAABBX = handle.includes('l') ? stationaryPoint.x - currentAABBW : initialAABB.x;
-        const currentAABBY = handle.includes('t') ? stationaryPoint.y - currentAABBH : initialAABB.y;
-
-        let finalX = Math.round(currentAABBX + offsetX * currentAABBW);
-        let finalY = Math.round(currentAABBY + offsetY * currentAABBH);
-        let finalW = Math.round(offsetW * currentAABBW);
-        let finalH = Math.round(offsetH * currentAABBH);
-
-        if (snapToGrid) {
-          finalX = Math.round(finalX / gridSizeW) * gridSizeW;
-          finalY = Math.round(finalY / gridSizeH) * gridSizeH;
-          finalW = Math.round(finalW / gridSizeW) * gridSizeW;
-          finalH = Math.round(finalH / gridSizeH) * gridSizeH;
-        }
-
         updateInstanceSilently(activeLayout.id, id, {
-          x: finalX,
-          y: finalY,
-          width: Math.max(1, finalW),
-          height: Math.max(1, finalH)
+          x: Math.round(currentAABBX + offsetX * currentAABBW),
+          y: Math.round(currentAABBY + offsetY * currentAABBH),
+          width: Math.max(1, Math.round(offsetW * currentAABBW)),
+          height: Math.max(1, Math.round(offsetH * currentAABBH))
         });
       });
     };
@@ -789,14 +784,19 @@ export const Viewport: React.FC = () => {
             
             {showGrid && (
               <>
-                <pattern id="grid-dots" width={gridSizeW} height={gridSizeH} patternUnits="userSpaceOnUse">
-                   <circle cx={gridSizeW/2} cy={gridSizeH/2} r={0.6} fill="rgba(255,255,255,0.08)" />
+                <pattern id="grid-major" width={gridSizeW * 4} height={gridSizeH * 4} patternUnits="userSpaceOnUse" patternTransform={`translate(${gridOffsetX}, ${gridOffsetY})`}>
+                  {/* Minor lines */}
+                  <path 
+                    d={`M ${gridSizeW} 0 L ${gridSizeW} ${gridSizeH * 4} M ${gridSizeW * 2} 0 L ${gridSizeW * 2} ${gridSizeH * 4} M ${gridSizeW * 3} 0 L ${gridSizeW * 3} ${gridSizeH * 4} M 0 ${gridSizeH} L ${gridSizeW * 4} ${gridSizeH} M 0 ${gridSizeH * 2} L ${gridSizeW * 4} ${gridSizeH * 2} M 0 ${gridSizeH * 3} L ${gridSizeW * 4} ${gridSizeH * 3}`} 
+                    fill="none" stroke={gridColor} strokeWidth={0.5 / zoom} opacity={gridOpacity * 0.3} style={{ vectorEffect: 'non-scaling-stroke' }} 
+                  />
+                  {/* Major lines */}
+                  <path 
+                    d={`M ${gridSizeW * 4} 0 L 0 0 0 ${gridSizeH * 4}`} 
+                    fill="none" stroke={gridColor} strokeWidth={1 / zoom} opacity={gridOpacity * 0.8} style={{ vectorEffect: 'non-scaling-stroke' }} 
+                  />
                 </pattern>
-                <pattern id="grid-main" width={gridSizeW * 4} height={gridSizeH * 4} patternUnits="userSpaceOnUse">
-                  <rect width={gridSizeW * 4} height={gridSizeH * 4} fill="url(#grid-dots)" />
-                  <path d={`M ${gridSizeW * 4} 0 L 0 0 0 ${gridSizeH * 4}`} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
-                </pattern>
-                <rect x={-50000} y={-50000} width={100000} height={100000} fill="url(#grid-main)" pointerEvents="none" />
+                <rect x={-50000} y={-50000} width={100000} height={100000} fill="none" pointerEvents="none" />
               </>
             )}
           </defs>
@@ -805,6 +805,7 @@ export const Viewport: React.FC = () => {
             {/* Workspace Background (Infinite) */}
             <rect x={-20000} y={-20000} width={40000} height={40000} fill="#161617" />
             <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#workspace-dots)" />
+            {showGrid && <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#grid-major)" opacity={0.3} pointerEvents="none" />}
             
             {/* Layout Canvas with shadow/distinct border */}
             <rect 
@@ -816,7 +817,7 @@ export const Viewport: React.FC = () => {
             />
             
             {showGrid && (
-              <rect width={width} height={height} fill="url(#grid-main)" pointerEvents="none" />
+              <rect width={width} height={height} fill="url(#grid-major)" pointerEvents="none" />
             )}
 
             {/* Viewport Window Boundary (Project Settings) */}

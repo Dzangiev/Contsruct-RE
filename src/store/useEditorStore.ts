@@ -68,7 +68,7 @@ interface EditorStore {
   setPreviewMode: (previewMode: boolean) => void;
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
-  setGridSettings: (gridSizeW?: number, gridSizeH?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
+  setGridSettings: (gridSizeW?: number, gridSizeH?: number, snapToGrid?: boolean, showGrid?: boolean, gridOffsetX?: number, gridOffsetY?: number, gridColor?: string, gridOpacity?: number) => void;
   setGridSettingsDialogOpen: (isOpen: boolean) => void;
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
@@ -374,8 +374,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedLogicItems: (itemIds) => set((state) => ({
     editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
   })),
-  setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid) => {
-    set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid) }));
+  setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) => {
+    set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) }));
   },
   setGridSettingsDialogOpen: (isOpen) => set((state) => ({
     editorState: { ...state.editorState, gridSettingsDialogOpen: isOpen }

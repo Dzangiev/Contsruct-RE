@@ -932,8 +932,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 <mask id="layout-mask">
                   <rect width={layout?.width || 0} height={layout?.height || 0} fill="white" />
                 </mask>
-                <pattern id="runtime-grid" width={editorState.gridSizeW} height={editorState.gridSizeH} patternUnits="userSpaceOnUse">
-                  <path d={`M ${editorState.gridSizeW} 0 L 0 0 0 ${editorState.gridSizeH}`} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+                <pattern id="runtime-grid-major" width={editorState.gridSizeW * 4} height={editorState.gridSizeH * 4} patternUnits="userSpaceOnUse" patternTransform={`translate(${editorState.gridOffsetX}, ${editorState.gridOffsetY})`}>
+                  <path 
+                    d={`M ${editorState.gridSizeW} 0 L ${editorState.gridSizeW} ${editorState.gridSizeH * 4} M ${editorState.gridSizeW * 2} 0 L ${editorState.gridSizeW * 2} ${editorState.gridSizeH * 4} M ${editorState.gridSizeW * 3} 0 L ${editorState.gridSizeW * 3} ${editorState.gridSizeH * 4} M 0 ${editorState.gridSizeH} L ${editorState.gridSizeW * 4} ${editorState.gridSizeH} M 0 ${editorState.gridSizeH * 2} L ${editorState.gridSizeW * 4} ${editorState.gridSizeH * 2} M 0 ${editorState.gridSizeH * 3} L ${editorState.gridSizeW * 4} ${editorState.gridSizeH * 3}`} 
+                    fill="none" stroke={editorState.gridColor} strokeWidth="1" opacity={editorState.gridOpacity * 0.4}
+                  />
+                  <path 
+                    d={`M ${editorState.gridSizeW * 4} 0 L 0 0 0 ${editorState.gridSizeH * 4}`} 
+                    fill="none" stroke={editorState.gridColor} strokeWidth="1.5" opacity={editorState.gridOpacity}
+                  />
                 </pattern>
               </defs>
 
@@ -942,7 +949,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                   {layout && (
                     <g mask="url(#layout-mask)">
                       <rect width={layout.width} height={layout.height} fill="#1e1e1e" />
-                      {showGrid && <rect width={layout.width} height={layout.height} fill="url(#runtime-grid)" />}
+                      {showGrid && <rect width={layout.width} height={layout.height} fill="url(#runtime-grid-major)" />}
       
                     {layout.layers.map(layer => {
                       if (!layer.visible) return null;

@@ -26,6 +26,10 @@ export interface EditorState {
   // Grid settings
   gridSizeW: number;
   gridSizeH: number;
+  gridOffsetX: number;
+  gridOffsetY: number;
+  gridColor: string;
+  gridOpacity: number;
   snapToGrid: boolean;
   showGrid: boolean;
   showRulers: boolean;
@@ -58,6 +62,10 @@ export function createInitialEditorState(project: Project): EditorState {
     clipboard: null,
     gridSizeW: 32,
     gridSizeH: 32,
+    gridOffsetX: 0,
+    gridOffsetY: 0,
+    gridColor: '#ffffff',
+    gridOpacity: 0.1,
     snapToGrid: true,
     showGrid: true,
     showRulers: false,
@@ -190,12 +198,20 @@ export function setGridSettings(
   gridSizeW?: number, 
   gridSizeH?: number,
   snapToGrid?: boolean, 
-  showGrid?: boolean
+  showGrid?: boolean,
+  gridOffsetX?: number,
+  gridOffsetY?: number,
+  gridColor?: string,
+  gridOpacity?: number
 ): EditorState {
   return {
     ...state,
     gridSizeW: gridSizeW !== undefined ? gridSizeW : state.gridSizeW,
     gridSizeH: gridSizeH !== undefined ? gridSizeH : state.gridSizeH,
+    gridOffsetX: gridOffsetX !== undefined ? gridOffsetX : state.gridOffsetX,
+    gridOffsetY: gridOffsetY !== undefined ? gridOffsetY : state.gridOffsetY,
+    gridColor: gridColor !== undefined ? gridColor : state.gridColor,
+    gridOpacity: gridOpacity !== undefined ? gridOpacity : state.gridOpacity,
     snapToGrid: snapToGrid !== undefined ? snapToGrid : state.snapToGrid,
     showGrid: showGrid !== undefined ? showGrid : state.showGrid,
   };
