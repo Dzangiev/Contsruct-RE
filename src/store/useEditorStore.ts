@@ -68,7 +68,7 @@ interface EditorStore {
   setPreviewMode: (previewMode: boolean) => void;
   setSelectedEventBlocks: (blockIds: string[]) => void;
   setSelectedLogicItems: (itemIds: string[]) => void;
-  setGridSettings: (gridSize?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
+  setGridSettings: (gridSizeW?: number, gridSizeH?: number, snapToGrid?: boolean, showGrid?: boolean) => void;
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
   
@@ -373,9 +373,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedLogicItems: (itemIds) => set((state) => ({
     editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
   })),
-  setGridSettings: (gridSize, snapToGrid, showGrid) => set((state) => ({
-    editorState: editorUpdates.setGridSettings(state.editorState, gridSize, snapToGrid, showGrid)
-  })),
+  setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid) => {
+    set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid) }));
+  },
   setRulerSettings: (showRulers) => set((state) => ({
     editorState: editorUpdates.setRulerSettings(state.editorState, showRulers)
   })),

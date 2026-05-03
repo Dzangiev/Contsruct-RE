@@ -6,7 +6,7 @@ import {
   Droplet, FlipHorizontal, FlipVertical, RotateCw, 
   Crop, Crosshair, ZoomIn, ZoomOut, Eye, EyeOff, 
   Pentagon, MousePointer2, Move, Maximize2, Scissors, 
-  Copy, Clipboard, MousePointer
+  Copy, Clipboard, MousePointer, Sparkles, Maximize
 } from 'lucide-react';
 import { generateId } from '../../utils/id';
 
@@ -31,18 +31,38 @@ export const SpriteEditor: React.FC = () => {
   const [color, setColor] = React.useState('#ffffff');
   const [brushSize, setBrushSize] = React.useState(1);
   const [selectedPointId, setSelectedPointId] = React.useState<string | 'origin'>('origin');
-  const [zoom, setZoom] = React.useState(8); 
+  const [zoom, setZoom] = React.useState(1); // Default to 1, will auto-fit
   const [showOnionSkin, setShowOnionSkin] = React.useState(false);
   const [draggedPointIdx, setDraggedPointIdx] = React.useState<number | null>(null);
   const [mousePos, setMousePos] = React.useState<{ x: number, y: number } | null>(null);
   const [showResizeDialog, setShowResizeDialog] = React.useState(false);
   const [selection, setSelection] = React.useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
+  const [canvasSize, setCanvasSize] = React.useState({ w: 64, h: 64 });
 
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const canvasAreaRef = React.useRef<HTMLDivElement>(null);
   const onionRef = React.useRef<HTMLCanvasElement>(null);
   const selectedAnim = objectType.animations.find(a => a.id === selectedAnimId);
   const selectedFrame = selectedAnim?.frames.find(f => f.id === selectedFrameId);
   const prevFrame = selectedAnim && selectedFrame ? selectedAnim.frames[selectedAnim.frames.indexOf(selectedFrame) - 1] : null;
+
+  const autoFitZoom = React.useCallback(() => {
+    const area = canvasAreaRef.current;
+    if (!area) return;
+    const padding = 80;
+    const areaW = area.clientWidth - padding;
+    const areaH = area.clientHeight - padding;
+    const zoomW = areaW / canvasSize.w;
+    const zoomH = areaH / canvasSize.h;
+    const newZoom = Math.floor(Math.min(zoomW, zoomH, 100));
+    setZoom(Math.max(1, newZoom));
+  }, [canvasSize]);
+
+  // Initial auto-fit
+  React.useEffect(() => {
+    const timer = setTimeout(autoFitZoom, 50);
+    return () => clearTimeout(timer);
+  }, [autoFitZoom]);
 
   // Animation playback
   React.useEffect(() => {
@@ -66,6 +86,7 @@ export const SpriteEditor: React.FC = () => {
     if (selectedFrame.assetId) {
       const img = new Image();
       img.onload = () => {
+        setCanvasSize({ w: img.width, h: img.height });
         canvas.width = img.width; canvas.height = img.height;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -73,7 +94,9 @@ export const SpriteEditor: React.FC = () => {
       };
       img.src = selectedFrame.assetId;
     } else {
-      canvas.width = 64; canvas.height = 64; ctx.clearRect(0, 0, 64, 64);
+      setCanvasSize({ w: 64, h: 64 });
+      canvas.width = 64; canvas.height = 64;
+      ctx.clearRect(0, 0, 64, 64);
     }
   }, [selectedFrameId, selectedFrame?.assetId]);
 
@@ -81,7 +104,6 @@ export const SpriteEditor: React.FC = () => {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
-      
       const key = e.key.toLowerCase();
       if (key === 'b') setTool('brush');
       if (key === 'e') setTool('eraser');
@@ -89,22 +111,15 @@ export const SpriteEditor: React.FC = () => {
       if (key === 'g') { setTool('point'); setSelectedPointId('origin'); }
       if (key === 'c') setTool('collision');
       if (key === 's') setTool('select');
-      
       if (key === '[') setBrushSize(Math.max(1, brushSize - 1));
       if (key === ']') setBrushSize(Math.min(10, brushSize + 1));
-      
       if (key === 'delete' || key === 'backspace') {
         if (tool === 'select' && selection) {
-          const canvas = canvasRef.current;
-          const ctx = canvas?.getContext('2d');
+          const ctx = canvasRef.current?.getContext('2d');
           if (ctx) {
-            const x = Math.min(selection.x1, selection.x2);
-            const y = Math.min(selection.y1, selection.y2);
-            const w = Math.abs(selection.x1 - selection.x2) + 1;
-            const h = Math.abs(selection.y1 - selection.y2) + 1;
-            ctx.clearRect(x, y, w, h);
-            saveCanvas();
-            setSelection(null);
+            const x = Math.min(selection.x1, selection.x2), y = Math.min(selection.y1, selection.y2);
+            const w = Math.abs(selection.x1 - selection.x2) + 1, h = Math.abs(selection.y1 - selection.y2) + 1;
+            ctx.clearRect(x, y, w, h); saveCanvas(); setSelection(null);
           }
         }
       }
@@ -114,18 +129,14 @@ export const SpriteEditor: React.FC = () => {
   }, [brushSize, tool, selection]);
 
   const saveCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !selectedFrame) return;
-    const dataUrl = canvas.toDataURL();
-    onUpdateFrame(selectedFrame.id, { assetId: dataUrl });
+    const canvas = canvasRef.current; if (!canvas || !selectedFrame) return;
+    onUpdateFrame(selectedFrame.id, { assetId: canvas.toDataURL() });
   };
 
   const onUpdateFrame = (frameId: string, updates: any) => {
     if (!selectedAnim) return;
     const nextFrames = selectedAnim.frames.map(f => f.id === frameId ? { ...f, ...updates } : f);
-    const nextAnims = objectType.animations.map(a => 
-      a.id === selectedAnimId ? { ...a, frames: nextFrames } : a
-    );
+    const nextAnims = objectType.animations.map(a => a.id === selectedAnimId ? { ...a, frames: nextFrames } : a);
     updateObjectType(objectType.id, { animations: nextAnims });
   };
 
@@ -142,7 +153,6 @@ export const SpriteEditor: React.FC = () => {
     }
   };
 
-  // Transformations
   const transformImage = (action: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void) => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -169,7 +179,7 @@ export const SpriteEditor: React.FC = () => {
     let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0, hasPixels = false;
     for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) if (data[(y * canvas.width + x) * 4 + 3] > 0) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); hasPixels = true; }
     if (!hasPixels) return; const w = maxX - minX + 1, h = maxY - minY + 1;
-    const cut = ctx.getImageData(minX, minY, w, h); canvas.width = w; canvas.height = h; ctx.putImageData(cut, 0, 0);
+    const cut = ctx.getImageData(minX, minY, w, h); canvas.width = w; canvas.height = h; ctx.putImageData(cut, 0, 0); setCanvasSize({ w, h });
   });
 
   const [isDrawing, setIsDrawing] = React.useState(false);
@@ -188,67 +198,55 @@ export const SpriteEditor: React.FC = () => {
   const handleMouseDown = (e: React.MouseEvent) => {
     const pos = getCanvasCoords(e);
     if (!pos || !selectedFrame) return;
-
-    if (tool === 'select') {
-      setSelection({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y });
-      setIsDrawing(true);
-      return;
-    }
-
+    if (tool === 'select') { setSelection({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y }); setIsDrawing(true); return; }
     if (tool === 'collision') {
       const poly = selectedFrame.collisionPolygon || [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
-      const threshold = 15 / (zoom * (canvasRef.current?.width || 64) / 100);
-      const idx = poly.findIndex(p => Math.abs(p.x - pos.x / canvasRef.current!.width) < threshold && Math.abs(p.y - pos.y / canvasRef.current!.height) < threshold);
+      const threshold = 15 / (zoom * canvasSize.w);
+      const idx = poly.findIndex(p => Math.abs(p.x - pos.x / canvasSize.w) < threshold && Math.abs(p.y - pos.y / canvasSize.h) < threshold);
       if (idx !== -1) setDraggedPointIdx(idx);
       else onUpdateFrame(selectedFrame.id, { collisionPolygon: poly });
       return;
     }
-
     if (tool === 'point') {
-      if (selectedPointId === 'origin') onUpdateFrame(selectedFrame.id, { originX: pos.x / canvasRef.current!.width, originY: pos.y / canvasRef.current!.height });
-      else {
-        const nextPoints = selectedFrame.imagePoints.map(p => p.id === selectedPointId ? { ...p, x: pos.x / canvasRef.current!.width, y: pos.y / canvasRef.current!.height } : p);
-        onUpdateFrame(selectedFrame.id, { imagePoints: nextPoints });
-      }
+      if (selectedPointId === 'origin') onUpdateFrame(selectedFrame.id, { originX: pos.x / canvasSize.w, originY: pos.y / canvasSize.h });
+      else onUpdateFrame(selectedFrame.id, { imagePoints: selectedFrame.imagePoints.map(p => p.id === selectedPointId ? { ...p, x: pos.x / canvasSize.w, y: pos.y / canvasSize.h } : p) });
       return;
     }
-
     setIsDrawing(true); lastPos.current = pos; draw(pos.x, pos.y);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    const pos = getCanvasCoords(e);
-    if (!pos) { setMousePos(null); return; }
-    setMousePos(pos);
-
-    if (tool === 'select' && isDrawing) {
-      setSelection(s => s ? { ...s, x2: pos.x, y2: pos.y } : null);
-      return;
-    }
-
+    const pos = getCanvasCoords(e); if (!pos) { setMousePos(null); return; } setMousePos(pos);
+    if (tool === 'select' && isDrawing) { setSelection(s => s ? { ...s, x2: pos.x, y2: pos.y } : null); return; }
     if (draggedPointIdx !== null && selectedFrame) {
       const poly = [...(selectedFrame.collisionPolygon || [])];
-      poly[draggedPointIdx] = { x: pos.x / canvasRef.current!.width, y: pos.y / canvasRef.current!.height };
-      onUpdateFrame(selectedFrame.id, { collisionPolygon: poly });
-      return;
+      poly[draggedPointIdx] = { x: pos.x / canvasSize.w, y: pos.y / canvasSize.h };
+      onUpdateFrame(selectedFrame.id, { collisionPolygon: poly }); return;
     }
-
-    if (!isDrawing) return;
-    draw(pos.x, pos.y);
+    if (!isDrawing) return; draw(pos.x, pos.y);
   };
 
-  const handleMouseUp = () => {
-    if (isDrawing) { setIsDrawing(false); lastPos.current = null; saveCanvas(); }
-    setDraggedPointIdx(null);
+  const handleMouseUp = () => { if (isDrawing) { setIsDrawing(false); lastPos.current = null; saveCanvas(); } setDraggedPointIdx(null); };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      setZoom(Math.max(1, Math.min(100, zoom + delta)));
+    }
   };
 
   const draw = (x: number, y: number) => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
     if (tool === 'fill') { floodFill(ctx, x, y, color); setIsDrawing(false); saveCanvas(); return; }
-    ctx.fillStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : color; ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    if (lastPos.current) { ctx.beginPath(); ctx.moveTo(lastPos.current.x + 0.5, lastPos.current.y + 0.5); ctx.lineTo(x + 0.5, y + 0.5); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.stroke(); }
-    else { ctx.fillRect(x, y, brushSize, brushSize); }
+    ctx.fillStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : color;
+    ctx.strokeStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : color;
+    ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+    if (lastPos.current) {
+      ctx.beginPath(); ctx.moveTo(lastPos.current.x + 0.5, lastPos.current.y + 0.5); ctx.lineTo(x + 0.5, y + 0.5);
+      ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.stroke();
+    } else { ctx.fillRect(x, y, brushSize, brushSize); }
     lastPos.current = { x, y };
   };
 
@@ -274,37 +272,35 @@ export const SpriteEditor: React.FC = () => {
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
-        {/* Header */}
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ backgroundColor: '#ff4b2b', padding: '6px', borderRadius: '4px', boxShadow: '0 2px 8px rgba(255,75,43,0.3)' }}><ImageIcon size={20} color="#fff" /></div>
-            <span style={{ fontWeight: 800, fontSize: '16px', color: '#fff', letterSpacing: '0.5px' }}>Sprite Editor: {objectType.name}</span>
+            <div style={{ backgroundColor: '#ff4b2b', padding: '6px', borderRadius: '4px' }}><ImageIcon size={20} color="#fff" /></div>
+            <span style={{ fontWeight: 800, fontSize: '16px', color: '#fff' }}>Sprite Editor: {objectType.name}</span>
           </div>
           <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#111', padding: '4px 8px', borderRadius: '20px', border: '1px solid #333' }}>
+            <div style={zoomContainerStyle}>
               <button onClick={() => setZoom(Math.max(1, zoom - 1))} style={zoomButtonStyle}><ZoomOut size={14}/></button>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#007acc', width: '50px', textAlign: 'center' }}>{zoom * 100}%</div>
-              <button onClick={() => setZoom(Math.min(20, zoom + 1))} style={zoomButtonStyle}><ZoomIn size={14}/></button>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#007acc', width: '50px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</div>
+              <button onClick={() => setZoom(Math.min(100, zoom + 1))} style={zoomButtonStyle}><ZoomIn size={14}/></button>
+              <button onClick={autoFitZoom} style={{ ...zoomButtonStyle, borderLeft: '1px solid #222' }} title="Auto Fit Zoom"><Maximize size={14} /></button>
             </div>
             <button onClick={closeSpriteEditor} style={closeButtonStyle}><X size={24} /></button>
           </div>
         </div>
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-          {/* Left Panel */}
           <div style={sidePanelStyle}>
             <div style={sectionHeaderStyle}>Animations</div>
-            <div style={{ height: '160px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ height: '140px', overflowY: 'auto', padding: '8px' }}>
               {objectType.animations.map(anim => (
                 <div key={anim.id} onClick={() => { setSelectedAnimId(anim.id); setSelectedFrameId(anim.frames[0]?.id || ''); setPreviewFrameIdx(0); }}
-                  style={{ ...animItemStyle, backgroundColor: selectedAnimId === anim.id ? '#3e3e42' : 'transparent', borderColor: selectedAnimId === anim.id ? '#007acc' : 'transparent', color: selectedAnimId === anim.id ? '#fff' : '#888' }}>
-                  <span style={{ flex: 1, fontWeight: selectedAnimId === anim.id ? 700 : 400 }}>{anim.name}</span>
+                  style={{ ...animItemStyle, backgroundColor: selectedAnimId === anim.id ? '#3e3e42' : 'transparent', borderColor: selectedAnimId === anim.id ? '#007acc' : 'transparent' }}>
+                  <span style={{ flex: 1 }}>{anim.name}</span>
                 </div>
               ))}
             </div>
-            
             <div style={sectionHeaderStyle}>Tools & Points</div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
               <ToolItem active={tool === 'select'} onClick={() => setTool('select')} icon={<MousePointer size={14}/>} label="Selection" shortcut="S" />
               <ToolItem active={tool === 'brush'} onClick={() => setTool('brush')} icon={<Pencil size={14}/>} label="Brush" shortcut="B" />
               <ToolItem active={tool === 'eraser'} onClick={() => setTool('eraser')} icon={<Eraser size={14}/>} label="Eraser" shortcut="E" />
@@ -325,14 +321,13 @@ export const SpriteEditor: React.FC = () => {
             </div>
           </div>
 
-          {/* Main Area */}
           <div style={mainAreaStyle}>
             <div style={toolbarStyle}>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <ToolBtn onClick={mirrorH} icon={<FlipHorizontal size={16}/>} title="Mirror H" />
                 <ToolBtn onClick={flipV} icon={<FlipVertical size={16}/>} title="Flip V" />
                 <ToolBtn onClick={rotate90} icon={<RotateCw size={16}/>} title="Rotate 90" />
-                <ToolBtn onClick={crop} icon={<Crop size={16}/>} title="Crop to Content" />
+                <ToolBtn onClick={crop} icon={<Crop size={16}/>} title="Crop" />
                 <div style={dividerStyle} />
                 <ToolBtn active={showOnionSkin} onClick={() => setShowOnionSkin(!showOnionSkin)} icon={showOnionSkin ? <Eye size={16}/> : <EyeOff size={16}/>} title="Onion Skinning" />
                 <div style={dividerStyle} />
@@ -340,81 +335,74 @@ export const SpriteEditor: React.FC = () => {
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '11px', color: '#666', fontWeight: 800 }}>SIZE</label>
-                  <input type="number" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} style={{ ...propInputStyle, width: '40px' }} />
-                </div>
-                <input type="color" value={color} onChange={e => setColor(e.target.value)} style={colorInputStyle} />
+                <input type="color" value={color} onChange={e => setColor(e.target.value)} style={colorInputStyle} title="Select Color" />
                 <label style={uploadButtonStyle}><Upload size={14} /> IMPORT <input type="file" hidden onChange={handleFileUpload} accept="image/*" /></label>
               </div>
             </div>
 
-            <div style={canvasAreaStyle} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+            <div ref={canvasAreaRef} style={canvasAreaStyle} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onWheel={handleWheel}>
               {selectedFrame ? (
                 <div style={{ 
-                  position: 'relative', boxShadow: '0 0 100px rgba(0,0,0,0.9)', backgroundColor: '#000',
-                  transform: `scale(${zoom})`, transformOrigin: 'center', transition: 'transform 0.1s ease-out'
+                  position: 'relative', boxShadow: '0 0 100px rgba(0,0,0,0.5)', 
+                  width: `${canvasSize.w * zoom}px`,
+                  height: `${canvasSize.h * zoom}px`,
+                  transition: 'width 0.1s, height 0.1s'
                 }}>
+                   <div style={checkerboardStyle} />
                    {showOnionSkin && prevFrame && (
-                     <canvas ref={onionRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />
+                     <canvas ref={onionRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated', opacity: 0.3 }} />
                    )}
                    <canvas ref={canvasRef} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
-                    style={{ display: 'block', imageRendering: 'pixelated', cursor: tool === 'brush' ? 'crosshair' : tool === 'select' ? 'crosshair' : 'pointer' }} />
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', imageRendering: 'pixelated', cursor: tool === 'brush' ? 'crosshair' : tool === 'select' ? 'crosshair' : 'pointer' }} />
                    
                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
                       {selection && (
                         <div style={{
-                          position: 'absolute',
-                          left: Math.min(selection.x1, selection.x2),
-                          top: Math.min(selection.y1, selection.y2),
-                          width: Math.abs(selection.x1 - selection.x2) + 1,
-                          height: Math.abs(selection.y1 - selection.y2) + 1,
-                          border: `${1/zoom}px dashed #fff`,
-                          backgroundColor: 'rgba(255,255,255,0.1)',
-                          boxShadow: '0 0 0 10000px rgba(0,0,0,0.3)',
-                          vectorEffect: 'non-scaling-stroke'
+                          position: 'absolute', left: `${(Math.min(selection.x1, selection.x2) / canvasSize.w) * 100}%`, top: `${(Math.min(selection.y1, selection.y2) / canvasSize.h) * 100}%`,
+                          width: `${((Math.abs(selection.x1 - selection.x2) + 1) / canvasSize.w) * 100}%`, height: `${((Math.abs(selection.y1 - selection.y2) + 1) / canvasSize.h) * 100}%`,
+                          border: '1px dashed #fff', backgroundColor: 'rgba(255,255,255,0.1)'
                         }} />
                       )}
+                      
                       <Marker x={selectedFrame.originX} y={selectedFrame.originY} color="#3498db" active={selectedPointId === 'origin' && tool === 'point'} />
                       {selectedFrame.imagePoints.map(p => (
                         <Marker key={p.id} x={p.x} y={p.y} color="#e74c3c" active={selectedPointId === p.id && tool === 'point'} />
                       ))}
+
                       {selectedFrame.collisionPolygon && (
-                        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                        <svg viewBox="0 0 1 1" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                           <polygon 
-                            points={selectedFrame.collisionPolygon.map(p => `${p.x * 100},${p.y * 100}`).join(' ')} 
-                            fill="rgba(46, 204, 113, 0.2)" stroke="#2ecc71" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }}
+                            points={selectedFrame.collisionPolygon.map(p => `${p.x},${p.y}`).join(' ')} 
+                            fill="rgba(46, 204, 113, 0.2)" stroke="#2ecc71" strokeWidth={1 / (zoom * canvasSize.w)} style={{ vectorEffect: 'non-scaling-stroke' }}
                           />
                           {tool === 'collision' && selectedFrame.collisionPolygon.map((p, idx) => (
-                            <circle key={idx} cx={`${p.x * 100}%`} cy={`${p.y * 100}%`} r={4 / zoom} fill="#2ecc71" stroke="#fff" strokeWidth={1/zoom} pointerEvents="auto" />
+                            <circle key={idx} cx={p.x} cy={p.y} r={4 / (zoom * canvasSize.w)} fill="#2ecc71" stroke="#fff" strokeWidth={1 / (zoom * canvasSize.w)} pointerEvents="auto" />
                           ))}
                         </svg>
                       )}
                    </div>
                 </div>
-              ) : <div style={{ color: '#444', fontWeight: 800 }}>SELECT A FRAME TO START</div>}
+              ) : <div style={{ color: '#444' }}>SELECT A FRAME</div>}
             </div>
 
-            {/* Editor Status Bar */}
             <div style={editorStatusBarStyle}>
                <div style={{ display: 'flex', gap: '20px' }}>
-                 <StatusItem label="SIZE" value={canvasRef.current ? `${canvasRef.current.width} x ${canvasRef.current.height}` : '-'} />
+                 <StatusItem label="SIZE" value={`${canvasSize.w} x ${canvasSize.h}`} />
                  <StatusItem label="POS" value={mousePos ? `${mousePos.x}, ${mousePos.y}` : '-'} />
+                 <StatusItem label="ZOOM" value={`${Math.round(zoom * 100)}%`} />
                </div>
-               <div style={{ flex: 1 }} />
-               <div style={{ fontSize: '10px', color: '#555', fontWeight: 800 }}>PIXEL PERFECT ENGINE v1.0</div>
             </div>
 
             <div style={frameStripStyle}>
               <div style={playbackControlsStyle}>
                 <button onClick={() => setIsPlaying(!isPlaying)} style={{ ...playButtonStyle, backgroundColor: isPlaying ? '#ff4b2b' : '#007acc' }}>
-                  {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" />}
+                  {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" />}
                 </button>
               </div>
               <div style={stripContainerStyle}>
                 {selectedAnim?.frames.map((frame, idx) => (
                   <div key={frame.id} onClick={() => setSelectedFrameId(frame.id)}
-                    style={{ ...frameBoxStyle, borderColor: selectedFrameId === frame.id ? '#007acc' : '#222', backgroundColor: selectedFrameId === frame.id ? '#1a1a1a' : '#0a0a0a', transform: selectedFrameId === frame.id ? 'scale(1.05)' : 'scale(1)' }}>
+                    style={{ ...frameBoxStyle, borderColor: selectedFrameId === frame.id ? '#007acc' : '#222', backgroundColor: selectedFrameId === frame.id ? '#1a1a1a' : '#0a0a0a' }}>
                     <div style={frameNumberStyle}>{idx}</div>
                     {frame.assetId ? <img src={frame.assetId} style={{ width: '80%', height: '80%', objectFit: 'contain', imageRendering: 'pixelated' }} alt="F" /> : <ImageIcon size={20} color="#222" />}
                     <button onClick={(e) => { e.stopPropagation(); 
@@ -434,10 +422,9 @@ export const SpriteEditor: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Panel */}
           <div style={sidePanelStyle}>
             <div style={sectionHeaderStyle}>Properties</div>
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {selectedAnim && (
                 <>
                   <div><label style={labelStyle}>Animation Name</label>
@@ -446,33 +433,53 @@ export const SpriteEditor: React.FC = () => {
                   <div><label style={labelStyle}>Speed (FPS)</label>
                     <input type="number" value={selectedAnim.speed} onChange={e => onUpdateAnim({ speed: Number(e.target.value) })} style={propInputStyle} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '10px', backgroundColor: '#1a1a1a', borderRadius: '4px' }} onClick={() => onUpdateAnim({ loop: !selectedAnim.loop })}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => onUpdateAnim({ loop: !selectedAnim.loop })}>
                     <div style={{ ...checkboxStyle, backgroundColor: selectedAnim.loop ? '#007acc' : '#000' }}>{selectedAnim.loop && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}</div>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#aaa' }}>Loop Animation</span>
+                    <span style={{ fontSize: '12px', color: '#aaa' }}>Loop</span>
                   </div>
                 </>
               )}
+              {tool === 'collision' && (
+                <div style={propertyBlockStyle}>
+                  <div style={sectionHeaderStyle}>Collision Editor</div>
+                  <div style={infoTextStyle}>Drag the green dots to shape the hit mask.</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 10px' }}>
+                    <button onClick={() => {
+                      onUpdateFrame(selectedFrame!.id, { collisionPolygon: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] });
+                    }} style={secondaryButtonStyle}>Reset to Box</button>
+                    <button onClick={() => {
+                      const canvas = canvasRef.current; if (!canvas) return;
+                      const ctx = canvas.getContext('2d'); if (!ctx) return;
+                      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                      const data = imageData.data;
+                      let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0, hasPixels = false;
+                      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) if (data[(y * canvas.width + x) * 4 + 3] > 0) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); hasPixels = true; }
+                      if (hasPixels) {
+                        onUpdateFrame(selectedFrame!.id, { collisionPolygon: [{ x: minX/canvas.width, y: minY/canvas.height }, { x: (maxX+1)/canvas.width, y: minY/canvas.height }, { x: (maxX+1)/canvas.width, y: (maxY+1)/canvas.height }, { x: minX/canvas.width, y: (maxY+1)/canvas.height }] });
+                      }
+                    }} style={primaryButtonStyle}><Sparkles size={12}/> Guess Shape</button>
+                  </div>
+                </div>
+              )}
             </div>
-            
             <div style={miniPreviewStyle}>
-              <div style={sectionHeaderStyle}>Live Preview</div>
+              <div style={sectionHeaderStyle}>Preview</div>
               <div style={miniPreviewContentStyle}>
                 {selectedAnim && selectedAnim.frames[previewFrameIdx]?.assetId ? (
                   <img src={selectedAnim.frames[previewFrameIdx].assetId} style={{ maxWidth: '80%', maxHeight: '80%', objectFit: 'contain', imageRendering: 'pixelated' }} alt="P" />
-                ) : <span style={{ color: '#222', fontSize: '10px', fontWeight: 800 }}>IDLE</span>}
+                ) : <span style={{ color: '#222', fontSize: '10px' }}>IDLE</span>}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Resize Dialog */}
         {showResizeDialog && (
           <div style={dialogOverlayStyle}>
             <div style={dialogStyle}>
-              <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '20px', color: '#fff' }}>RESIZE CANVAS</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '20px' }}>RESIZE CANVAS</div>
               <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
-                <div style={{ flex: 1 }}><label style={labelStyle}>WIDTH</label><input id="resize-w" type="number" defaultValue={canvasRef.current?.width} style={propInputStyle} /></div>
-                <div style={{ flex: 1 }}><label style={labelStyle}>HEIGHT</label><input id="resize-h" type="number" defaultValue={canvasRef.current?.height} style={propInputStyle} /></div>
+                <div style={{ flex: 1 }}><label style={labelStyle}>WIDTH</label><input id="resize-w" type="number" defaultValue={canvasSize.w} style={propInputStyle} /></div>
+                <div style={{ flex: 1 }}><label style={labelStyle}>HEIGHT</label><input id="resize-h" type="number" defaultValue={canvasSize.h} style={propInputStyle} /></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button onClick={() => setShowResizeDialog(false)} style={secondaryButtonStyle}>CANCEL</button>
@@ -482,8 +489,8 @@ export const SpriteEditor: React.FC = () => {
                   transformImage((ctx, canvas) => {
                     const temp = document.createElement('canvas'); temp.width = canvas.width; temp.height = canvas.height;
                     temp.getContext('2d')?.drawImage(canvas, 0, 0);
-                    canvas.width = w; canvas.height = h;
-                    ctx.clearRect(0, 0, w, h); ctx.drawImage(temp, 0, 0);
+                    canvas.width = w; canvas.height = h; ctx.clearRect(0, 0, w, h); ctx.drawImage(temp, 0, 0);
+                    setCanvasSize({ w, h });
                   });
                   setShowResizeDialog(false);
                 }} style={primaryButtonStyle}>APPLY</button>
@@ -498,66 +505,70 @@ export const SpriteEditor: React.FC = () => {
 
 const StatusItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-    <span style={{ fontSize: '10px', color: '#555', fontWeight: 800 }}>{label}</span>
-    <span style={{ fontSize: '10px', color: '#aaa', fontWeight: 700, fontFamily: 'monospace' }}>{value}</span>
+    <span style={{ fontSize: '10px', color: '#444', fontWeight: 800 }}>{label}</span>
+    <span style={{ fontSize: '10px', color: '#888', fontWeight: 700, fontFamily: 'monospace' }}>{value}</span>
   </div>
 );
 
 const ToolItem: React.FC<{ active: boolean, onClick: () => void, icon: React.ReactNode, label: string, color?: string, shortcut?: string }> = ({ active, onClick, icon, label, color, shortcut }) => (
   <div onClick={onClick} style={{ ...animItemStyle, backgroundColor: active ? '#007acc22' : 'transparent', border: active ? '1px solid #007acc' : '1px solid transparent', color: active ? '#fff' : (color || '#888') }}>
     {icon} <span style={{ flex: 1 }}>{label}</span>
-    {shortcut && <span style={{ fontSize: '9px', opacity: 0.5, fontWeight: 800 }}>{shortcut}</span>}
+    {shortcut && <span style={{ fontSize: '9px', opacity: 0.5 }}>{shortcut}</span>}
   </div>
 );
 
 const ToolBtn: React.FC<{ active?: boolean, onClick: () => void, icon: React.ReactNode, title: string }> = ({ active, onClick, icon, title }) => (
-  <button onClick={onClick} title={title} style={{ padding: '8px', backgroundColor: active ? '#007acc' : '#111', border: '1px solid #222', borderRadius: '4px', color: active ? '#fff' : '#888', cursor: 'pointer', transition: 'all 0.1s' }}>{icon}</button>
+  <button onClick={onClick} title={title} style={{ padding: '8px', backgroundColor: active ? '#007acc' : '#1a1a1b', border: '1px solid #333', borderRadius: '4px', color: active ? '#fff' : '#666', cursor: 'pointer' }}>{icon}</button>
 );
 
 const Marker: React.FC<{ x: number, y: number, color: string, active: boolean }> = ({ x, y, color, active }) => (
   <div style={{
     position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`,
-    width: '14px', height: '14px', border: `2px solid ${color}`, borderRadius: '50%', transform: 'translate(-50%, -50%)',
-    boxShadow: active ? `0 0 15px ${color}` : 'none', zIndex: active ? 10 : 1, vectorEffect: 'non-scaling-stroke', backgroundColor: 'rgba(0,0,0,0.5)'
+    width: '6px', height: '6px', border: `1.5px solid ${color}`, borderRadius: '50%', transform: 'translate(-50%, -50%)',
+    boxShadow: active ? `0 0 10px ${color}` : 'none', zIndex: active ? 10 : 1, vectorEffect: 'non-scaling-stroke', backgroundColor: 'rgba(0,0,0,0.3)'
   }}>
     <div style={{ position: 'absolute', left: '50%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: color }} />
     <div style={{ position: 'absolute', top: '50%', left: '-4px', right: '-4px', height: '1px', backgroundColor: color }} />
   </div>
 );
 
+const checkerboardStyle: React.CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%)', backgroundSize: '10px 10px', backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px', backgroundColor: '#080808' };
+const zoomContainerStyle: React.CSSProperties = { display: 'flex', gap: '4px', backgroundColor: '#111', padding: '4px 8px', borderRadius: '20px', border: '1px solid #333' };
 const zoomButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '2px 8px' };
-const dividerStyle: React.CSSProperties = { width: '1px', height: '24px', backgroundColor: '#222', margin: '0 8px' };
+const dividerStyle: React.CSSProperties = { width: '1px', height: '20px', backgroundColor: '#333', margin: '0 8px' };
 const dividerHStyle: React.CSSProperties = { height: '1px', backgroundColor: '#1a1a1a', margin: '8px 4px' };
-const playbackControlsStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '10px', padding: '0 20px', borderRight: '1px solid #222', backgroundColor: '#121213' };
-const colorInputStyle: React.CSSProperties = { width: '32px', height: '32px', padding: '0', border: '2px solid #333', borderRadius: '4px', background: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' };
+const colorInputStyle: React.CSSProperties = { width: '28px', height: '28px', padding: '0', border: '2px solid #333', borderRadius: '4px', background: 'none', cursor: 'pointer' };
 
-const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
-const modalStyle: React.CSSProperties = { width: '99%', height: '99%', backgroundColor: '#0c0c0d', borderRadius: '4px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 100px rgba(0,0,0,1)', border: '1px solid #222', overflow: 'hidden', color: '#d4d4d4' };
+const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
+const modalStyle: React.CSSProperties = { width: '98%', height: '98%', backgroundColor: '#0c0c0d', borderRadius: '4px', display: 'flex', flexDirection: 'column', border: '1px solid #222', color: '#d4d4d4' };
 const headerStyle: React.CSSProperties = { padding: '8px 20px', backgroundColor: '#1a1a1b', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
 const closeButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#444', cursor: 'pointer' };
 const sidePanelStyle: React.CSSProperties = { width: '220px', backgroundColor: '#121213', borderRight: '1px solid #222', display: 'flex', flexDirection: 'column' };
-const mainAreaStyle: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000' };
-const sectionHeaderStyle: React.CSSProperties = { padding: '10px 15px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', color: '#444', backgroundColor: '#1a1a1b', letterSpacing: '1.5px' };
-const animItemStyle: React.CSSProperties = { padding: '10px 12px', borderRadius: '4px', marginBottom: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', border: '1px solid transparent', transition: 'all 0.15s' };
-const addPointBtnStyle: React.CSSProperties = { padding: '10px', backgroundColor: 'transparent', border: '1px dashed #333', margin: '8px', color: '#555', cursor: 'pointer', fontSize: '11px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
+const mainAreaStyle: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#252526' };
+const sectionHeaderStyle: React.CSSProperties = { padding: '10px 15px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', color: '#444', backgroundColor: '#1a1a1b' };
+const animItemStyle: React.CSSProperties = { padding: '8px 12px', borderRadius: '4px', marginBottom: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', border: '1px solid transparent' };
+const addPointBtnStyle: React.CSSProperties = { padding: '8px', backgroundColor: 'transparent', border: '1px dashed #333', margin: '8px', color: '#444', cursor: 'pointer', fontSize: '11px', borderRadius: '4px' };
 const toolbarStyle: React.CSSProperties = { padding: '8px 15px', backgroundColor: '#1a1a1b', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', gap: '12px' };
-const uploadButtonStyle: React.CSSProperties = { backgroundColor: '#007acc', color: '#fff', padding: '6px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '1px' };
-const canvasAreaStyle: React.CSSProperties = { flex: 1, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundImage: 'radial-gradient(circle, #1a1a1a 1.5px, transparent 0)', backgroundSize: '40px 40px', userSelect: 'none' };
-const editorStatusBarStyle: React.CSSProperties = { height: '24px', backgroundColor: '#1a1a1b', borderTop: '1px solid #222', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', padding: '0 15px' };
-const frameStripStyle: React.CSSProperties = { height: '110px', backgroundColor: '#121213', borderTop: '1px solid #222', display: 'flex', overflow: 'hidden' };
-const playButtonStyle: React.CSSProperties = { width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0,122,204,0.3)' };
-const stripContainerStyle: React.CSSProperties = { flex: 1, padding: '10px 20px', display: 'flex', gap: '12px', overflowX: 'auto', alignItems: 'center' };
-const frameBoxStyle: React.CSSProperties = { width: '70px', height: '70px', borderRadius: '6px', border: '2px solid #222', position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' };
-const frameNumberStyle: React.CSSProperties = { position: 'absolute', top: '2px', left: '4px', fontSize: '10px', color: '#444', fontWeight: 800 };
+const uploadButtonStyle: React.CSSProperties = { backgroundColor: '#333', color: '#eee', padding: '6px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 800, cursor: 'pointer' };
+const canvasAreaStyle: React.CSSProperties = { flex: 1, backgroundColor: '#252526', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', userSelect: 'none' };
+const editorStatusBarStyle: React.CSSProperties = { height: '24px', backgroundColor: '#1a1a1b', borderTop: '1px solid #222', display: 'flex', alignItems: 'center', padding: '0 15px' };
+const playbackControlsStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '10px', padding: '0 20px', borderRight: '1px solid #222', backgroundColor: '#121213' };
+const frameStripStyle: React.CSSProperties = { height: '100px', backgroundColor: '#121213', borderTop: '1px solid #222', display: 'flex', overflow: 'hidden' };
+const playButtonStyle: React.CSSProperties = { width: '44px', height: '44px', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const stripContainerStyle: React.CSSProperties = { flex: 1, padding: '10px', display: 'flex', gap: '10px', overflowX: 'auto' };
+const frameBoxStyle: React.CSSProperties = { width: '70px', height: '70px', borderRadius: '4px', border: '2px solid #222', position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+const frameNumberStyle: React.CSSProperties = { position: 'absolute', top: '2px', left: '4px', fontSize: '9px', color: '#444' };
 const deleteFrameButtonStyle: React.CSSProperties = { position: 'absolute', top: '2px', right: '2px', background: 'none', border: 'none', color: '#333', cursor: 'pointer' };
-const addFrameButtonStyle: React.CSSProperties = { width: '70px', height: '70px', border: '2px dashed #222', backgroundColor: 'transparent', color: '#222', cursor: 'pointer', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const propInputStyle: React.CSSProperties = { width: '100%', backgroundColor: '#000', border: '1px solid #333', borderRadius: '4px', padding: '8px 10px', color: '#fff', fontSize: '13px', outline: 'none' };
-const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#444', marginBottom: '6px', display: 'block', fontWeight: 900, letterSpacing: '1px' };
+const addFrameButtonStyle: React.CSSProperties = { width: '70px', height: '70px', border: '2px dashed #222', backgroundColor: 'transparent', color: '#222', cursor: 'pointer', borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const propInputStyle: React.CSSProperties = { width: '100%', backgroundColor: '#000', border: '1px solid #333', borderRadius: '4px', padding: '6px 8px', color: '#fff', fontSize: '12px' };
+const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#444', marginBottom: '6px', display: 'block', fontWeight: 900 };
 const checkboxStyle: React.CSSProperties = { width: '18px', height: '18px', border: '1px solid #333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const miniPreviewStyle: React.CSSProperties = { marginTop: 'auto', borderTop: '1px solid #222' };
-const miniPreviewContentStyle: React.CSSProperties = { height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', backgroundImage: 'radial-gradient(#111 1px, transparent 0)', backgroundSize: '10px 10px' };
+const miniPreviewContentStyle: React.CSSProperties = { height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' };
 
 const dialogOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000 };
-const dialogStyle: React.CSSProperties = { backgroundColor: '#1a1a1b', padding: '32px', borderRadius: '8px', border: '1px solid #333', width: '320px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)' };
-const primaryButtonStyle: React.CSSProperties = { backgroundColor: '#007acc', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer' };
+const dialogStyle: React.CSSProperties = { backgroundColor: '#1a1a1b', padding: '32px', borderRadius: '8px', border: '1px solid #333', width: '320px' };
+const primaryButtonStyle: React.CSSProperties = { backgroundColor: '#007acc', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
 const secondaryButtonStyle: React.CSSProperties = { backgroundColor: 'transparent', color: '#666', border: '1px solid #333', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer' };
+const infoTextStyle: React.CSSProperties = { fontSize: '11px', color: '#444', padding: '10px', fontStyle: 'italic' };
+const propertyBlockStyle: React.CSSProperties = { marginTop: '10px', borderTop: '1px solid #222', paddingTop: '10px' };

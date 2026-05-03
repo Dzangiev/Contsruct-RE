@@ -24,7 +24,8 @@ export interface EditorState {
   clipboard: ClipboardData | null;
   
   // Grid settings
-  gridSize: number;
+  gridSizeW: number;
+  gridSizeH: number;
   snapToGrid: boolean;
   showGrid: boolean;
   showRulers: boolean;
@@ -54,7 +55,8 @@ export function createInitialEditorState(project: Project): EditorState {
     selectedEventBlockIds: [],
     selectedLogicItemIds: [],
     clipboard: null,
-    gridSize: 32,
+    gridSizeW: 32,
+    gridSizeH: 32,
     snapToGrid: true,
     showGrid: true,
     showRulers: false,
@@ -183,13 +185,15 @@ export function setSelectedLogicItems(state: EditorState, itemIds: string[]): Ed
  */
 export function setGridSettings(
   state: EditorState, 
-  gridSize?: number, 
+  gridSizeW?: number, 
+  gridSizeH?: number,
   snapToGrid?: boolean, 
   showGrid?: boolean
 ): EditorState {
   return {
     ...state,
-    gridSize: gridSize !== undefined ? gridSize : state.gridSize,
+    gridSizeW: gridSizeW !== undefined ? gridSizeW : state.gridSizeW,
+    gridSizeH: gridSizeH !== undefined ? gridSizeH : state.gridSizeH,
     snapToGrid: snapToGrid !== undefined ? snapToGrid : state.snapToGrid,
     showGrid: showGrid !== undefined ? showGrid : state.showGrid,
   };

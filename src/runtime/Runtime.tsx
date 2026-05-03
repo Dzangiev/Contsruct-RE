@@ -30,7 +30,19 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
       const ivs: Record<string, any> = {};
       ot?.instanceVariables.forEach(v => { ivs[v.name] = v.initialValue; });
-      return { ...inst, properties: { ...ivs, ...inst.properties } };
+      
+      // Initialize Animation State
+      const defaultAnim = ot?.animations?.[0];
+      return { 
+        ...inst, 
+        properties: { 
+          ...ivs, 
+          ...inst.properties,
+          _animId: defaultAnim?.id || '',
+          _frameIdx: 0,
+          _animTimer: 0
+        } 
+      };
     });
     runtimeInstancesRef.current = initial;
     setRuntimeInstances(initial);
@@ -717,6 +729,30 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         return updatedInst;
       });
 
+      // 1.5 Process Sprite Animations
+      nextInstances = nextInstances.map(inst => {
+        const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+        if (!ot || ot.kind !== 'sprite' || !ot.animations) return inst;
+
+        const animId = inst.properties._animId;
+        const anim = ot.animations.find(a => a.id === animId) || ot.animations[0];
+        if (!anim || anim.frames.length <= 1 || anim.speed === 0) return inst;
+
+        let frameIdx = inst.properties._frameIdx ?? 0;
+        let timer = (inst.properties._animTimer ?? 0) + dt;
+        const frameDuration = 1 / anim.speed;
+
+        if (timer >= frameDuration) {
+          timer -= frameDuration;
+          frameIdx++;
+          if (frameIdx >= anim.frames.length) {
+            frameIdx = anim.loop ? 0 : anim.frames.length - 1;
+          }
+        }
+
+        return { ...inst, properties: { ...inst.properties, _frameIdx: frameIdx, _animTimer: timer } };
+      });
+
       // 2. Process Event Sheet
       let lastRes = true;
       eventSheet.events.forEach(block => {
@@ -896,8 +932,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 <mask id="layout-mask">
                   <rect width={layout?.width || 0} height={layout?.height || 0} fill="white" />
                 </mask>
-                <pattern id="runtime-grid" width={editorState.gridSize} height={editorState.gridSize} patternUnits="userSpaceOnUse">
-                  <path d={`M ${editorState.gridSize} 0 L 0 0 0 ${editorState.gridSize}`} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
+                <pattern id="runtime-grid" width={editorState.gridSizeW} height={editorState.gridSizeH} patternUnits="userSpaceOnUse">
+                  <path d={`M ${editorState.gridSizeW} 0 L 0 0 0 ${editorState.gridSizeH}`} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1"/>
                 </pattern>
               </defs>
 
@@ -956,6 +992,23 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                                 }
                                 case 'sprite':
                                 default: {
+                                  const animId = inst.properties._animId;
+                                  const frameIdx = inst.properties._frameIdx || 0;
+                                  const anim = ot?.animations?.find(a => a.id === animId) || ot?.animations?.[0];
+                                  const currentFrame = anim?.frames[frameIdx] || anim?.frames[0];
+                                  const assetId = currentFrame?.assetId;
+
+                                  if (assetId) {
+                                    return (
+                                      <image 
+                                        width={inst.width} height={inst.height} 
+                                        href={assetId} 
+                                        preserveAspectRatio="none"
+                                        style={{ imageRendering: 'pixelated', opacity: inst.opacity ?? 1 }}
+                                      />
+                                    );
+                                  }
+
                                   const spriteColor = inst.properties.color || '#5c5c5c';
                                   return (
                                     <rect 

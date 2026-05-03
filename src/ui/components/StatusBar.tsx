@@ -56,7 +56,7 @@ export const StatusBar: React.FC = () => {
 
           <div style={sectionStyle}>
             <List size={14} style={{ opacity: 0.7 }} />
-            <span>Grid: {editorState.gridSize}px</span>
+            <span>Grid: {editorState.gridSizeW}x{editorState.gridSizeH}</span>
           </div>
         </>
       ) : (

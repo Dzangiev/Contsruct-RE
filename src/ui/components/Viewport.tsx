@@ -42,7 +42,7 @@ export const Viewport: React.FC = () => {
   const [insertDialogPos, setInsertDialogPos] = React.useState<{ x: number, y: number } | null>(null);
   const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
-  const { zoom, panX, panY, selectedInstanceIds, tool, gridSize, snapToGrid, showGrid, showRulers } = editorState;
+  const { zoom, panX, panY, selectedInstanceIds, tool, gridSizeW, gridSizeH, snapToGrid, showGrid, showRulers } = editorState;
 
   // Global key handlers
   React.useEffect(() => {
@@ -64,9 +64,10 @@ export const Viewport: React.FC = () => {
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
         if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
           e.preventDefault();
-          const amount = e.shiftKey ? gridSize : 1;
-          const dx = e.key === 'ArrowLeft' ? -amount : e.key === 'ArrowRight' ? amount : 0;
-          const dy = e.key === 'ArrowUp' ? -amount : e.key === 'ArrowDown' ? amount : 0;
+          const amountX = e.shiftKey ? gridSizeW : 1;
+          const amountY = e.shiftKey ? gridSizeH : 1;
+          const dx = e.key === 'ArrowLeft' ? -amountX : e.key === 'ArrowRight' ? amountX : 0;
+          const dy = e.key === 'ArrowUp' ? -amountY : e.key === 'ArrowDown' ? amountY : 0;
           
           if (activeLayout) {
             selectedInstanceIds.forEach(id => {
@@ -133,7 +134,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSize, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
@@ -185,8 +186,8 @@ export const Viewport: React.FC = () => {
           }
 
           if (snapToGrid) {
-            newX = Math.round(newX / gridSize) * gridSize;
-            newY = Math.round(newY / gridSize) * gridSize;
+            newX = Math.round(newX / gridSizeW) * gridSizeW;
+            newY = Math.round(newY / gridSizeH) * gridSizeH;
           }
 
           // Smart Guides (Object Snapping)
@@ -249,7 +250,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSize, snapToGrid, selectedInstanceIds, project.settings.viewportWidth, project.settings.viewportHeight]);
+  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSizeW, gridSizeH, snapToGrid, selectedInstanceIds, project.settings.viewportWidth, project.settings.viewportHeight]);
 
   // Panning
   React.useEffect(() => {
@@ -422,11 +423,23 @@ export const Viewport: React.FC = () => {
         const currentAABBX = handle.includes('l') ? stationaryPoint.x - currentAABBW : initialAABB.x;
         const currentAABBY = handle.includes('t') ? stationaryPoint.y - currentAABBH : initialAABB.y;
 
+        let finalX = Math.round(currentAABBX + offsetX * currentAABBW);
+        let finalY = Math.round(currentAABBY + offsetY * currentAABBH);
+        let finalW = Math.round(offsetW * currentAABBW);
+        let finalH = Math.round(offsetH * currentAABBH);
+
+        if (snapToGrid) {
+          finalX = Math.round(finalX / gridSizeW) * gridSizeW;
+          finalY = Math.round(finalY / gridSizeH) * gridSizeH;
+          finalW = Math.round(finalW / gridSizeW) * gridSizeW;
+          finalH = Math.round(finalH / gridSizeH) * gridSizeH;
+        }
+
         updateInstanceSilently(activeLayout.id, id, {
-          x: Math.round(currentAABBX + offsetX * currentAABBW),
-          y: Math.round(currentAABBY + offsetY * currentAABBH),
-          width: Math.round(offsetW * currentAABBW),
-          height: Math.round(offsetH * currentAABBH)
+          x: finalX,
+          y: finalY,
+          width: Math.max(1, finalW),
+          height: Math.max(1, finalH)
         });
       });
     };
@@ -591,7 +604,7 @@ export const Viewport: React.FC = () => {
     const my = e.clientY - rect.top - (showRulers ? 22 : 0);
     let x = (mx - panX) / zoom;
     let y = (my - panY) / zoom;
-    if (snapToGrid) { x = Math.round(x / gridSize) * gridSize; y = Math.round(y / gridSize) * gridSize; }
+    if (snapToGrid) { x = Math.round(x / gridSizeW) * gridSizeW; y = Math.round(y / gridSizeH) * gridSizeH; }
     const newId = generateId();
     addInstance(activeLayout.id, editorState.placementObjectTypeId, activeLayer.id, Math.round(x), Math.round(y), newId);
     setSelectedInstances([newId]);
@@ -613,8 +626,8 @@ export const Viewport: React.FC = () => {
     let y = (my - panY) / zoom;
     
     if (snapToGrid) {
-      x = Math.round(x / gridSize) * gridSize;
-      y = Math.round(y / gridSize) * gridSize;
+      x = Math.round(x / gridSizeW) * gridSizeW;
+      y = Math.round(y / gridSizeH) * gridSizeH;
     }
 
     const newId = generateId();
@@ -765,12 +778,12 @@ export const Viewport: React.FC = () => {
             
             {showGrid && (
               <>
-                <pattern id="grid-dots" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+                <pattern id="grid-dots" width={gridSizeW} height={gridSizeH} patternUnits="userSpaceOnUse">
                   <circle cx={1} cy={1} r={0.5} fill="rgba(255,255,255,0.15)" />
                 </pattern>
-                <pattern id="grid-main" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse">
-                  <rect width={gridSize * 4} height={gridSize * 4} fill="url(#grid-dots)" />
-                  <path d={`M ${gridSize * 4} 0 L 0 0 0 ${gridSize * 4}`} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                <pattern id="grid-main" width={gridSizeW * 4} height={gridSizeH * 4} patternUnits="userSpaceOnUse">
+                  <rect width={gridSizeW * 4} height={gridSizeH * 4} fill="url(#grid-dots)" />
+                  <path d={`M ${gridSizeW * 4} 0 L 0 0 0 ${gridSizeH * 4}`} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
                 </pattern>
               </>
             )}
@@ -854,6 +867,20 @@ export const Viewport: React.FC = () => {
                         }
                         case ObjectTypeKind.Sprite:
                         default: {
+                          const defaultFrame = objectType?.animations?.[0]?.frames?.[0];
+                          const assetId = defaultFrame?.assetId;
+                          
+                          if (assetId) {
+                            return (
+                              <image 
+                                width={inst.width} height={inst.height} 
+                                href={assetId} 
+                                preserveAspectRatio="none"
+                                style={{ imageRendering: 'pixelated', opacity: inst.visible ? 1 : 0.3 }}
+                              />
+                            );
+                          }
+
                           const spriteColor = inst.properties.color || '#4a4a4a';
                           return (
                             <g>
@@ -1025,8 +1052,8 @@ export const Viewport: React.FC = () => {
                    selectedInstanceIds.forEach(id => {
                      const inst = activeLayout.instances.find(i => i.id === id);
                      if (inst) updateInstanceSilently(activeLayout.id, id, { 
-                       x: Math.round(inst.x / gridSize) * gridSize, 
-                       y: Math.round(inst.y / gridSize) * gridSize 
+                       x: Math.round(inst.x / gridSizeW) * gridSizeW, 
+                       y: Math.round(inst.y / gridSizeH) * gridSizeH 
                      });
                    });
                    commitProject();
@@ -1048,18 +1075,29 @@ export const Viewport: React.FC = () => {
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances(activeLayout.instances.map(i => i.id)); setContextMenu(null); }}>Select All</div>
                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>GRID</div>
-                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, !showGrid); setContextMenu(null); }}>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, undefined, !showGrid); setContextMenu(null); }}>
                    <span style={{ flex: 1 }}>Show Grid</span> <span style={{ color: showGrid ? '#4caf50' : '#666' }}>{showGrid ? 'ON' : 'OFF'}</span>
                  </div>
-                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, !snapToGrid, undefined); setContextMenu(null); }}>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, !snapToGrid, undefined); setContextMenu(null); }}>
                    <span style={{ flex: 1 }}>Snap to Grid</span> <span style={{ color: snapToGrid ? '#4caf50' : '#666' }}>{snapToGrid ? 'ON' : 'OFF'}</span>
                  </div>
                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setRulerSettings(!showRulers); setContextMenu(null); }}>
                     <span style={{ flex: 1 }}>Show Rulers</span> <span style={{ color: showRulers ? '#4caf50' : '#666' }}>{showRulers ? 'ON' : 'OFF'}</span>
                  </div>
                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(16); setContextMenu(null); }}>Grid Size: 16</div>
-                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(32); setContextMenu(null); }}>Grid Size: 32</div>
+                 <div className="context-menu-item" style={contextMenuItemStyle} onClick={async () => {
+                   const res = await useEditorStore.getState().showDialog({
+                     title: 'Grid Settings',
+                     type: 'prompt',
+                     defaultValue: `${gridSizeW},${gridSizeH}`,
+                     message: 'Enter grid width and height (e.g. 32,32):'
+                   });
+                   if (res && typeof res === 'string') {
+                     const [w, h] = res.split(',').map(Number);
+                     if (!isNaN(w) && !isNaN(h)) setGridSettings(w, h);
+                   }
+                   setContextMenu(null);
+                 }}>Edit Grid...</div>
                </>
              )}
           </div>
