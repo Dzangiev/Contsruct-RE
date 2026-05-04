@@ -4,6 +4,7 @@ import { Project, EventBlock } from '../../../model/project';
 import { LogicDefinition } from '../../../model/definitions';
 
 import { ExpressionParser } from '../../../model/expressionParser';
+import { ExpressionBuilder } from './ExpressionBuilder';
 
 interface ParamEditorProps {
   project: Project;
@@ -421,26 +422,12 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
           </div>
         </div>
         <div style={{ width: '320px', display: 'flex', flexDirection: 'column', backgroundColor: '#252526' }}>
-          <div style={{ padding: '16px', borderBottom: '1px solid #333' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-              <input placeholder="EXPRESSION ASSISTANT" value={filter} onChange={e => setFilter(e.target.value)} style={{ width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '11px', padding: '8px 12px 8px 32px', borderRadius: '4px', outline: 'none' }} />
-            </div>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-            {categories.map(cat => (
-              <div key={cat} style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '10px', color: '#555', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px', paddingLeft: '8px' }}>{cat}</div>
-                {assistantItems.filter(i => i.category === cat).map((item, idx) => (
-                  <div key={idx} onClick={() => insertAtCaret(item.name)} onDoubleClick={() => { insertAtCaret(item.name); onSave(params); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '4px', cursor: 'pointer', transition: 'background 0.2s', fontSize: '12px' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d2d')} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                    <div style={{ opacity: 0.6 }}>{item.icon}</div>
-                    <span style={{ color: '#ccc' }}>{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div style={{ padding: '12px', fontSize: '11px', color: '#666', borderTop: '1px solid #444', fontStyle: 'italic' }}>Double-click or click items to add them to the current parameter.</div>
+          <ExpressionBuilder 
+            project={project}
+            eventSheetId={eventSheetId}
+            blockId={blockId}
+            onInsert={(text) => insertAtCaret(text)}
+          />
         </div>
       </div>
     </div>
