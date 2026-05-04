@@ -571,6 +571,13 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               default: return false;
             }
           }
+          case 'isTweenPlaying': {
+            const tag = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], pickedSets, i)) ?? "");
+            const objTweens = tweensRef.current.get(i.id);
+            if (!objTweens || objTweens.length === 0) return false;
+            if (tag === "" || tag === '""') return true;
+            return objTweens.some(t => t.tag === tag);
+          }
           case 'onAnimFinished': {
             // Triggers are handled in the tick loop via emitTriggerRef
             return true; 
@@ -1510,6 +1517,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           }
 
           if (progress < 1) stillActive.push(t);
+          else emitTriggerRef.current('onTweenFinished', { inst: updatedInst, tag: t.tag }, nextInstances);
         });
 
         tweensRef.current.set(inst.id, stillActive);

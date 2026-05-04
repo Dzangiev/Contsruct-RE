@@ -544,6 +544,30 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'Physics',
     target: 'object',
     behaviorType: 'physics'
+  },
+  // Tween Conditions
+  {
+    type: 'onTweenFinished',
+    name: 'On any tween finished',
+    description: 'Triggered when any tween on this object completes.',
+    params: [
+      { name: 'Tag', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Tween',
+    target: 'object',
+    behaviorType: 'tween',
+    isTrigger: true
+  },
+  {
+    type: 'isTweenPlaying',
+    name: 'Is any tween playing',
+    description: 'True if there is at least one active tween on this object.',
+    params: [
+      { name: 'Tag', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Tween',
+    target: 'object',
+    behaviorType: 'tween'
   }
 ];
 
