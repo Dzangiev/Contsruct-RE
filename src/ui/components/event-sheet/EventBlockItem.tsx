@@ -206,7 +206,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
 
         <div style={{ display: 'grid', gridTemplateColumns: `${gutterWidth}px calc(50% - ${gutterWidth}px) 50%` }}>
           <div />
-          <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderTop: 'none', borderRight: '1px solid #333', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
+          <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', backgroundColor: '#2d2d2d', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderTop: 'none', borderRight: '1px solid #333', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
             {block.conditions.map((c, i) => (
               <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
             ))}
@@ -329,7 +329,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
             </span>
           )}
         </div>
-        <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRight: '1px solid #333', borderRadius: '3px 0 0 3px', minWidth: '300px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', backgroundColor: '#2d2d2d', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRight: '1px solid #333', borderRadius: '3px 0 0 3px', minWidth: '300px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
           {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}
           {block.conditions.map((c, i) => (

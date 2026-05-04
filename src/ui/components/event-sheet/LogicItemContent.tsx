@@ -106,7 +106,7 @@ export const LogicItemContent: React.FC<{
   };
 
   return (
-    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', borderBottom: '1px solid #111', opacity: item.disabled ? 0.35 : 1 }}>
+    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', backgroundColor: type === 'condition' ? '#353535' : 'transparent', borderBottom: 'none', opacity: item.disabled ? 0.35 : 1 }}>
       <div style={{ 
         width: '120px', 
         display: 'flex', 
@@ -114,7 +114,7 @@ export const LogicItemContent: React.FC<{
         gap: '6px', 
         padding: '4px 8px',
         borderRight: '1px solid #1a1a1a',
-        backgroundColor: '#2d2d2d',
+        backgroundColor: 'transparent',
         flexShrink: 0
       }}>
         {ot ? (
