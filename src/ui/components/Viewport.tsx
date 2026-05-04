@@ -45,7 +45,7 @@ export const Viewport: React.FC = () => {
   const [insertDialogPos, setInsertDialogPos] = React.useState<{ x: number, y: number } | null>(null);
   const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
-  const { zoom, panX, panY, selectedInstanceIds, tool, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, snapToGrid, showGrid, showRulers } = editorState;
+  const { zoom, panX, panY, selectedInstanceIds, highlightedInstanceIds, tool, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, snapToGrid, showGrid, showRulers } = editorState;
   
   
 
@@ -758,6 +758,7 @@ export const Viewport: React.FC = () => {
       
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
         .context-menu-item:hover { background-color: rgba(255,255,255,0.05); color: #fff !important; }
       `}</style>
       
@@ -942,6 +943,16 @@ export const Viewport: React.FC = () => {
                         style={{ filter: getEffectsFilter([...(objectType?.effects || []), ...(inst.effects || [])]) }}
                       >
                         {renderContent()}
+                        {highlightedInstanceIds.includes(inst.id) && !isSelected && (
+                          <rect 
+                            width={inst.width} height={inst.height} 
+                            fill="none" 
+                            stroke="#f1c40f" 
+                            strokeWidth={2 / zoom} 
+                            strokeDasharray={`${6/zoom} ${4/zoom}`}
+                            style={{ vectorEffect: 'non-scaling-stroke', animation: 'pulse 1s infinite' }}
+                          />
+                        )}
                         {isSelected && (
                           <g>
                             <rect width={inst.width} height={inst.height} fill="rgba(0, 153, 255, 0.1)" pointerEvents="none" />

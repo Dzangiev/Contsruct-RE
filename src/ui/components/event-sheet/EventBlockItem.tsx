@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Variable as VariableIcon, 
-  Zap, 
-  Bookmark, 
-  FilePlus, 
-  Ghost, 
+import {
+  Variable as VariableIcon,
+  Zap,
+  Bookmark,
+  FilePlus,
+  Ghost,
   Edit2,
   Box
 } from 'lucide-react';
@@ -16,8 +16,8 @@ import { EventBlockItemProps } from './types';
 const BASE_GUTTER_WIDTH = 50;
 const INDENT_STEP = 24;
 
-export const EventBlockItem: React.FC<EventBlockItemProps> = ({ 
-  eventSheetId, block, onOpenBrowser, onOpenParamEditor, onOpenVariableEditor, onOpenFunctionEditor, onOpenGroupDialog, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices 
+export const EventBlockItem: React.FC<EventBlockItemProps> = ({
+  eventSheetId, block, onOpenBrowser, onOpenParamEditor, onOpenVariableEditor, onOpenFunctionEditor, onOpenGroupDialog, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices
 }) => {
   const gutterWidth = BASE_GUTTER_WIDTH + (depth * INDENT_STEP);
 
@@ -31,11 +31,11 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
   const [dragIndicator, setDragIndicator] = React.useState<'before' | 'inside' | 'after' | null>(null);
 
   const handleDragStart = (e: React.DragEvent) => { e.stopPropagation(); setDraggedBlockId(block.id); e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; };
-  
+
   const handleDragOver = (e: React.DragEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    
+
     // If hovering in the gutter area, bubble to parent for hierarchical D&D
     if (x < gutterWidth) {
       if (dragIndicator) setDragIndicator(null);
@@ -44,12 +44,12 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
 
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!draggedBlockId || draggedBlockId === block.id) return;
-    
+
     const y = e.clientY - rect.top;
     const canHaveChildren = block.type === 'event' || block.type === 'group' || block.type === 'function';
-    
+
     if (y < rect.height * 0.3) {
       setDragIndicator('before');
     } else if (canHaveChildren && x > gutterWidth + 20) {
@@ -63,41 +63,41 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
     setDragIndicator(null);
   };
 
-  const handleDrop = (e: React.DragEvent) => { 
+  const handleDrop = (e: React.DragEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
 
     // Bubble to parent if dropping in the gutter
     if (x < gutterWidth) return;
 
-    e.preventDefault(); 
-    e.stopPropagation(); 
+    e.preventDefault();
+    e.stopPropagation();
     const indicator = dragIndicator;
     setDragIndicator(null);
 
-    if (draggedLogicItem) { 
-      if (draggedLogicItem.type === 'condition') moveCondition(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.conditions.length); 
-      else moveAction(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.actions.length); 
-      return setDraggedLogicItem(null); 
-    } 
-    
-    if (!draggedBlockId || draggedBlockId === block.id) return; 
+    if (draggedLogicItem) {
+      if (draggedLogicItem.type === 'condition') moveCondition(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.conditions.length);
+      else moveAction(eventSheetId, draggedLogicItem.blockId, draggedLogicItem.itemId, block.id, block.actions.length);
+      return setDraggedLogicItem(null);
+    }
+
+    if (!draggedBlockId || draggedBlockId === block.id) return;
 
     if (indicator === 'inside') {
       moveEventBlock(eventSheetId, draggedBlockId, block.id, 0);
     } else if (indicator === 'before') {
       moveEventBlock(eventSheetId, draggedBlockId, null, 0, undefined, block.id);
     } else {
-      moveEventBlock(eventSheetId, draggedBlockId, null, -1, block.id); 
+      moveEventBlock(eventSheetId, draggedBlockId, null, -1, block.id);
     }
-    setDraggedBlockId(null); 
+    setDraggedBlockId(null);
   };
 
-  const itemStyleWrapper: React.CSSProperties = { 
-    position: 'relative', 
-    marginLeft: '0', 
-    opacity: isDragged ? 0.4 : 1, 
-    transition: 'opacity 0.2s', 
+  const itemStyleWrapper: React.CSSProperties = {
+    position: 'relative',
+    marginLeft: '0',
+    opacity: isDragged ? 0.4 : 1,
+    transition: 'opacity 0.2s',
     marginBottom: '0px',
     width: '100%',
     paddingTop: '2px'
@@ -110,7 +110,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
     if (!dragIndicator) return null;
     const isInside = dragIndicator === 'inside';
     const isBefore = dragIndicator === 'before';
-    
+
     return (
       <div style={{
         position: 'absolute',
@@ -129,14 +129,14 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
   if (block.type === 'variable' && block.variable) {
     const isLocal = depth > 0;
     return (
-      <div 
-        className="event-block-item-container" 
-        data-block-id={block.id} 
-        draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} 
+      <div
+        className="event-block-item-container"
+        data-block-id={block.id}
+        draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)}
         onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-        onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} 
+        onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }}
         onDoubleClick={(e) => { e.stopPropagation(); onOpenVariableEditor(eventSheetId, block.id, block.variable); }}
-        onContextMenu={(e) => onContextMenu(e, block.id)} 
+        onContextMenu={(e) => onContextMenu(e, block.id)}
         style={{ ...itemStyleWrapper, display: 'grid', gridTemplateColumns: `${gutterWidth}px 1fr`, opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), cursor: 'pointer', marginBottom: depth > 0 ? '0px' : '2px' }}
       >
         <DragIndicatorLine />
@@ -146,7 +146,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
           <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? 'Local' : 'Global'}</div>
           <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '12px' }}>
-            <VariableIcon size={14} color={isLocal ? '#e67e22' : '#3498db'} /> 
+            <VariableIcon size={14} color={isLocal ? '#e67e22' : '#3498db'} />
             <span>{block.variable.name}</span>
             <span style={{ color: '#888' }}>=</span>
             <span style={{ color: block.variable.type === 'string' ? '#e67e22' : '#2ecc71' }}>{block.variable.type === 'string' ? `"${block.variable.initialValue}"` : String(block.variable.initialValue)}</span>
@@ -161,18 +161,18 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
   if (block.type === 'function') {
     const paramsSummary = (block.functionParams || []).map((p: any) => p.name).join(', ');
     return (
-      <div 
-        className="event-block-item-container" 
-        data-block-id={block.id} 
-        draggable 
-        onDragStart={handleDragStart} 
-        onDragEnd={() => setDraggedBlockId(null)} 
-        onDrop={handleDrop} 
-        onDragOver={handleDragOver} 
-        onDragLeave={handleDragLeave} 
-        onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} 
+      <div
+        className="event-block-item-container"
+        data-block-id={block.id}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={() => setDraggedBlockId(null)}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }}
         onDoubleClick={(e) => { e.stopPropagation(); onOpenFunctionEditor(eventSheetId, block); }}
-        onContextMenu={(e) => onContextMenu(e, block.id)} 
+        onContextMenu={(e) => onContextMenu(e, block.id)}
         style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: depth > 0 ? '0px' : '6px', overflow: 'visible' }}
       >
         <DragIndicatorLine />
@@ -180,7 +180,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           <div style={{ color: isSelected ? '#fff' : '#555', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 5px 0 8px' }}>
             <span>{blockIndices.get(block.id)}</span>
             {block.children.length > 0 && (
-              <span 
+              <span
                 onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}
                 style={{ width: '20px', height: '20px', cursor: 'pointer', transition: 'all 0.1s', transform: isExpanded ? 'rotate(90deg)' : 'none', fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px', marginRight: '-5px' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
@@ -208,10 +208,10 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           <div />
           <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('condition', block.id); }} style={{ padding: '0', backgroundColor: '#2d2d2d', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderTop: 'none', borderRight: '1px solid #333', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
             {block.conditions.map((c, i) => (
-              <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
+              <ConditionItem key={c.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i + 1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
             ))}
-            <div 
-              style={addLinkStyle} 
+            <div
+              style={addLinkStyle}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
             >
@@ -220,9 +220,9 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           </div>
           <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderTop: 'none', borderLeft: 'none', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
             {block.actions.map((a, i) => (
-              <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={a} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="action" />
+              <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={a} index={i + 1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="action" />
             ))}
-            <div 
+            <div
               style={addLinkStyle}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
@@ -286,7 +286,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: `${gutterWidth}px 1fr`, cursor: 'pointer' }}>
           <div style={{ color: isSelected ? '#fff' : '#555', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 5px 0 8px' }}>
             <span>{blockIndices.get(block.id)}</span>
-            <span 
+            <span
               onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}
               style={{ width: '20px', height: '20px', cursor: 'pointer', transition: 'all 0.1s', transform: isExpanded ? 'rotate(90deg)' : 'none', fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px', marginRight: '-5px' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
@@ -295,8 +295,8 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
               ▶
             </span>
           </div>
-          <div 
-            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: isSelected ? '#007acc' : '#2d2d2d', border: isSelected ? '1px solid #005a9e' : '1px solid #333', borderRadius: '2px', cursor: 'default' }} 
+          <div
+            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: isSelected ? '#007acc' : '#2d2d2d', border: isSelected ? '1px solid #005a9e' : '1px solid #333', borderRadius: '2px', cursor: 'default' }}
             onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}
           >
             <div style={{ fontWeight: 'bold', flex: 1, userSelect: 'none', color: '#fff', fontSize: '12px' }}>
@@ -322,7 +322,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: isSelected ? '#fff' : '#555', padding: '0 5px 0 8px', fontWeight: 'bold' }}>
           <span>{blockIndices.get(block.id)}</span>
           {block.children.length > 0 && (
-            <span 
+            <span
               onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}
               style={{ width: '20px', height: '20px', cursor: 'pointer', transition: 'all 0.1s', transform: isExpanded ? 'rotate(90deg)' : 'none', fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px', marginRight: '-5px' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
@@ -338,10 +338,10 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           {block.conditions.map((c, i) => (
             <React.Fragment key={c.id}>
               {block.isOrBlock && i > 0 && <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', margin: '3px 0', fontWeight: 'bold', backgroundColor: '#222' }}>— OR —</div>}
-              <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
+              <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i + 1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
             </React.Fragment>
           ))}
-          <div 
+          <div
             style={addLinkStyle}
             onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
@@ -351,9 +351,9 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderLeft: 'none', borderRadius: '0 3px 3px 0', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           {block.actions.map((a, i) => (
-            <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={a} index={i+1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="action" />
+            <ActionItem key={a.id} project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={a} index={i + 1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="action" />
           ))}
-          <div 
+          <div
             style={addLinkStyle}
             onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}

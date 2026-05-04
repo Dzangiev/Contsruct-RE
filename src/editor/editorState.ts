@@ -38,6 +38,7 @@ export interface EditorState {
   spriteEditor: { objectTypeId: string, isOpen: boolean } | null;
   gridSettingsDialogOpen: boolean;
   showWatchers: boolean;
+  highlightedInstanceIds: string[];
 }
 
 /**
@@ -76,6 +77,7 @@ export function createInitialEditorState(project: Project): EditorState {
     spriteEditor: null,
     gridSettingsDialogOpen: false,
     showWatchers: true,
+    highlightedInstanceIds: [],
   };
 }
 

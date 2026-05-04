@@ -130,6 +130,7 @@ interface EditorStore {
   addState: (objectTypeId: string, name: string) => void;
   removeState: (objectTypeId: string, stateId: string) => void;
   updateState: (objectTypeId: string, stateId: string, updates: any) => void;
+  setHighlightedInstances: (instanceIds: string[]) => void;
 }
 
 const initialProject = projectUpdates.sanitizeProject(createEmptyProject());
@@ -464,7 +465,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     editorState: editorUpdates.setActiveLayer(state.editorState, layerId)
   })),
   setSelectedInstances: (instanceIds) => set((state) => ({
-    editorState: editorUpdates.setSelectedInstances(state.editorState, instanceIds)
+    editorState: { ...editorUpdates.setSelectedInstances(state.editorState, instanceIds), highlightedInstanceIds: [] }
   })),
   setSelectedObjectType: (objectTypeId) => set((state) => ({
     editorState: editorUpdates.setSelectedObjectType(state.editorState, objectTypeId)
@@ -485,10 +486,47 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     editorState: editorUpdates.setPreviewMode(state.editorState, previewMode)
   })),
   setSelectedEventBlocks: (blockIds) => set((state) => ({
-    editorState: editorUpdates.setSelectedEventBlocks(state.editorState, blockIds)
+    editorState: { ...editorUpdates.setSelectedEventBlocks(state.editorState, blockIds), highlightedInstanceIds: [] }
   })),
-  setSelectedLogicItems: (itemIds) => set((state) => ({
-    editorState: editorUpdates.setSelectedLogicItems(state.editorState, itemIds)
+  setSelectedLogicItems: (itemIds) => set((state) => {
+    const nextEditorState = editorUpdates.setSelectedLogicItems(state.editorState, itemIds);
+    let highlightedInstanceIds: string[] = [];
+    
+    if (itemIds.length === 1) {
+      const [blockId, itemId] = itemIds[0].split(':');
+      const { project } = state;
+      const activeLayout = project.layouts.find(l => l.id === nextEditorState.activeLayoutId);
+      
+      let foundItem: any = null;
+      project.eventSheets.forEach(es => {
+        const find = (blocks: EventBlock[]) => {
+          blocks.forEach(b => {
+            if (b.id === blockId) {
+              foundItem = b.conditions.find(c => c.id === itemId) || b.actions.find(a => a.id === itemId);
+            }
+            if (!foundItem) find(b.children);
+          });
+        };
+        find(es.events);
+      });
+
+      if (foundItem && foundItem.targetObjectTypeId && activeLayout) {
+        const targetId = foundItem.targetObjectTypeId;
+        const family = project.families.find(f => f.id === targetId);
+        activeLayout.instances.forEach(inst => {
+          if (family) {
+            if (family.objectTypeIds.includes(inst.objectTypeId)) highlightedInstanceIds.push(inst.id);
+          } else if (inst.objectTypeId === targetId) {
+            highlightedInstanceIds.push(inst.id);
+          }
+        });
+      }
+    }
+    
+    return { editorState: { ...nextEditorState, highlightedInstanceIds } };
+  }),
+  setHighlightedInstances: (instanceIds) => set((state) => ({
+    editorState: { ...state.editorState, highlightedInstanceIds: instanceIds }
   })),
   setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) => {
     set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) }));
