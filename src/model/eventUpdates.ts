@@ -1091,6 +1091,50 @@ function syncVariableInTree(blocks: EventBlock[], variableId: string, oldName: s
   });
 }
 
+/**
+ * Counts usages of a variable name across the whole project.
+ */
+export function getVariableUsageCount(project: Project, variableName: string): number {
+  let count = 0;
+
+  // 1. Check in other global variables' initial values
+  project.globalVariables.forEach(v => {
+    if (v.name === variableName) return; // Don't count self
+    if (typeof v.initialValue === 'string' && isVariableInExpression(v.initialValue, variableName)) {
+      count++;
+    }
+  });
+
+  // 2. Check in all event sheets
+  project.eventSheets.forEach(es => {
+    const scanBlocks = (blocks: EventBlock[]) => {
+      blocks.forEach(b => {
+        // Check conditions
+        b.conditions.forEach(c => {
+          c.params.forEach(p => {
+            if (typeof p === 'string' && isVariableInExpression(p, variableName)) count++;
+          });
+        });
+        // Check actions
+        b.actions.forEach(a => {
+          a.params.forEach(p => {
+            if (typeof p === 'string' && isVariableInExpression(p, variableName)) count++;
+          });
+        });
+        // Check local variables or other definitions
+        if (b.variable && b.variable.name !== variableName) {
+           if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) count++;
+        }
+        
+        scanBlocks(b.children);
+      });
+    };
+    scanBlocks(es.events);
+  });
+
+  return count;
+}
+
 function updateVariableReferencesInBlock(block: EventBlock, oldName: string, newName: string): EventBlock {
   return {
     ...block,
@@ -1108,5 +1152,57 @@ function updateVariableReferencesInBlock(block: EventBlock, oldName: string, new
       initialValue: replaceVariableNameInExpression(block.variable.initialValue, oldName, newName)
     } : undefined
   };
+}
+
+/**
+ * Returns a list of locations where a variable is used.
+ */
+export function getVariableUsageLocations(project: Project, variableName: string): { type: string, sheetName?: string, sheetId?: string, blockId?: string, index?: string, detail: string }[] {
+  const locations: { type: string, sheetName?: string, sheetId?: string, blockId?: string, index?: string, detail: string }[] = [];
+
+  // 1. Check in other global variables
+  project.globalVariables.forEach(v => {
+    if (v.name === variableName) return;
+    if (typeof v.initialValue === 'string' && isVariableInExpression(v.initialValue, variableName)) {
+      locations.push({ type: 'Global Variable', detail: `Initial value of "${v.name}"` });
+    }
+  });
+
+  // 2. Check in all event sheets
+  project.eventSheets.forEach(es => {
+    const scanBlocks = (blocks: EventBlock[], depthIndex: string) => {
+      blocks.forEach((b, idx) => {
+        const currentIndex = depthIndex ? `${depthIndex}.${idx + 1}` : `${idx + 1}`;
+        b.conditions.forEach(c => {
+          c.params.forEach(p => {
+            if (typeof p === 'string' && isVariableInExpression(p, variableName)) {
+              locations.push({ type: 'Condition', sheetName: es.name, sheetId: es.id, blockId: b.id, index: currentIndex, detail: `${c.type} (param)` });
+            }
+          });
+        });
+        b.actions.forEach(a => {
+          a.params.forEach(p => {
+            if (typeof p === 'string' && isVariableInExpression(p, variableName)) {
+              locations.push({ type: 'Action', sheetName: es.name, sheetId: es.id, blockId: b.id, index: currentIndex, detail: `${a.type} (param)` });
+            }
+          });
+        });
+        if (b.variable && b.variable.name !== variableName) {
+           if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) {
+             locations.push({ type: 'Local Variable', sheetName: es.name, sheetId: es.id, blockId: b.id, index: currentIndex, detail: `Initial value of "${b.variable.name}"` });
+           }
+        }
+        scanBlocks(b.children, currentIndex);
+      });
+    };
+    scanBlocks(es.events, '');
+  });
+  return locations;
+}
+
+function isVariableInExpression(expression: string, variableName: string): boolean {
+  const escapedName = variableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`\\b${escapedName}\\b`, 'g');
+  return regex.test(expression);
 }
 

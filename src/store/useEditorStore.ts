@@ -99,12 +99,13 @@ interface EditorStore {
   pasteSelected: (eventSheetId: string, targetParentId: string | null) => void;
   pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
   pasteInstances: () => void;
+  jumpToLogic: (sheetId: string, blockId: string) => void;
   
   // Folder Actions
-  addFolder: (type: 'objectType' | 'layout' | 'eventSheet' | 'family', name: string, parentId?: string | null) => void;
+  addFolder: (type: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', name: string, parentId?: string | null) => void;
   updateFolder: (folderId: string, updates: any) => void;
   removeFolder: (folderId: string) => void;
-  moveEntityToFolder: (entityType: 'objectType' | 'layout' | 'eventSheet' | 'family', entityId: string, folderId: string | null) => void;
+  moveEntityToFolder: (entityType: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', entityId: string, folderId: string | null) => void;
   
   // History
   commitProject: () => void;
@@ -213,8 +214,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().pushHistory(next);
   },
   updateInstanceSilently: (layoutId, instanceId, updates) => {
-    const next = projectUpdates.updateInstance(get().project, layoutId, instanceId, updates);
-    set({ project: next });
+    set(state => ({
+      project: {
+        ...state.project,
+        layouts: state.project.layouts.map(l => l.id === layoutId ? {
+          ...l,
+          instances: l.instances.map(i => i.id === instanceId ? { ...i, ...updates } : i)
+        } : l)
+      }
+    }));
   },
   removeInstance: (layoutId, instanceId) => {
     const next = projectUpdates.removeInstance(get().project, layoutId, instanceId);
@@ -592,7 +600,30 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       get().pushHistory(next);
     }
   },
-  
+  jumpToLogic: (sheetId: string, blockId: string) => {
+    const { project } = get();
+    const layout = project.layouts.find(l => l.eventSheetId === sheetId);
+    set(state => {
+      let nextEditorState = { 
+        ...state.editorState, 
+        currentTab: 'eventSheet' as const,
+        selectedEventBlockIds: [blockId]
+      };
+      if (layout) nextEditorState.activeLayoutId = layout.id;
+      return { editorState: nextEditorState };
+    });
+    setTimeout(() => {
+      const el = document.getElementById(`block-${blockId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const originalShadow = el.style.boxShadow;
+        el.style.transition = 'all 0.5s';
+        el.style.boxShadow = '0 0 15px #3498db';
+        setTimeout(() => { el.style.boxShadow = originalShadow; }, 2000);
+      }
+    }, 150);
+  },
+
   // Sprite Editor
   openSpriteEditor: (objectTypeId) => set((state) => ({
     editorState: { ...state.editorState, spriteEditor: { objectTypeId, isOpen: true } }
@@ -605,7 +636,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().pushHistory(get().project);
   },
 
-  dialogState: null,
+  // Dialogs
   showDialog: (options) => {
     return new Promise((resolve) => {
       set({ dialogState: { ...options, isOpen: true, resolve } });
@@ -618,7 +649,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       set({ dialogState: null });
     }
   },
+  dialogState: null,
 
+  // Folder Actions
   addFolder: (type, name, parentId = null) => {
     set(state => {
       const next = projectUpdates.addFolder(state.project, type, name, parentId);
@@ -626,7 +659,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return { project: next };
     });
   },
-
   updateFolder: (folderId, updates) => {
     set(state => {
       const next = projectUpdates.updateFolder(state.project, folderId, updates);
@@ -634,7 +666,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return { project: next };
     });
   },
-
   removeFolder: (folderId) => {
     set(state => {
       const next = projectUpdates.removeFolder(state.project, folderId);
@@ -642,7 +673,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return { project: next };
     });
   },
-
   moveEntityToFolder: (entityType, entityId, folderId) => {
     set(state => {
       const next = projectUpdates.moveEntityToFolder(state.project, entityType, entityId, folderId);

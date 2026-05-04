@@ -746,7 +746,7 @@ export function removeFamilyBehavior(project: Project, familyId: string, behavio
 /**
  * Adds a new folder to the project.
  */
-export function addFolder(project: Project, type: 'objectType' | 'layout' | 'eventSheet' | 'family', name: string, parentId: string | null = null): Project {
+export function addFolder(project: Project, type: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', name: string, parentId: string | null = null): Project {
   const folder: ProjectFolder = {
     id: generateId(),
     name,
@@ -785,6 +785,7 @@ export function removeFolder(project: Project, folderId: string): Project {
     objectTypes: project.objectTypes.map(ot => ot.folderId === folderId ? { ...ot, folderId: parentId } : ot),
     eventSheets: project.eventSheets.map(es => es.folderId === folderId ? { ...es, folderId: parentId } : es),
     families: project.families.map(f => f.folderId === folderId ? { ...f, folderId: parentId } : f),
+    globalVariables: project.globalVariables.map(v => v.folderId === folderId ? { ...v, folderId: parentId } : v),
     folders: project.folders.filter(f => f.id !== folderId).map(f => f.parentId === folderId ? { ...f, parentId } : f)
   };
 }
@@ -794,7 +795,7 @@ export function removeFolder(project: Project, folderId: string): Project {
  */
 export function moveEntityToFolder(
   project: Project, 
-  entityType: 'objectType' | 'layout' | 'eventSheet' | 'family', 
+  entityType: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', 
   entityId: string, 
   folderId: string | null
 ): Project {
@@ -807,6 +808,8 @@ export function moveEntityToFolder(
       return { ...project, eventSheets: project.eventSheets.map(es => es.id === entityId ? { ...es, folderId } : es) };
     case 'family':
       return { ...project, families: project.families.map(f => f.id === entityId ? { ...f, folderId } : f) };
+    case 'globalVariable':
+      return { ...project, globalVariables: project.globalVariables.map(v => v.id === entityId ? { ...v, folderId } : v) };
     default:
       return project;
   }

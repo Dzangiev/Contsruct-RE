@@ -106,6 +106,7 @@ export const ProjectExplorer: React.FC = () => {
     updateLayout,
     updateFamily,
     setTool,
+    setTab,
     setSelectedObjectType,
     setSelectedFamily,
     addFamily,
@@ -261,6 +262,12 @@ export const ProjectExplorer: React.FC = () => {
                  if (type === 'layout') setActiveLayout(item.id, item.layers?.[0]?.id);
                  else if (type === 'objectType') setSelectedObjectType(item.id);
                  else if (type === 'family') setSelectedFamily(item.id);
+                 else if (type === 'eventSheet') {
+                   const layout = project.layouts.find(l => l.eventSheetId === item.id);
+                   if (layout) setActiveLayout(layout.id);
+                   setTab('eventSheet');
+                 }
+
                }}
                onDoubleClick={() => {
                  if (type === 'objectType' && item.kind === ObjectTypeKind.Sprite) {

@@ -138,6 +138,7 @@ export interface GlobalVariable {
   isStatic?: boolean;
   isConstant?: boolean;
   comment?: string;
+  folderId?: string | null;
 }
 
 export interface EventBlock {
@@ -182,7 +183,7 @@ export interface Family {
 export interface ProjectFolder {
   id: string;
   name: string;
-  type: 'objectType' | 'layout' | 'eventSheet' | 'family';
+  type: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable';
   parentId: string | null;
   expanded: boolean;
 }
