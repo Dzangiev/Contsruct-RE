@@ -23,7 +23,51 @@ export const EventSheetEditor: React.FC = () => {
   } = useEditorStore();
   
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [replaceTerm, setReplaceTerm] = React.useState('');
   const [showReplace, setShowReplace] = React.useState(false);
+  
+  const handleReplaceAll = () => {
+    if (!eventSheet || !searchTerm) return;
+    
+    const updateRecursive = (blocks: EventBlock[]) => {
+      blocks.forEach(block => {
+        // Replace in conditions
+        block.conditions.forEach(cond => {
+          const newParams = cond.params.map(p => 
+            typeof p === 'string' ? p.split(searchTerm).join(replaceTerm) : p
+          );
+          if (JSON.stringify(newParams) !== JSON.stringify(cond.params)) {
+            updateCondition(eventSheet.id, block.id, cond.id, { params: newParams });
+          }
+        });
+        
+        // Replace in actions
+        block.actions.forEach(act => {
+          const newParams = act.params.map(p => 
+            typeof p === 'string' ? p.split(searchTerm).join(replaceTerm) : p
+          );
+          if (JSON.stringify(newParams) !== JSON.stringify(act.params)) {
+            updateAction(eventSheet.id, block.id, act.id, { params: newParams });
+          }
+        });
+
+        if (block.type === 'comment' && block.commentText) {
+          const newText = block.commentText.split(searchTerm).join(replaceTerm);
+          if (newText !== block.commentText) updateEventBlock(eventSheet.id, block.id, { commentText: newText });
+        }
+        
+        if (block.type === 'group' && block.groupName) {
+          const newName = block.groupName.split(searchTerm).join(replaceTerm);
+          if (newName !== block.groupName) updateEventBlock(eventSheet.id, block.id, { groupName: newName });
+        }
+
+        updateRecursive(block.children);
+      });
+    };
+    
+    updateRecursive(eventSheet.events);
+    setShowReplace(false);
+  };
   
   const [browserState, setBrowserState] = React.useState<{
     isOpen: boolean, mode: 'condition' | 'action', eventSheetId: string, blockId: string, targetObjectTypeId?: string, initialLogicTypeId?: string, editingItemId?: string
@@ -316,6 +360,33 @@ export const EventSheetEditor: React.FC = () => {
           <button onClick={(e) => { e.stopPropagation(); onAddVariable(); }} style={toolbarButtonStyle} title="Add Variable (V)"> Var</button>
         </div>
       </div>
+      
+      {showReplace && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px', backgroundColor: '#2d2d2d', borderBottom: '1px solid #111' }}>
+          <div style={{ fontSize: '11px', color: '#888', fontWeight: 700, textTransform: 'uppercase', width: '60px' }}>Replace</div>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, maxWidth: '300px' }}>
+            <Replace size={14} style={{ position: 'absolute', left: '8px', color: '#666' }} />
+            <input 
+              value={replaceTerm} 
+              onChange={(e) => setReplaceTerm(e.target.value)} 
+              placeholder="Replace with..." 
+              style={{ backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '100%', outline: 'none' }} 
+            />
+          </div>
+          <button 
+            onClick={handleReplaceAll}
+            style={{ ...toolbarButtonStyle, backgroundColor: '#007acc', color: '#fff', border: 'none' }}
+          >
+            Replace All
+          </button>
+          <button 
+            onClick={() => setShowReplace(false)}
+            style={{ ...iconButtonStyle }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ width: '220px', backgroundColor: '#2d2d2d', borderRight: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column' }}>
