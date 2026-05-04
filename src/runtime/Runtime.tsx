@@ -260,6 +260,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const physicsBodiesRef = React.useRef<Map<string, Matter.Body>>(new Map());
   const particlesRef = React.useRef<Map<string, any[]>>(new Map());
   const triggerIndexRef = React.useRef<Map<string, EventBlock[]>>(new Map());
+  const playingSoundsRef = React.useRef<Map<string, HTMLAudioElement[]>>(new Map());
   const emitTriggerRef = React.useRef<(type: string, data?: any, currentInsts?: Instance[]) => Instance[]>(() => []);
 
   React.useEffect(() => {
@@ -1172,6 +1173,59 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             case 'setAnimSpeed': {
               return { ...inst, properties: { ...inst.properties, _animSpeed: Number(evalParam(0) ?? 10) } };
             }
+            // --- Audio Actions ---
+            case 'audioPlay': {
+              const assetId = String(evalParam(0));
+              const looping = !!evalParam(1);
+              const volume = Number(evalParam(2) ?? 100) / 100;
+              const tag = String(evalParam(3) ?? "");
+
+              const asset = project.assets.find(a => a.id === assetId || a.name === assetId);
+              if (asset && asset.data) {
+                const audio = new Audio(asset.data);
+                audio.loop = looping;
+                audio.volume = Math.max(0, Math.min(1, volume));
+                audio.play().catch(e => console.warn('Audio play failed:', e));
+                
+                const tagKey = tag;
+                if (!playingSoundsRef.current.has(tagKey)) playingSoundsRef.current.set(tagKey, []);
+                playingSoundsRef.current.get(tagKey)!.push(audio);
+                
+                audio.onended = () => {
+                  const list = playingSoundsRef.current.get(tagKey);
+                  if (list) {
+                    const idx = list.indexOf(audio);
+                    if (idx !== -1) list.splice(idx, 1);
+                  }
+                };
+              }
+              return inst;
+            }
+            case 'audioStop': {
+              const tag = String(evalParam(0) ?? "");
+              const list = playingSoundsRef.current.get(tag);
+              if (list) {
+                list.forEach(a => { a.pause(); a.src = ""; });
+                playingSoundsRef.current.delete(tag);
+              }
+              return inst;
+            }
+            case 'audioStopAll': {
+              playingSoundsRef.current.forEach(list => {
+                list.forEach(a => { a.pause(); a.src = ""; });
+              });
+              playingSoundsRef.current.clear();
+              return inst;
+            }
+            case 'audioSetVolume': {
+              const tag = String(evalParam(0) ?? "");
+              const volume = Number(evalParam(1) ?? 100) / 100;
+              const list = playingSoundsRef.current.get(tag);
+              if (list) {
+                list.forEach(a => { a.volume = Math.max(0, Math.min(1, volume)); });
+              }
+              return inst;
+            }
             default: return inst;
           }
         });
@@ -1510,6 +1564,12 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     return () => {
       cancelAnimationFrame(animationFrameId);
       useEditorStore.getState().setRuntimeState(null);
+      
+      // Stop all audio
+      playingSoundsRef.current.forEach(list => {
+        list.forEach(a => { a.pause(); a.src = ""; });
+      });
+      playingSoundsRef.current.clear();
     };
   }, [layout, eventSheet, isPaused, timeScale]);
 

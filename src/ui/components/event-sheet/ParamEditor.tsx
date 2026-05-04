@@ -104,6 +104,11 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
           newParams[i] = layout.layers[0].id;
           changed = true;
         }
+      } else if (pDef.type === 'asset' && !newParams[i]) {
+        if (project.assets.length > 0) {
+          newParams[i] = project.assets[0].id;
+          changed = true;
+        }
       }
     });
     if (changed) setParams(newParams);
@@ -365,6 +370,11 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
                       const layout = project.layouts.find(l => l.eventSheetId === eventSheetId) || project.layouts[0];
                       return layout?.layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>);
                     })()}
+                  </select>
+                ) : pDef.type === 'asset' ? (
+                  <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}>
+                    <option value="">Select an asset...</option>
+                    {project.assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.type})</option>)}
                   </select>
                 ) : (pDef.type as any) === 'number' || (pDef.type as any) === 'string' ? (
                   <div style={{ position: 'relative' }}>

@@ -39,6 +39,9 @@ export const LogicItemContent: React.FC<{
       const targetFamily = project.families.find(f => f.id === val);
       if (targetFamily) return <span style={{ color: isSelected ? '#121212' : '#f1c40f', fontWeight: 700 }}>{targetFamily.name}</span>;
       
+      const asset = project.assets.find(a => a.id === val || a.name === val);
+      if (asset) return <span style={{ color: isSelected ? '#121212' : '#9b59b6', fontWeight: 700 }}>{asset.name}</span>;
+
       const isString = typeof val === 'string' && val.startsWith('"') && val.endsWith('"');
       const displayVal = typeof val === 'string' && val.length > 25 ? val.substring(0, 22) + '...' : val;
       

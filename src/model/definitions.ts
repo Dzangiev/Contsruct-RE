@@ -1,6 +1,6 @@
 export interface ParamDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'objectType' | 'layer' | 'instanceVariable' | 'globalVariable' | 'functionName' | 'color' | 'any';
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'objectType' | 'layer' | 'instanceVariable' | 'globalVariable' | 'functionName' | 'color' | 'any' | 'asset';
   options?: string[]; // For enum type
   defaultValue?: any;
 }
@@ -73,6 +73,15 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
       { name: 'startSize', type: 'number', defaultValue: 4 },
       { name: 'endSize', type: 'number', defaultValue: 0 }
     ]
+  },
+  {
+    kind: 'audio',
+    name: 'Audio',
+    description: 'Play sound effects and background music.',
+    icon: 'volume-2',
+    defaultWidth: 0,
+    defaultHeight: 0,
+    propertyDefinitions: []
   }
 ];
 
@@ -737,6 +746,53 @@ export const ACTIONS: LogicDefinition[] = [
     category: 'Animations',
     target: 'object',
     requiredKind: 'sprite'
+  },
+  // Audio Actions
+  {
+    type: 'audioPlay',
+    name: 'Play',
+    description: 'Play an audio asset.',
+    params: [
+      { name: 'Audio', type: 'asset' },
+      { name: 'Looping', type: 'boolean', defaultValue: false },
+      { name: 'Volume', type: 'number', defaultValue: 100 },
+      { name: 'Tag', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Audio',
+    target: 'object',
+    requiredKind: 'audio'
+  },
+  {
+    type: 'audioStop',
+    name: 'Stop',
+    description: 'Stop playing audio with a specific tag.',
+    params: [
+      { name: 'Tag', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Audio',
+    target: 'object',
+    requiredKind: 'audio'
+  },
+  {
+    type: 'audioStopAll',
+    name: 'Stop all',
+    description: 'Stop all sounds currently playing.',
+    params: [],
+    category: 'Audio',
+    target: 'object',
+    requiredKind: 'audio'
+  },
+  {
+    type: 'audioSetVolume',
+    name: 'Set volume',
+    description: 'Set the volume for a specific tag.',
+    params: [
+      { name: 'Tag', type: 'string', defaultValue: '""' },
+      { name: 'Volume', type: 'number', defaultValue: 100 }
+    ],
+    category: 'Audio',
+    target: 'object',
+    requiredKind: 'audio'
   }
 ];
 
