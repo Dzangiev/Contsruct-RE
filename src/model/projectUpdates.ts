@@ -1,6 +1,7 @@
 import { Project, Layout, Layer, ObjectType, Instance, ObjectTypeKind, EventSheet, Behavior, InstanceVariable, Family, ProjectFolder } from './project';
 import { PLUGIN_DEFINITIONS } from './definitions';
 import { generateId } from '../utils/id';
+import { syncObjectTypeRenaming, syncInstanceVariableRenaming } from './eventUpdates';
 
 /**
  * Adds a new layout to the project.
@@ -151,43 +152,45 @@ export function updateInstanceVariable(
   variableId: string,
   updates: Partial<Omit<InstanceVariable, 'id'>>
 ): Project {
-  return {
+  const ot = project.objectTypes.find(o => o.id === objectTypeId);
+  if (!ot) return project;
+  
+  const oldVar = ot.instanceVariables.find(v => v.id === variableId);
+  if (!oldVar) return project;
+
+  const newVarName = updates.name;
+  const oldVarName = oldVar.name;
+
+  // 1. Update Project Data (Object Type and Instance Properties)
+  let updatedProject = {
     ...project,
-    objectTypes: project.objectTypes.map(ot => {
-      if (ot.id !== objectTypeId) return ot;
-      const oldVar = ot.instanceVariables.find(v => v.id === variableId);
-      if (!oldVar) return ot;
-
-      const newVar = { ...oldVar, ...updates };
-      
-      // If name changed, we might want to update all instances' properties to match?
-      // Actually, Construct 3 uses names as keys in instance properties, so renaming 
-      // a variable should ideally rename the key in all instances.
-      let updatedProject = project;
-      if (updates.name && updates.name !== oldVar.name) {
-        updatedProject = {
-          ...project,
-          layouts: project.layouts.map(l => ({
-            ...l,
-            instances: l.instances.map(inst => {
-              if (inst.objectTypeId !== objectTypeId) return inst;
-              const nextProps = { ...inst.properties };
-              if (oldVar.name in nextProps) {
-                nextProps[updates.name!] = nextProps[oldVar.name];
-                delete nextProps[oldVar.name];
-              }
-              return { ...inst, properties: nextProps };
-            })
-          }))
-        };
-      }
-
+    objectTypes: project.objectTypes.map(o => {
+      if (o.id !== objectTypeId) return o;
       return {
-        ...ot,
-        instanceVariables: ot.instanceVariables.map(v => v.id === variableId ? newVar : v)
+        ...o,
+        instanceVariables: o.instanceVariables.map(v => v.id === variableId ? { ...v, ...updates } : v)
       };
-    })
+    }),
+    layouts: project.layouts.map(l => ({
+      ...l,
+      instances: l.instances.map(inst => {
+        if (inst.objectTypeId !== objectTypeId) return inst;
+        const nextProps = { ...inst.properties };
+        if (newVarName && oldVarName in nextProps) {
+          nextProps[newVarName] = nextProps[oldVarName];
+          delete nextProps[oldVarName];
+        }
+        return { ...inst, properties: nextProps };
+      })
+    }))
   };
+
+  // 2. Sync Logic (Expressions)
+  if (newVarName && newVarName !== oldVarName) {
+    updatedProject = syncInstanceVariableRenaming(updatedProject, ot.name, oldVarName, newVarName);
+  }
+
+  return updatedProject;
 }
 
 /**
@@ -243,10 +246,20 @@ export function updateObjectType(
   objectTypeId: string,
   updates: Partial<Omit<ObjectType, 'id'>>
 ): Project {
-  return {
+  const oldOt = project.objectTypes.find(o => o.id === objectTypeId);
+  const oldName = oldOt?.name;
+  const newName = updates.name;
+
+  let updatedProject = {
     ...project,
     objectTypes: project.objectTypes.map(ot => ot.id === objectTypeId ? { ...ot, ...updates } : ot),
   };
+
+  if (oldName && newName && oldName !== newName) {
+    updatedProject = syncObjectTypeRenaming(updatedProject, oldName, newName);
+  }
+
+  return updatedProject;
 }
 
 /**
@@ -546,10 +559,20 @@ export function removeFamily(project: Project, familyId: string): Project {
  * Updates properties of a family.
  */
 export function updateFamily(project: Project, familyId: string, updates: Partial<Omit<Family, 'id'>>): Project {
-  return {
+  const oldFamily = project.families.find(f => f.id === familyId);
+  const oldName = oldFamily?.name;
+  const newName = updates.name;
+
+  let updatedProject = {
     ...project,
     families: project.families.map(f => f.id === familyId ? { ...f, ...updates } : f),
   };
+
+  if (oldName && newName && oldName !== newName) {
+    updatedProject = syncObjectTypeRenaming(updatedProject, oldName, newName);
+  }
+
+  return updatedProject;
 }
 
 /**
@@ -613,7 +636,17 @@ export function updateFamilyInstanceVariable(
   variableId: string,
   updates: Partial<Omit<InstanceVariable, 'id'>>
 ): Project {
-  return {
+  const family = project.families.find(f => f.id === familyId);
+  if (!family) return project;
+
+  const oldVar = family.instanceVariables.find(v => v.id === variableId);
+  if (!oldVar) return project;
+
+  const oldVarName = oldVar.name;
+  const newVarName = updates.name;
+
+  // 1. Update Family Definition
+  let updatedProject = {
     ...project,
     families: project.families.map(f => {
       if (f.id !== familyId) return f;
@@ -623,6 +656,13 @@ export function updateFamilyInstanceVariable(
       };
     })
   };
+
+  // 2. Sync Logic (Expressions)
+  if (newVarName && newVarName !== oldVarName) {
+    updatedProject = syncInstanceVariableRenaming(updatedProject, family.name, oldVarName, newVarName);
+  }
+
+  return updatedProject;
 }
 
 /**

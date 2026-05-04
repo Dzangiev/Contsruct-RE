@@ -68,6 +68,8 @@ interface EditorStore {
   moveAction: (eventSheetId: string, sourceBlockId: string, actionId: string, targetBlockId: string, targetIndex: number) => void;
   addKeyboardMovementTemplate: (eventSheetId: string, objectTypeId: string) => void;
   toggleConditionInverted: (eventSheetId: string, blockId: string, conditionId: string) => void;
+  toggleConditionDisabled: (eventSheetId: string, blockId: string, conditionId: string) => void;
+  toggleActionDisabled: (eventSheetId: string, blockId: string, actionId: string) => void;
   toggleOrBlock: (eventSheetId: string, blockId: string) => void;
 
   // Editor Actions
@@ -111,6 +113,11 @@ interface EditorStore {
   showDialog: (options: { title: string, message?: string, type: 'prompt' | 'confirm' | 'alert', defaultValue?: string }) => Promise<string | boolean | undefined>;
   closeDialog: () => void;
   dialogState: { isOpen: boolean, title: string, message?: string, type: 'prompt' | 'confirm' | 'alert', defaultValue?: string, resolve: (val: any) => void } | null;
+
+  // Global Variables
+  addGlobalVariable: (name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
+  updateGlobalVariable: (variableId: string, updates: any) => void;
+  removeGlobalVariable: (variableId: string) => void;
 }
 
 const initialProject = createEmptyProject();
@@ -402,6 +409,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       get().pushHistory(next);
     }
   },
+  toggleConditionDisabled: (eventSheetId, blockId, conditionId) => {
+    const next = eventUpdates.toggleConditionDisabled(get().project, eventSheetId, blockId, conditionId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  toggleActionDisabled: (eventSheetId, blockId, actionId) => {
+    const next = eventUpdates.toggleActionDisabled(get().project, eventSheetId, blockId, actionId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
   toggleOrBlock: (eventSheetId, blockId) => {
     const { project } = get();
     const es = project.eventSheets.find(s => s.id === eventSheetId);
@@ -632,5 +649,22 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       state.pushHistory(next);
       return { project: next };
     });
+  },
+
+  // Global Variables
+  addGlobalVariable: (name, type, initialValue) => {
+    const next = eventUpdates.addGlobalVariable(get().project, name, type, initialValue);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateGlobalVariable: (variableId, updates) => {
+    const next = eventUpdates.updateGlobalVariable(get().project, variableId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeGlobalVariable: (variableId) => {
+    const next = eventUpdates.removeGlobalVariable(get().project, variableId);
+    set({ project: next });
+    get().pushHistory(next);
   },
 }));

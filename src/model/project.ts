@@ -118,6 +118,7 @@ export interface Condition {
   targetObjectTypeId?: string;
   params: any[];
   inverted: boolean;
+  disabled?: boolean;
 }
 
 export interface Action {
@@ -125,6 +126,7 @@ export interface Action {
   type: string;
   targetObjectTypeId?: string;
   params: any[];
+  disabled?: boolean;
 }
 
 export interface GlobalVariable {

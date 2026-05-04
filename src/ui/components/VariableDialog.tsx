@@ -14,13 +14,28 @@ interface VariableDialogProps {
 export const VariableDialog: React.FC<VariableDialogProps> = ({ 
   title, variable, existingNames, onSave, onCancel, showStaticConstant = false
 }) => {
-  const [name, setName] = React.useState(variable?.name || '');
+  const getDefaultName = () => {
+    let i = 1;
+    while (existingNames.includes(`Variable${i}`)) i++;
+    return `Variable${i}`;
+  };
+
+  const [name, setName] = React.useState(variable?.name || getDefaultName());
   const [type, setType] = React.useState(variable?.type || 'number');
   const [initialValue, setInitialValue] = React.useState(variable?.initialValue ?? 0);
   const [description, setDescription] = React.useState(variable?.description || '');
   const [isStatic, setIsStatic] = React.useState(variable?.isStatic || false);
   const [isConstant, setIsConstant] = React.useState(variable?.isConstant || false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, []);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -56,6 +71,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
             <div style={rowStyle}>
               <label style={labelStyle}>Name</label>
               <input 
+                ref={inputRef}
                 autoFocus 
                 value={name} 
                 onChange={e => { setName(e.target.value); setError(null); }} 

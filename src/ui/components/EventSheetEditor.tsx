@@ -120,7 +120,7 @@ export const EventSheetEditor: React.FC = () => {
 
   const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
   const [draggedLogicItem, setDraggedLogicItem] = React.useState<{ type: 'condition' | 'action', blockId: string, itemId: string } | null>(null);
-  const [variableEditorState, setVariableEditorState] = React.useState<{ isOpen: boolean, eventSheetId: string, blockId: string, variable: any } | null>(null);
+  const [variableEditorState, setVariableEditorState] = React.useState<{ isOpen: boolean, eventSheetId: string, blockId: string, variable: any, isNew?: boolean, parentId?: string | null } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
@@ -137,12 +137,13 @@ export const EventSheetEditor: React.FC = () => {
 
   const onAddVariable = (parentId: string | null = null) => {
     if (!eventSheet) return;
-    const blockId = addEventBlock(eventSheet.id, parentId, 'variable');
     setVariableEditorState({ 
       isOpen: true, 
       eventSheetId: eventSheet.id, 
-      blockId, 
-      variable: { name: '', type: 'number', initialValue: 0 } 
+      blockId: 'NEW', 
+      variable: { name: '', type: 'number', initialValue: 0 },
+      isNew: true,
+      parentId
     });
   };
 
@@ -186,33 +187,85 @@ export const EventSheetEditor: React.FC = () => {
         const idx = flatEvents.indexOf(selectedBlockId || '');
         if (idx > 0) setSelectedEventBlocks([flatEvents[idx - 1]!]);
       }
-      if (e.key === 'F2' || (e.key === 'b' && !e.ctrlKey)) {
+      if (e.key === 'y' && !e.ctrlKey) {
+        if (selectedBlockId) toggleOrBlock(eventSheet.id, selectedBlockId);
+      }
+      if (e.key === 'Enter') {
         if (selectedBlockId) {
           const b = findBlockRecursive(eventSheet.events, selectedBlockId);
-          if (b) updateEventBlock(eventSheet.id, b.id, { bookmarked: !b.bookmarked });
+          if (b) {
+            if (b.type === 'variable' && b.variable) setVariableEditorState({ isOpen: true, eventSheetId: eventSheet.id, blockId: b.id, variable: b.variable });
+            else if (b.type === 'function') onOpenFunctionEditor(eventSheet.id, b);
+            else if (b.type === 'group') { /* Focus group name input? */ }
+            else setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: b.id });
+          }
+        } else if (selectedLogicId) {
+          const [bId, lId] = selectedLogicId.split(':');
+          const b = findBlockRecursive(eventSheet.events, bId);
+          if (b) {
+            const cond = b.conditions.find(c => c.id === lId);
+            const act = b.actions.find(a => a.id === lId);
+            if (cond) {
+              const def = findConditionDefinition(cond.type);
+              if (def) {
+                if (def.params.length > 0) setParamEditorState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: bId, itemId: lId, def, params: cond.params, targetObjectTypeId: cond.targetObjectTypeId });
+                else setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: bId, targetObjectTypeId: cond.targetObjectTypeId, initialLogicTypeId: cond.type, editingItemId: lId });
+              }
+            } else if (act) {
+              const def = findActionDefinition(act.type);
+              if (def) {
+                if (def.params.length > 0) setParamEditorState({ isOpen: true, mode: 'action', eventSheetId: eventSheet.id, blockId: bId, itemId: lId, def, params: act.params, targetObjectTypeId: act.targetObjectTypeId });
+                else setBrowserState({ isOpen: true, mode: 'action', eventSheetId: eventSheet.id, blockId: bId, targetObjectTypeId: act.targetObjectTypeId, initialLogicTypeId: act.type, editingItemId: lId });
+              }
+            }
+          }
+        }
+      }
+      if (e.key === 'F2' || (e.key === 'b' && !e.ctrlKey)) {
+        if (selectedBlockId) {
+          addEventBlock(eventSheet.id, selectedBlockId, 'event'); // Blank sub-event
+        } else {
+          addEventBlock(eventSheet.id, null, 'event'); // Blank event
         }
       }
       if (e.key === 's' && !e.ctrlKey) { if (selectedBlockId) addEventBlock(eventSheet.id, selectedBlockId, 'event'); }
+      if (e.key === 'e' && !e.ctrlKey) { addEventBlock(eventSheet.id, null, 'event'); }
+      if (e.key === 'a' && !e.ctrlKey) { if (selectedBlockId) setBrowserState({ isOpen: true, mode: 'action', eventSheetId: eventSheet.id, blockId: selectedBlockId }); }
+      if (e.key === 'c' && !e.ctrlKey && !e.shiftKey) { if (selectedBlockId) setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: selectedBlockId }); else addEventBlock(eventSheet.id, null, 'comment'); }
       if (e.key === 'g' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'group'); }
       if (e.key === 'v' && !e.ctrlKey) { onAddVariable(selectedBlockId || null); }
-      if (e.key === 'c' && !e.ctrlKey && !e.shiftKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'comment'); }
       if (e.key === 'f' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'function'); }
+      if (e.key === 'x' && !e.ctrlKey) {
+        if (selectedBlockId) {
+          const newBlockId = addEventBlock(eventSheet.id, null, 'event');
+          addCondition(eventSheet.id, newBlockId, 'else', []);
+          setSelectedEventBlocks([newBlockId]);
+        }
+      }
       if (e.key === 'd' && !e.ctrlKey) {
         if (selectedBlockId) {
           const b = findBlockRecursive(eventSheet.events, selectedBlockId);
           if (b) updateEventBlock(eventSheet.id, b.id, { disabled: !b.disabled });
+        } else if (selectedLogicId) {
+          const [bId, lId] = selectedLogicId.split(':');
+          const b = findBlockRecursive(eventSheet.events, bId);
+          if (b) {
+            if (b.conditions.some(c => c.id === lId)) useEditorStore.getState().toggleConditionDisabled(eventSheet.id, bId, lId);
+            else if (b.actions.some(a => a.id === lId)) useEditorStore.getState().toggleActionDisabled(eventSheet.id, bId, lId);
+          }
         }
       }
-      if (e.key === 'i' && !e.ctrlKey) {
-        if (selectedLogicId) {
-          const [bId, cId] = selectedLogicId.split(':');
-          if (bId && cId) toggleConditionInverted(eventSheet.id, bId, cId);
-        }
-      }
-      if (e.key === 'x' && !e.ctrlKey) {
+      if (e.key === '/' && e.ctrlKey) {
         if (selectedBlockId) {
-          addEventBlock(eventSheet.id, null, 'event');
-          addCondition(eventSheet.id, 'LAST', 'else', []);
+          const b = findBlockRecursive(eventSheet.events, selectedBlockId);
+          if (b) updateEventBlock(eventSheet.id, b.id, { disabled: !b.disabled });
+        } else if (selectedLogicId) {
+          const [bId, lId] = selectedLogicId.split(':');
+          const b = findBlockRecursive(eventSheet.events, bId);
+          if (b) {
+            if (b.conditions.some(c => c.id === lId)) useEditorStore.getState().toggleConditionDisabled(eventSheet.id, bId, lId);
+            else if (b.actions.some(a => a.id === lId)) useEditorStore.getState().toggleActionDisabled(eventSheet.id, bId, lId);
+          }
         }
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -416,6 +469,28 @@ export const EventSheetEditor: React.FC = () => {
           ref={containerRef} 
           className="event-sheet-bg" 
           onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); setContextMenu(null); }}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes('x-cre-variable-id') || e.dataTransfer.types.includes('objectTypeId')) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const variableId = e.dataTransfer.getData('x-cre-variable-id');
+            const objectTypeId = e.dataTransfer.getData('objectTypeId');
+
+            if (variableId && eventSheet) {
+              const globalVar = project.globalVariables.find(v => v.id === variableId);
+              if (globalVar) {
+                const newBlockId = addEventBlock(eventSheet.id, null, 'variable');
+                updateEventBlock(eventSheet.id, newBlockId, { variable: { ...globalVar } });
+              }
+            } else if (objectTypeId && eventSheet) {
+              // Handle object drop if needed (create event with object?)
+              setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: 'NEW', targetObjectTypeId: objectTypeId });
+            }
+          }}
           style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto', position: 'relative' }}
         >
             {eventSheet.events.map((block) => (
@@ -524,13 +599,47 @@ export const EventSheetEditor: React.FC = () => {
           existingNames={getAllVariableNames(project)}
           showStaticConstant={true}
           onSave={(updates) => {
-            updateEventBlock(variableEditorState.eventSheetId, variableEditorState.blockId, { variable: { ...variableEditorState.variable, ...updates } });
+            if (variableEditorState.isNew) {
+              const newBlockId = addEventBlock(variableEditorState.eventSheetId, variableEditorState.parentId || null, 'variable');
+              // Find the newly created block to get its variable ID
+              const es = project.eventSheets.find(s => s.id === variableEditorState.eventSheetId);
+              const findB = (list: EventBlock[]): EventBlock | undefined => {
+                for (const b of list) { if (b.id === newBlockId) return b; const f = findB(b.children); if (f) return f; }
+                return undefined;
+              };
+              const newBlock = es ? findB(es.events) : undefined;
+              
+              if (newBlock && newBlock.variable) {
+                updateEventBlock(variableEditorState.eventSheetId, newBlockId, { 
+                  variable: { ...newBlock.variable, ...updates } 
+                });
+              }
+            } else {
+              const block = findBlockRecursive(eventSheet?.events || [], variableEditorState.blockId);
+              if (block && block.variable) {
+                updateEventBlock(variableEditorState.eventSheetId, variableEditorState.blockId, { 
+                  variable: { ...block.variable, ...updates } 
+                });
+              }
+            }
             setVariableEditorState(null);
           }}
           onCancel={() => setVariableEditorState(null)}
         />
       )}
-      {contextMenu && <ContextMenu project={project} x={contextMenu.x} y={contextMenu.y} blockId={contextMenu.blockId} logicItemId={contextMenu.logicItemId} eventSheetId={eventSheet.id} onAddVariable={onAddVariable} onClose={() => setContextMenu(null)} />}
+      {contextMenu && (
+        <ContextMenu 
+          project={project} 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          blockId={contextMenu.blockId} 
+          logicItemId={contextMenu.logicItemId} 
+          eventSheetId={eventSheet.id} 
+          onAddVariable={onAddVariable} 
+          onClose={() => setContextMenu(null)} 
+          setBrowserState={setBrowserState}
+        />
+      )}
     </div>
   );
 };
@@ -608,7 +717,14 @@ const EventBlockItem: React.FC<{
     setDraggedBlockId(null); 
   };
 
-  const itemStyleWrapper: React.CSSProperties = { position: 'relative', marginLeft: depth > 0 ? '16px' : '0', borderLeft: (depth > 0 || block.children.length > 0) ? '1px solid #444' : 'none', paddingLeft: depth > 0 ? '8px' : '0', borderTop: block.color ? `2px solid ${block.color}` : 'none', opacity: isDragged ? 0.4 : 1, transition: 'opacity 0.2s', marginBottom: '2px' };
+  const itemStyleWrapper: React.CSSProperties = { 
+    position: 'relative', 
+    marginLeft: depth > 0 ? '24px' : '0', 
+    opacity: isDragged ? 0.4 : 1, 
+    transition: 'opacity 0.2s', 
+    marginBottom: '0px' // No margin to avoid gaps in lines
+  };
+
 
   const DragIndicatorLine = () => {
     if (!dragIndicator) return null;
@@ -641,7 +757,7 @@ const EventBlockItem: React.FC<{
         onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} 
         onDoubleClick={(e) => { e.stopPropagation(); onOpenVariableEditor(eventSheetId, block.id, block.variable); }}
         onContextMenu={(e) => onContextMenu(e, block.id)} 
-        style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid', borderLeftColor: isLocal ? '#e67e22' : '#3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), cursor: 'pointer' }}
+        style={{ ...itemStyleWrapper, backgroundColor: isSelected ? '#004b7e' : '#252526', borderLeft: '4px solid', borderLeftColor: isLocal ? '#e67e22' : '#3498db', padding: '6px 12px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '12px', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), cursor: 'pointer', marginBottom: '2px' }}
       >
         <DragIndicatorLine />
         <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? 'Local' : 'Global'}</div>
@@ -758,17 +874,18 @@ const EventBlockItem: React.FC<{
   if (block.type === 'group') {
     const isExpanded = searchTerm ? true : block.groupExpanded;
     return (
-      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'visible', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1) }}>
+      <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, borderRadius: '4px', overflow: 'visible', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '2px' }}>
         <DragIndicatorLine />
         <div style={{ backgroundColor: isSelected ? '#007acc' : '#2d2d2d', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderLeft: '4px solid #f39c12' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !block.groupExpanded }); }}>
-          <span style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>▶</span>
+          <span style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', fontSize: '10px' }}>▶</span>
           <div style={{ fontWeight: 'bold', flex: 1 }}>
             <input value={block.groupName} onChange={(e) => updateEventBlock(eventSheetId, block.id, { groupName: e.target.value })} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'transparent', border: 'none', color: '#fff', fontWeight: 'bold', outline: 'none', width: '100%' }} />
           </div>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
         {isExpanded && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', position: 'relative' }}>
+            <div style={{ position: 'absolute', left: '12px', top: 0, bottom: 0, width: '1px', backgroundColor: '#444' }} />
             {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
           </div>
         )}
@@ -777,7 +894,7 @@ const EventBlockItem: React.FC<{
   }
 
   return (
-    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '3px', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', boxShadow: isSelected ? '0 0 12px rgba(0, 122, 204, 0.3)' : 'none', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '6px', overflow: 'visible', borderLeft: isSelected ? '4px solid #007acc' : '4px solid #3498db' }}>
+    <div className="event-block-item-container" data-block-id={block.id} draggable onDragStart={handleDragStart} onDragEnd={() => setDraggedBlockId(null)} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={(e) => { e.stopPropagation(); setSelectedEventBlocks([block.id]); }} onContextMenu={(e) => onContextMenu(e, block.id)} style={{ ...itemStyleWrapper, display: 'flex', flexDirection: 'column', borderRadius: '3px', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', boxShadow: isSelected ? '0 0 12px rgba(0, 122, 204, 0.3)' : 'none', opacity: isDisabled ? 0.4 : (isDragged ? 0.3 : 1), marginBottom: '4px', overflow: 'visible', borderLeft: isSelected ? '4px solid #007acc' : '4px solid #3498db' }}>
       <DragIndicatorLine />
       <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr', minHeight: '60px', position: 'relative' }}>
         {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" style={{ position: 'absolute', right: '4px', top: '4px', zIndex: 5 }} />}
@@ -802,7 +919,8 @@ const EventBlockItem: React.FC<{
         </div>
       </div>
       {block.children.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', marginTop: '0px', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '12px', top: 0, bottom: 0, width: '1px', backgroundColor: '#444' }} />
           {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       )}
@@ -903,7 +1021,7 @@ const LogicItemContent: React.FC<{
   };
 
   return (
-    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', borderBottom: '1px solid #111' }}>
+    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', borderBottom: '1px solid #111', opacity: item.disabled ? 0.35 : 1 }}>
       {/* Object Column */}
       <div style={{ 
         width: '120px', 
@@ -933,6 +1051,7 @@ const LogicItemContent: React.FC<{
       {/* Logic Column */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 10px', gap: '6px', overflow: 'hidden', lineHeight: '1.4' }}>
         {type === 'condition' && item.inverted && <span style={{ color: '#e67e22', fontWeight: 800, marginRight: '2px' }}>!</span>}
+        {type === 'condition' && def?.isTrigger && <Zap size={10} fill="#2ecc71" color="#2ecc71" style={{ marginRight: '4px' }} />}
         {renderFormattedLogic()}
       </div>
     </div>
@@ -1019,8 +1138,18 @@ const ActionItem: React.FC<{ project: Project, eventSheetId: string, blockId: st
   );
 };
 
-const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: string | null, logicItemId: string | null | undefined, eventSheetId: string, onAddVariable: (parentId?: string | null) => void, onClose: any }> = ({ project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onClose }) => {
-  const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem } = useEditorStore();
+const ContextMenu: React.FC<{ 
+  project: Project, 
+  x: number, 
+  y: number, 
+  blockId: string | null, 
+  logicItemId: string | null | undefined, 
+  eventSheetId: string, 
+  onAddVariable: (parentId?: string | null) => void, 
+  onClose: any,
+  setBrowserState: (state: any) => void
+}> = ({ project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onClose, setBrowserState }) => {
+  const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem, moveEventBlock } = useEditorStore();
   const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
 
   const findBlock = (list: EventBlock[]): EventBlock | undefined => { for (const b of list) { if (b.id === blockId) return b; const f = findBlock(b.children); if (f) return f; } return undefined; };
@@ -1032,6 +1161,15 @@ const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: s
     <div style={{ position: 'fixed', top: y, left: x, backgroundColor: '#2d2d2d', border: '1px solid #444', borderRadius: '4px', boxShadow: '0 5px 15px rgba(0,0,0,0.5)', zIndex: 3000, padding: '4px 0', minWidth: '180px' }}>
       {isLogicItem ? (
         <>
+          <div style={contextItemStyle} onClick={() => { if (blockId && logicItemId) { 
+            const findB = (list: EventBlock[]): EventBlock | undefined => { for (const b of list) { if (b.id === blockId) return b; const f = findB(b.children); if (f) return f; } return undefined; };
+            const b = findB(project.eventSheets.find(es => es.id === eventSheetId)?.events || []);
+            if (b) {
+              if (b.conditions.some(c => c.id === logicItemId)) useEditorStore.getState().toggleConditionDisabled(eventSheetId, blockId, logicItemId);
+              else if (b.actions.some(a => a.id === logicItemId)) useEditorStore.getState().toggleActionDisabled(eventSheetId, blockId, logicItemId);
+            }
+          } onClose(); }}><EyeOff size={14} /> Toggle disabled (D)</div>
+          <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> Copy Item</div>
           <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> Cut Item</div>
           <div style={contextDividerStyle} />
@@ -1045,10 +1183,17 @@ const ContextMenu: React.FC<{ project: Project, x: number, y: number, blockId: s
         <>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> Add sub-event (S)</div>
           <div style={contextItemStyle} onClick={() => { onAddVariable(blockId); onClose(); }}><Variable size={14} /> Add local variable (V)</div>
+          <div style={contextDividerStyle} />
+          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'condition', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add condition (C)</div>
+          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'action', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add action (A)</div>
+          <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { updateEventBlock(eventSheetId, blockId, { disabled: !currentBlock?.disabled }); onClose(); }}><EyeOff size={14} /> {currentBlock?.disabled ? 'Enable' : 'Disable (D)'}</div>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); addCondition(eventSheetId, 'LAST', 'else', []); onClose(); }}><GitBranch size={14} /> Add Else (X)</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { toggleOrBlock(eventSheetId, blockId); onClose(); }}> {currentBlock?.isOrBlock ? 'Make AND block' : 'Make OR block'}</div>
+          <div style={contextItemStyle} onClick={() => { toggleOrBlock(eventSheetId, blockId); onClose(); }}> {currentBlock?.isOrBlock ? 'Make AND block' : 'Make OR block (Y)'}</div>
+          <div style={contextDividerStyle} />
+          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, undefined, blockId); onClose(); }}>Add Above</div>
+          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, blockId, undefined); onClose(); }}>Add Below</div>
           <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> Copy Block (Ctrl+C)</div>
           <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> Cut Block (Ctrl+X)</div>
@@ -1253,6 +1398,7 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
 
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const [filter, setFilter] = React.useState('');
+  const [suggestionState, setSuggestionState] = React.useState<{ isOpen: boolean, items: any[], activeIndex: number, rect: DOMRect | null } | null>(null);
 
   const { globals: inScopeGlobals, locals: inScopeLocals } = getInScopeVariables(project, eventSheetId, blockId);
 
@@ -1296,17 +1442,72 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (suggestionState?.isOpen) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setSuggestionState(s => s ? { ...s, activeIndex: (s.activeIndex + 1) % s.items.length } : null); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); setSuggestionState(s => s ? { ...s, activeIndex: (s.activeIndex - 1 + s.items.length) % s.items.length } : null); }
+        if (e.key === 'Enter' || e.key === 'Tab') { 
+          e.preventDefault(); 
+          const item = suggestionState.items[suggestionState.activeIndex];
+          if (item) insertAtCaret(item.name);
+          setSuggestionState(null);
+        }
+        if (e.key === 'Escape') { e.preventDefault(); setSuggestionState(null); }
+        return;
+      }
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onSave(params);
       if (e.key === 'Escape') onCancel();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [params, onSave, onCancel]);
+  }, [params, onSave, onCancel, suggestionState]);
+
+  const updateSuggestions = (val: string, rect: DOMRect) => {
+    const parts = val.split(/[\s+\-*/(),]/);
+    const lastPart = parts.pop() || '';
+    
+    if (lastPart.length < 1) { setSuggestionState(null); return; }
+    
+    let filtered = [];
+    if (lastPart.includes('.')) {
+      const [objName, search] = lastPart.split('.');
+      const ot = project.objectTypes.find(o => o.name.toLowerCase() === objName.toLowerCase());
+      if (ot) {
+        const props = [
+          { name: 'X', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          { name: 'Y', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          { name: 'Width', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          { name: 'Height', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          { name: 'Angle', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          { name: 'Opacity', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
+          ...ot.instanceVariables.map(v => ({ name: v.name, type: 'variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))
+        ];
+        filtered = props.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => ({ ...p, name: p.name })); // We only want the part after dot for display? No, usually we want to replace the whole part after dot.
+        // Special case: we want to replace only the part AFTER the dot if we were using a more complex system, 
+        // but for now our insertAtCaret replaces the whole last part. 
+        // So we need the items to be "Object.Property"
+        filtered = props.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => ({ ...p, name: `${ot.name}.${p.name}` }));
+      }
+    } else {
+      filtered = assistantItems.filter(i => i.name.toLowerCase().includes(lastPart.toLowerCase())).slice(0, 10);
+    }
+    
+    if (filtered.length > 0) setSuggestionState({ isOpen: true, items: filtered, activeIndex: 0, rect });
+    else setSuggestionState(null);
+  };
 
   const insertAtCaret = (text: string) => {
     const n = [...params];
     const current = String(n[activeParamIndex] || '');
-    n[activeParamIndex] = current ? current + (current.endsWith('.') ? '' : ' ') + text : text;
+    
+    // Find the word being typed to replace it
+    const parts = current.split(/([\s+\-*/(),])/);
+    if (parts.length > 0) {
+      parts[parts.length - 1] = text;
+      n[activeParamIndex] = parts.join('');
+    } else {
+      n[activeParamIndex] = text;
+    }
+    
     setParams(n);
   };
 
@@ -1491,14 +1692,57 @@ const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, 
                       ));
                     })()}
                   </select>
-                ) : (pDef.type as string) === 'number' ? (
-                  <input 
-                    type="text" 
-                    onFocus={() => setActiveParamIndex(i)} 
-                    value={params[i]} 
-                    onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} 
-                    style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333', borderLeft: activeParamIndex === i ? '4px solid #007acc' : '1px solid #333' }} 
-                  />
+                ) : (pDef.type as string) === 'number' || (pDef.type as string) === 'string' ? (
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type="text" 
+                      onFocus={(e) => { setActiveParamIndex(i); updateSuggestions(e.target.value, e.target.getBoundingClientRect()); }} 
+                      value={params[i]} 
+                      onChange={(e) => { 
+                        const n = [...params]; 
+                        n[i] = e.target.value; 
+                        setParams(n); 
+                        updateSuggestions(e.target.value, e.target.getBoundingClientRect());
+                      }} 
+                      onBlur={() => setTimeout(() => setSuggestionState(null), 200)}
+                      style={{ ...paramInputStyle, width: '100%', border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333', borderLeft: activeParamIndex === i ? '4px solid #007acc' : '1px solid #333' }} 
+                    />
+                    {suggestionState?.isOpen && activeParamIndex === i && (
+                      <div style={{ 
+                        position: 'fixed', 
+                        top: (suggestionState.rect?.bottom || 0) + 4, 
+                        left: suggestionState.rect?.left || 0,
+                        width: suggestionState.rect?.width || 200,
+                        backgroundColor: '#252526',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                        zIndex: 3000,
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
+                        {suggestionState.items.map((item, idx) => (
+                          <div 
+                            key={idx}
+                            onClick={() => { insertAtCaret(item.name); setSuggestionState(null); }}
+                            style={{ 
+                              padding: '6px 10px', 
+                              fontSize: '12px', 
+                              cursor: 'pointer', 
+                              backgroundColor: suggestionState.activeIndex === idx ? '#007acc' : 'transparent',
+                              color: suggestionState.activeIndex === idx ? '#fff' : '#ccc',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}
+                          >
+                            <div style={{ opacity: 0.7 }}>{item.icon}</div>
+                            <span>{item.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <input 
                     type="text" 

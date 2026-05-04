@@ -111,7 +111,22 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     const initial = layout.instances.map(inst => {
       const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
       const ivs: Record<string, any> = {};
+      
+      // 1. Collect from Object Type
       ot?.instanceVariables.forEach(v => { ivs[v.name] = v.initialValue; });
+      
+      // 2. Collect from Families
+      project.families.forEach(f => {
+        if (f.objectTypeIds.includes(inst.objectTypeId)) {
+          f.instanceVariables.forEach(v => {
+            // Families can override or provide new variables. In C3, if names clash, it's usually an error or specific precedence.
+            // Here we'll let object type variables take precedence if they have the same name.
+            if (!(v.name in ivs)) {
+              ivs[v.name] = v.initialValue;
+            }
+          });
+        }
+      });
       
       // Initialize Animation State
       const defaultAnim = ot?.animations?.[0];
@@ -141,7 +156,16 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     initial.forEach(inst => {
       const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
-      const physBehavior = ot?.behaviors.find(b => b.type === 'physics' && !b.disabled);
+      
+      // Check for physics behavior on Object Type OR its Families
+      let physBehavior = ot?.behaviors.find(b => b.type === 'physics' && !b.disabled);
+      if (!physBehavior) {
+        const familyWithPhys = project.families.find(f => 
+          f.objectTypeIds.includes(inst.objectTypeId) && 
+          f.behaviors.some(b => b.type === 'physics' && !b.disabled)
+        );
+        physBehavior = familyWithPhys?.behaviors.find(b => b.type === 'physics' && !b.disabled);
+      }
       
       if (physBehavior) {
         const props = physBehavior.properties;
@@ -229,6 +253,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   // Physics Engine Refs
   const physicsEngineRef = React.useRef<Matter.Engine | null>(null);
   const physicsBodiesRef = React.useRef<Map<string, Matter.Body>>(new Map());
+  const triggerIndexRef = React.useRef<Map<string, EventBlock[]>>(new Map());
+  const emitTriggerRef = React.useRef<(type: string, data?: any, currentInsts?: Instance[]) => Instance[]>(() => []);
 
   React.useEffect(() => {
     addLog(`Runtime initialized for layout: ${layout?.name}`, 'info');
@@ -238,6 +264,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
     const onKeyDown = (e: KeyboardEvent) => {
       if (!keysDownRef.current.has(e.code)) {
         keysPressedRef.current.add(e.code);
+        emitTriggerRef.current('keyPressed', { key: e.code });
       }
       keysDownRef.current.add(e.code);
     };
@@ -263,12 +290,24 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         const rect = svgRef.current.getBoundingClientRect();
         const scaleX = project.settings.viewportWidth / rect.width;
         const scaleY = project.settings.viewportHeight / rect.height;
-        pointerPosRef.current = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        pointerPosRef.current = { x, y };
+
+        emitTriggerRef.current('pointerPressed', { x, y });
+        
+        // Handle pointerPressedOnObject trigger
+        runtimeInstancesRef.current.forEach(inst => {
+           if (x >= inst.x && x <= inst.x + inst.width && y >= inst.y && y <= inst.y + inst.height) {
+              emitTriggerRef.current('pointerPressedOnObject', { inst });
+           }
+        });
       }
     };
     const onPointerUp = () => {
       pointerDownRef.current = false;
       pointerReleasedRef.current = true;
+      emitTriggerRef.current('pointerReleased', pointerPosRef.current);
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -291,14 +330,44 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     let animationFrameId: number;
 
-    const getEvaluationContext = (dt: number, instances: Instance[], currentInstance?: Instance, funcParams?: any[], localVars?: Record<string, any>): EvaluationContext => {
+    const rebuildTriggerIndex = () => {
+      const index = new Map<string, EventBlock[]>();
+      const CONDITIONS = project.eventSheets.length > 0 ? (window as any).CONDITIONS || [] : []; // Fallback to global if needed
+      
+      const scan = (blocks: EventBlock[]) => {
+        blocks.forEach(b => {
+          if (b.conditions.length > 0) {
+            const firstCond = b.conditions[0];
+            // We need a way to check isTrigger. For now we use a hardcoded list or find it in CONDITIONS
+            const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision'];
+            if (triggerTypes.includes(firstCond.type)) {
+              if (!index.has(firstCond.type)) index.set(firstCond.type, []);
+              index.get(firstCond.type)!.push(b);
+            }
+          }
+          if (b.children) scan(b.children);
+        });
+      };
+      project.eventSheets.forEach(es => scan(es.events));
+      triggerIndexRef.current = index;
+    };
+    rebuildTriggerIndex();
+
+    const getEvaluationContext = (dt: number, instances: Instance[], pickedSets: PickedSets = {}, currentInstance?: Instance, funcParams?: any[], localVars?: Record<string, any>): EvaluationContext => {
       const objects: Record<string, any> = {};
       // 1. Object Types
       project.objectTypes.forEach(ot => {
-        const insts = instances.filter(i => i.objectTypeId === ot.id);
-        if (insts.length > 0) {
-          // If we have a current instance of this type, use it, otherwise use the first one
-          const target = (currentInstance && currentInstance.objectTypeId === ot.id) ? currentInstance : insts[0];
+        const picked = pickedSets[ot.id];
+        let target: Instance | undefined;
+        if (currentInstance && currentInstance.objectTypeId === ot.id) {
+           target = currentInstance;
+        } else if (picked && picked.length > 0) {
+           target = instances.find(i => i.id === picked[0]);
+        } else {
+           target = instances.find(i => i.objectTypeId === ot.id);
+        }
+        
+        if (target) {
           objects[ot.name] = {
             ...target,
             instanceVariables: target.properties
@@ -308,10 +377,17 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
       // 2. Families
       project.families.forEach(f => {
-        const insts = instances.filter(i => f.objectTypeIds.includes(i.objectTypeId));
-        if (insts.length > 0) {
-          // If current instance belongs to this family, use it, otherwise use the first one
-          const target = (currentInstance && f.objectTypeIds.includes(currentInstance.objectTypeId)) ? currentInstance : insts[0];
+        const picked = pickedSets[f.id];
+        let target: Instance | undefined;
+        if (currentInstance && f.objectTypeIds.includes(currentInstance.objectTypeId)) {
+           target = currentInstance;
+        } else if (picked && picked.length > 0) {
+           target = instances.find(i => i.id === picked[0]);
+        } else {
+           target = instances.find(i => f.objectTypeIds.includes(i.objectTypeId));
+        }
+
+        if (target) {
           objects[f.name] = {
             ...target,
             instanceVariables: target.properties
@@ -336,7 +412,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
     type PickedSets = Record<string, string[]>; // objectTypeId -> instanceIds
 
-    const filterInstances = (condition: any, currentPicked: Instance[], allInstances: Instance[], dt: number): Instance[] => {
+    const filterInstances = (condition: any, currentPicked: Instance[], allInstances: Instance[], dt: number, pickedSets: PickedSets): Instance[] => {
       const px = pointerPosRef.current.x;
       const py = pointerPosRef.current.y;
 
@@ -405,7 +481,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           case 'compareInstanceVariable': {
             const varName = condition.params[0];
             const operator = condition.params[1];
-            const context = getEvaluationContext(dt, [i], i);
+            const context = getEvaluationContext(dt, [i], pickedSets, i);
             const compareValue = evaluateExpression(condition.params[2], context);
             const val = i.properties[varName];
             switch (operator) {
@@ -419,7 +495,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           }
           case 'compareText': {
             const operator = condition.params[0];
-            const context = getEvaluationContext(dt, [i], i);
+            const context = getEvaluationContext(dt, [i], pickedSets, i);
             const compareValue = String(evaluateExpression(condition.params[1], context));
             const val = String(i.properties.text || '');
             switch (operator) {
@@ -439,7 +515,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             return true; // Logic handled in bulk after filtering
           }
           case 'pickByUID': {
-            const targetId = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], i)));
+            const targetId = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], pickedSets, i)));
             return i.id === targetId;
           }
           case 'physicsIsStatic': {
@@ -466,7 +542,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           return [baseFiltered[idx]];
         }
         case 'pickByIndex': {
-          const context = getEvaluationContext(dt, allInstances);
+          const context = getEvaluationContext(dt, allInstances, {});
           const targetIdx = Math.floor(Number(evaluateExpression(condition.params[0], context) ?? 0));
           if (targetIdx >= 0 && targetIdx < baseFiltered.length) {
             return [baseFiltered[targetIdx]];
@@ -474,7 +550,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           return [];
         }
         case 'pickNearest': {
-          const context = getEvaluationContext(dt, allInstances);
+          const context = getEvaluationContext(dt, allInstances, {});
           const tx = Number(evaluateExpression(condition.params[0], context) ?? 0);
           const ty = Number(evaluateExpression(condition.params[1], context) ?? 0);
           let nearest = baseFiltered[0];
@@ -489,7 +565,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           return [nearest];
         }
         case 'pickFarthest': {
-          const context = getEvaluationContext(dt, allInstances);
+          const context = getEvaluationContext(dt, allInstances, {});
           const tx = Number(evaluateExpression(condition.params[0], context) ?? 0);
           const ty = Number(evaluateExpression(condition.params[1], context) ?? 0);
           let farthest = baseFiltered[0];
@@ -519,25 +595,33 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         
         if (block.variable.isStatic) {
           if (!(block.id in staticVariablesRef.current)) {
-            const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+            const context = getEvaluationContext(dt, instances, {}, undefined, funcParams, localVars);
             staticVariablesRef.current[block.id] = evaluateExpression(block.variable.initialValue, context);
           }
           localVars[varName] = staticVariablesRef.current[block.id];
         } else {
-          const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+          const context = getEvaluationContext(dt, instances, {}, undefined, funcParams, localVars);
           localVars[varName] = evaluateExpression(block.variable.initialValue, context);
         }
         return { instances, result: true };
       }
 
       let currentPickedSets: PickedSets = { ...parentPickedSets };
-      let allPass = true;
+      let allPass = !block.isOrBlock; // For AND blocks, assume pass and fail on first fail. For OR blocks, assume fail and pass on first pass.
+      
+      const orBlockPickedSets: PickedSets[] = [];
+      const passingConditionIndices: number[] = [];
 
-      for (const condition of block.conditions) {
+      for (let i = 0; i < block.conditions.length; i++) {
+        const condition = block.conditions[i]!;
         const otid = condition.targetObjectTypeId;
+        
+        // OR blocks start each condition with the parent's picked set
+        const conditionPickedSets: PickedSets = block.isOrBlock ? { ...parentPickedSets } : { ...currentPickedSets };
+
         if (!otid) {
           let result = true;
-          const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+          const context = getEvaluationContext(dt, instances, conditionPickedSets, undefined, funcParams, localVars);
           switch (condition.type) {
             case 'always': result = true; break;
             case 'onStartOfLayout': result = !hasStartedRef.current; break;
@@ -546,7 +630,10 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               const varName = condition.params[0];
               const operator = condition.params[1];
               const compareValue = evaluateExpression(condition.params[2], context);
-              const val = runtimeVariablesRef.current[varName];
+              
+              // Check local variables first, then globals
+              const val = (localVars && varName in localVars) ? localVars[varName] : runtimeVariablesRef.current[varName];
+              
               switch (operator) {
                 case '<': result = val < compareValue; break;
                 case '<=': result = val <= compareValue; break;
@@ -567,22 +654,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               if (pickOtid) {
                 const family = project.families.find(f => f.id === pickOtid);
                 if (family) {
-                  currentPickedSets[pickOtid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
+                  conditionPickedSets[pickOtid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
                 } else {
-                  currentPickedSets[pickOtid] = instances.filter(i => i.objectTypeId === pickOtid).map(i => i.id);
+                  conditionPickedSets[pickOtid] = instances.filter(i => i.objectTypeId === pickOtid).map(i => i.id);
                 }
-                result = currentPickedSets[pickOtid].length > 0;
+                result = conditionPickedSets[pickOtid].length > 0;
               } else result = false;
               break;
             }
             case 'pickRandom': {
-               // System variant of pick random (e.g. System -> Pick random Sprite)
                const pickOtid = condition.params[0];
                if (pickOtid && instances.length > 0) {
                  const typeInsts = instances.filter(i => i.objectTypeId === pickOtid);
                  if (typeInsts.length > 0) {
                     const rand = typeInsts[Math.floor(Math.random() * typeInsts.length)];
-                    currentPickedSets[pickOtid] = [rand.id];
+                    conditionPickedSets[pickOtid] = [rand.id];
                     result = true;
                  } else result = false;
                } else result = false;
@@ -590,11 +676,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             }
           }
           if (condition.inverted) result = !result;
-          if (!result) { allPass = false; break; }
+          
+          if (block.isOrBlock) {
+            if (result) {
+              allPass = true;
+              orBlockPickedSets.push(conditionPickedSets);
+              passingConditionIndices.push(i);
+            }
+          } else {
+            if (!result) { allPass = false; break; }
+            currentPickedSets = conditionPickedSets;
+          }
           continue;
         }
 
-        const context = getEvaluationContext(dt, instances, undefined, funcParams, localVars);
+        const context = getEvaluationContext(dt, instances, conditionPickedSets, undefined, funcParams, localVars);
 
         if (condition.type === 'setPhysicsGravity') {
            if (physicsEngineRef.current) {
@@ -603,26 +699,56 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
              physicsEngineRef.current.gravity.x = gx;
              physicsEngineRef.current.gravity.y = gy;
            }
+           if (block.isOrBlock) { allPass = true; passingConditionIndices.push(i); }
            continue;
         }
 
-        if (!currentPickedSets[otid]) {
+        if (!conditionPickedSets[otid]) {
           const family = project.families.find(f => f.id === otid);
           if (family) {
-            currentPickedSets[otid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
+            conditionPickedSets[otid] = instances.filter(i => family.objectTypeIds.includes(i.objectTypeId)).map(i => i.id);
           } else {
-            currentPickedSets[otid] = instances.filter(i => i.objectTypeId === otid).map(i => i.id);
+            conditionPickedSets[otid] = instances.filter(i => i.objectTypeId === otid).map(i => i.id);
           }
         }
 
-        const pickedInstances = instances.filter(i => currentPickedSets[otid].includes(i.id));
-        const filtered = filterInstances(condition, pickedInstances, instances, dt);
+        const pickedInstances = instances.filter(i => conditionPickedSets[otid].includes(i.id));
+        const filtered = filterInstances(condition, pickedInstances, instances, dt, conditionPickedSets);
+        const result = filtered.length > 0;
 
-        if (filtered.length === 0) {
-          allPass = false;
-          break;
+        if (block.isOrBlock) {
+          if (result) {
+            allPass = true;
+            conditionPickedSets[otid] = filtered.map(i => i.id);
+            orBlockPickedSets.push(conditionPickedSets);
+            passingConditionIndices.push(i);
+          }
+        } else {
+          if (!result) { allPass = false; break; }
+          conditionPickedSets[otid] = filtered.map(i => i.id);
+          currentPickedSets = conditionPickedSets;
         }
-        currentPickedSets[otid] = filtered.map(i => i.id);
+      }
+      
+      // Post-process OR block picking (Union of all passing conditions)
+      if (block.isOrBlock && allPass) {
+        currentPickedSets = {};
+        // Start with parent's picked set for all objects involved in the OR block
+        const involvedOtids = new Set<string>();
+        block.conditions.forEach(c => { if (c.targetObjectTypeId) involvedOtids.add(c.targetObjectTypeId); });
+        
+        involvedOtids.forEach(otid => {
+          const unionIds = new Set<string>();
+          orBlockPickedSets.forEach(cps => {
+            if (cps[otid]) cps[otid].forEach(id => unionIds.add(id));
+          });
+          currentPickedSets[otid] = Array.from(unionIds);
+        });
+
+        // For objects NOT involved in any condition, keep parent's picked state if it existed
+        Object.keys(parentPickedSets).forEach(otid => {
+          if (!currentPickedSets[otid]) currentPickedSets[otid] = parentPickedSets[otid];
+        });
       }
       
       if (!allPass) return { instances, result: false };
@@ -635,7 +761,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         block.children.forEach(child => {
           if (child.type === 'variable' && child.variable) {
             const varName = child.variable.name;
-            const context = getEvaluationContext(dt, nextInstances, undefined, funcParams, localVars);
+            const context = getEvaluationContext(dt, nextInstances, currentPickedSets, undefined, funcParams, localVars);
             
             localVarsMeta[varName] = { blockId: child.id, isStatic: !!child.variable.isStatic };
             
@@ -654,7 +780,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       block.actions.forEach(action => {
         const otid = action.targetObjectTypeId;
         
-        const context = getEvaluationContext(dt, nextInstances, undefined, funcParams, localVars);
+        const context = getEvaluationContext(dt, nextInstances, currentPickedSets, undefined, funcParams, localVars);
         const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
         const isSystemAction = !otid || action.type === 'callFunction' || action.type === 'setReturnValue' || action.type === 'setVariable' || action.type === 'addVariable' || action.type === 'log';
@@ -731,7 +857,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
         if (action.type === 'createInstance') {
             const spawn = (instForContext?: Instance) => {
-              const context = getEvaluationContext(dt, nextInstances, instForContext, funcParams, localVars);
+              const context = getEvaluationContext(dt, nextInstances, currentPickedSets, instForContext, funcParams, localVars);
               
               // 1. Resolve Object Type (Try raw ID first, then evaluate)
               const rawSpawnTypeId = action.params[0];
@@ -840,7 +966,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
 
         nextInstances = nextInstances.map(inst => {
           if (!pickedIds.includes(inst.id)) return inst;
-          const context = getEvaluationContext(dt, nextInstances, inst, funcParams, localVars);
+          const context = getEvaluationContext(dt, nextInstances, currentPickedSets, inst, funcParams, localVars);
           const evalParam = (index: number) => evaluateExpression(action.params[index], context);
 
           switch (action.type) {
@@ -920,6 +1046,23 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
               return inst;
             }
+            case 'moveToLayer': {
+              const targetLayerNameOrId = String(evalParam(0));
+              const targetLayer = layout.layers.find(l => l.id === targetLayerNameOrId || l.name === targetLayerNameOrId);
+              if (targetLayer) {
+                return { ...inst, layerId: targetLayer.id };
+              }
+              return inst;
+            }
+            case 'moveToTop': {
+              // We'll handle this by reordering in nextInstances after the map
+              (inst as any)._moveToTop = true;
+              return inst;
+            }
+            case 'moveToBottom': {
+              (inst as any)._moveToBottom = true;
+              return inst;
+            }
             case 'findPath': {
               const tx = Number(evalParam(0) ?? 0);
               const ty = Number(evalParam(1) ?? 0);
@@ -983,6 +1126,28 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         });
       });
 
+      // Handle Z-order changes
+      const toTop: string[] = [];
+      const toBottom: string[] = [];
+      nextInstances.forEach(inst => {
+        if ((inst as any)._moveToTop) {
+           toTop.push(inst.id);
+           delete (inst as any)._moveToTop;
+        }
+        if ((inst as any)._moveToBottom) {
+           toBottom.push(inst.id);
+           delete (inst as any)._moveToBottom;
+        }
+      });
+
+      if (toTop.length > 0 || toBottom.length > 0) {
+         const others = nextInstances.filter(i => !toTop.includes(i.id) && !toBottom.includes(i.id));
+         const topInsts = nextInstances.filter(i => toTop.includes(i.id));
+         const bottomInsts = nextInstances.filter(i => toBottom.includes(i.id));
+         // Order: Bottoms, Others, Tops
+         nextInstances = [...bottomInsts, ...others, ...topInsts];
+      }
+
       let currentResult = allPass;
       block.children.forEach(child => {
         // Skip variable blocks as they were already initialized above
@@ -992,6 +1157,49 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       });
 
       return { instances: nextInstances, result: allPass };
+    };
+
+    emitTriggerRef.current = (type: string, data?: any, currentInsts?: Instance[]) => {
+      const blocks = triggerIndexRef.current.get(type);
+      if (!blocks) return currentInsts || runtimeInstancesRef.current;
+
+      let nextInsts = [...(currentInsts || runtimeInstancesRef.current)];
+
+      blocks.forEach(block => {
+        let initialPickedSets: PickedSets = {};
+        const firstCond = block.conditions[0];
+        const otid = firstCond.targetObjectTypeId;
+
+        if (type === 'onCollision' && data) {
+           if (otid) {
+              const isFamily = project.families.some(f => f.id === otid);
+              const family = project.families.find(f => f.id === otid);
+              // Ensure instA is the one matching otid (or family)
+              let instA = data.instA;
+              let instB = data.instB;
+              
+              const matchesA = isFamily ? family?.objectTypeIds.includes(instA.objectTypeId) : instA.objectTypeId === otid;
+              if (!matchesA) { [instA, instB] = [instB, instA]; }
+
+              initialPickedSets[otid] = [instA.id];
+              const otherOtid = firstCond.params[0];
+              if (otherOtid) {
+                 initialPickedSets[otherOtid] = [instB.id];
+              }
+           }
+        } else if (type === 'pointerPressedOnObject' && data) {
+            if (otid) initialPickedSets[otid] = [data.inst.id];
+        } else if (type === 'keyPressed' && data) {
+            // No specific instance to pick for key press usually
+        }
+
+        const res = processBlock(block, nextInsts, initialPickedSets, 0, true);
+        nextInsts = res.instances;
+      });
+      
+      runtimeInstancesRef.current = nextInsts;
+      setRuntimeInstances(nextInsts);
+      return nextInsts;
     };
 
     const tick = () => {
@@ -1042,14 +1250,24 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       // 1. Process Behaviors
       nextInstances = nextInstances.map(inst => {
         const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
-        if (!ot || !ot.behaviors) return inst;
+        if (!ot) return inst;
+
+        // Collect all behaviors (ObjectType + Families)
+        const allBehaviors = [...(ot.behaviors || [])];
+        project.families.forEach(f => {
+          if (f.objectTypeIds.includes(inst.objectTypeId)) {
+            allBehaviors.push(...f.behaviors);
+          }
+        });
+
+        if (allBehaviors.length === 0) return inst;
 
         let updatedInst = { ...inst };
-        ot.behaviors.forEach(behavior => {
+        allBehaviors.forEach(behavior => {
           if (behavior.disabled) return;
           if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
           if (!behaviorsStateRef.current[inst.id][behavior.id]) {
-          behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
+            behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
           }
           const state = behaviorsStateRef.current[inst.id][behavior.id];
           const props = behavior.properties;
@@ -1103,7 +1321,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               } else {
                 // Decelerate
                 if (state.vx > 0) state.vx = Math.max(0, state.vx - deceleration * dt);
-                else if (state.vx < 0) state.vx = Math.min(0, state.vx + deceleration * dt);
+                else if (state.vx < 0) state.vx = Math.min(0, state.vx - deceleration * dt);
               }
 
               // 2. Vertical Movement (Gravity & Jump)
@@ -1117,7 +1335,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               const solids = nextInstances.filter(o => {
                 if (o.id === inst.id) return false;
                 const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
-                return ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled);
+                return (ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled) || 
+                        project.families.some(f => f.objectTypeIds.includes(o.objectTypeId) && f.behaviors.some(b => b.type === 'solid' && !b.disabled)));
               });
 
               const checkCollision = (tx: number, ty: number) => {
@@ -1132,7 +1351,6 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               // X Pass
               let newX = updatedInst.x + state.vx * dt;
               if (checkCollision(newX, updatedInst.y)) {
-                // Binary search or simple step back to find edge
                 const step = state.vx > 0 ? 1 : -1;
                 while (checkCollision(updatedInst.x + step, updatedInst.y) === false && Math.abs(updatedInst.x - newX) > 1) {
                   updatedInst.x += step;
@@ -1148,14 +1366,12 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               let onFloor = false;
               if (checkCollision(updatedInst.x, newY)) {
                 if (state.vy > 0) {
-                  // Hit floor
                   const step = 1;
                   while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y < newY) {
                     updatedInst.y += step;
                   }
                   onFloor = true;
                 } else if (state.vy < 0) {
-                  // Hit ceiling
                   const step = -1;
                   while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y > newY) {
                     updatedInst.y += step;
@@ -1171,33 +1387,19 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             }
             case 'pathfinding': {
               const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 200);
-              const cellSize = Number(props.cellSide ?? 32);
-              
-              if (state.path === undefined) {
-                state.path = [];
-                state.targetX = updatedInst.x;
-                state.targetY = updatedInst.y;
-              }
-
-              // Logic to calculate path if target changes (usually triggered by action)
-              // For now, let's assume we follow the path waypoints
               if (state.path && state.path.length > 0) {
                 const waypoint = state.path[0];
                 const dx = waypoint.x - (updatedInst.x + updatedInst.width / 2);
                 const dy = waypoint.y - (updatedInst.y + updatedInst.height / 2);
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                
                 if (dist < 5) {
                   state.path.shift();
                 } else {
                   const moveDist = Math.min(dist, maxSpeed * dt);
                   updatedInst.x += (dx / dist) * moveDist;
                   updatedInst.y += (dy / dist) * moveDist;
-                  
                   if (props.rotateSpeed > 0) {
-                    const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-                    // Simple angle lerp could be added here
-                    updatedInst.angle = targetAngle;
+                    updatedInst.angle = Math.atan2(dy, dx) * (180 / Math.PI);
                   }
                 }
               }
@@ -1232,18 +1434,39 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         return { ...inst, properties: { ...inst.properties, _frameIdx: frameIdx, _animTimer: timer } };
       });
 
+      // 1.8 Process Collision Triggers
+      nextInstances.forEach(i => {
+        nextInstances.forEach(o => {
+          if (i.id === o.id) return;
+          const isOverlapping = i.x < o.x + o.width && i.x + i.width > o.x && i.y < o.y + o.height && i.y + i.height > o.y;
+          if (isOverlapping) {
+             const pairId = i.id < o.id ? `${i.id}:${o.id}` : `${o.id}:${i.id}`;
+             if (!prevOverlapsRef.current.has(pairId)) {
+                nextInstances = emitTriggerRef.current('onCollision', { instA: i, instB: o }, nextInstances);
+             }
+          }
+        });
+      });
+
+      if (!hasStartedRef.current) {
+        nextInstances = emitTriggerRef.current('onStartOfLayout', undefined, nextInstances);
+        hasStartedRef.current = true;
+        addLog(`Layout started. Instances: ${nextInstances.length}`, 'info');
+      }
+
       // 2. Process Event Sheet
       let lastRes = true;
       eventSheet.events.forEach(block => {
+        const firstCond = block.conditions[0];
+        const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision'];
+        if (firstCond && triggerTypes.includes(firstCond.type)) return;
+
         const blockRes = processBlock(block, nextInstances, {}, dt, lastRes, false, undefined, {}, {}, 0);
         nextInstances = blockRes.instances;
         lastRes = blockRes.result;
       });
 
-      if (!hasStartedRef.current) {
-        hasStartedRef.current = true;
-        addLog(`First frame processed. Final instances: ${nextInstances.length}`, 'info');
-      }
+      // Layout start handled above via trigger
 
       runtimeInstancesRef.current = nextInstances;
       setRuntimeInstances(nextInstances);

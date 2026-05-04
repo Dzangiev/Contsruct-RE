@@ -61,21 +61,27 @@ const sectionHeaderStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '4px 8px',
-  background: '#252526',
-  borderRadius: '4px',
-  marginBottom: '4px'
+  padding: '6px 12px',
+  background: '#2d2d2d',
+  borderBottom: '1px solid #1a1a1a',
+  marginBottom: '2px',
+  color: '#888',
+  fontSize: '10px',
+  fontWeight: 800,
+  textTransform: 'uppercase',
+  letterSpacing: '0.8px'
 };
 
 const itemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex',
   alignItems: 'center',
-  gap: '6px',
-  padding: '4px 8px',
+  gap: '8px',
+  padding: '6px 10px',
   cursor: 'pointer',
-  backgroundColor: selected ? '#37373d' : 'transparent',
+  backgroundColor: selected ? '#094771' : 'transparent',
   color: selected ? '#fff' : '#ccc',
-  borderRadius: '3px'
+  fontSize: '12px',
+  transition: 'background-color 0.1s, color 0.1s'
 });
 
 const miniIconButtonStyle: React.CSSProperties = {
@@ -108,7 +114,10 @@ export const ProjectExplorer: React.FC = () => {
     addFolder,
     updateFolder,
     removeFolder,
-    moveEntityToFolder
+    moveEntityToFolder,
+    addGlobalVariable,
+    updateGlobalVariable,
+    removeGlobalVariable
   } = useEditorStore();
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number, y: number, folderId?: string, itemId?: string, type: string } | null>(null);
@@ -293,15 +302,17 @@ export const ProjectExplorer: React.FC = () => {
     );
   };
 
+
   return (
     <div className="project-explorer" style={explorerStyle}>
       <div style={{ padding: '12px 16px 8px 16px', fontWeight: 800, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         Project Explorer
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px 8px' }}>
+        {/* Layouts */}
         <section 
-          style={{ padding: '10px', marginBottom: '20px' }}
+          style={{ marginBottom: '16px' }}
           onDragOver={(e) => { 
             if (e.dataTransfer.types.includes('x-cre-org-layout') || e.dataTransfer.types.includes('x-cre-org-folder-layout')) {
               e.preventDefault(); 
@@ -312,11 +323,9 @@ export const ProjectExplorer: React.FC = () => {
           onDrop={(e) => {
             e.preventDefault();
             setDragIndicator(null);
-            
             const draggedFolderId = e.dataTransfer.getData('folder-id');
             const entityId = e.dataTransfer.getData('entity-id');
             const entityType = e.dataTransfer.getData('organize-type');
-
             if (draggedFolderId) {
               updateFolder(draggedFolderId, { parentId: null });
             } else if (entityId && entityType === 'layout') {
@@ -324,21 +333,27 @@ export const ProjectExplorer: React.FC = () => {
             }
           }}
         >
-          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-layout' ? '1px solid #007acc' : 'none', outlineOffset: '-1px' }}>
-            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Layouts</span>
+          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-layout' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LayoutIcon size={12} />
+              <span>Layouts</span>
+            </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => addFolder('layout', 'New Folder')} style={miniIconButtonStyle}><Folder size={12} /></button>
+              <button onClick={() => addFolder('layout', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
               <button onClick={async () => {
                   const name = await showDialog({ title: 'New Layout', message: 'Enter layout name:', type: 'prompt', defaultValue: `Layout ${(project.layouts?.length || 0) + 1}` });
                   if (name && typeof name === 'string') addLayout(name);
-              }} style={miniIconButtonStyle}><Plus size={12} /></button>
+              }} style={miniIconButtonStyle} title="Add Layout"><Plus size={12} /></button>
             </div>
           </div>
-          {renderFolderContent('layout', null)}
+          <div style={{ padding: '4px 0' }}>
+            {renderFolderContent('layout', null)}
+          </div>
         </section>
 
+        {/* Object Types */}
         <section 
-          style={{ padding: '10px', borderTop: '1px solid #1a1a1a', marginBottom: '20px' }}
+          style={{ marginBottom: '16px' }}
           onDragOver={(e) => { 
             if (e.dataTransfer.types.includes('x-cre-org-objecttype') || e.dataTransfer.types.includes('x-cre-org-folder-objecttype')) {
               e.preventDefault(); 
@@ -352,7 +367,6 @@ export const ProjectExplorer: React.FC = () => {
             const draggedFolderId = e.dataTransfer.getData('folder-id');
             const entityId = e.dataTransfer.getData('entity-id');
             const entityType = e.dataTransfer.getData('organize-type');
-
             if (draggedFolderId) {
               updateFolder(draggedFolderId, { parentId: null });
             } else if (entityId && entityType === 'objectType') {
@@ -360,8 +374,11 @@ export const ProjectExplorer: React.FC = () => {
             }
           }}
         >
-          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-objectType' ? '1px solid #007acc' : 'none', outlineOffset: '-1px' }}>
-            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Object Types</span>
+          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-objectType' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Package size={12} />
+              <span>Object Types</span>
+            </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button onClick={() => addFolder('objectType', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
               <button 
@@ -376,14 +393,14 @@ export const ProjectExplorer: React.FC = () => {
               </button>
             </div>
           </div>
-          {renderFolderContent('objectType', null)}
-          {project.objectTypes?.length === 0 && (
-             <div style={{ padding: '8px 10px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>No objects</div>
-          )}
+          <div style={{ padding: '4px 0' }}>
+            {renderFolderContent('objectType', null)}
+          </div>
         </section>
 
+        {/* Families */}
         <section 
-          style={{ padding: '10px', borderTop: '1px solid #1a1a1a', marginBottom: '20px' }}
+          style={{ marginBottom: '16px' }}
           onDragOver={(e) => { 
             if (e.dataTransfer.types.includes('x-cre-org-family') || e.dataTransfer.types.includes('x-cre-org-folder-family')) {
               e.preventDefault(); 
@@ -397,7 +414,6 @@ export const ProjectExplorer: React.FC = () => {
             const draggedFolderId = e.dataTransfer.getData('folder-id');
             const entityId = e.dataTransfer.getData('entity-id');
             const entityType = e.dataTransfer.getData('organize-type');
-
             if (draggedFolderId) {
               updateFolder(draggedFolderId, { parentId: null });
             } else if (entityId && entityType === 'family') {
@@ -405,8 +421,11 @@ export const ProjectExplorer: React.FC = () => {
             }
           }}
         >
-          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-family' ? '1px solid #007acc' : 'none', outlineOffset: '-1px' }}>
-            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Families</span>
+          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-family' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={12} />
+              <span>Families</span>
+            </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button onClick={() => addFolder('family', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
               <button 
@@ -421,14 +440,16 @@ export const ProjectExplorer: React.FC = () => {
               </button>
             </div>
           </div>
-          {renderFolderContent('family', null)}
-          {project.families?.length === 0 && (
-             <div style={{ padding: '8px 10px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>No families</div>
-          )}
+          <div style={{ padding: '4px 0' }}>
+            {renderFolderContent('family', null)}
+            {project.families?.length === 0 && (
+               <div style={{ padding: '8px 12px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>No families</div>
+            )}
+          </div>
         </section>
 
+        {/* Event Sheets */}
         <section 
-          style={{ padding: '10px', borderTop: '1px solid #1a1a1a' }}
           onDragOver={(e) => { 
             if (e.dataTransfer.types.includes('x-cre-org-eventsheet') || e.dataTransfer.types.includes('x-cre-org-folder-eventsheet')) {
               e.preventDefault(); 
@@ -442,7 +463,6 @@ export const ProjectExplorer: React.FC = () => {
             const draggedFolderId = e.dataTransfer.getData('folder-id');
             const entityId = e.dataTransfer.getData('entity-id');
             const entityType = e.dataTransfer.getData('organize-type');
-
             if (draggedFolderId) {
               updateFolder(draggedFolderId, { parentId: null });
             } else if (entityId && entityType === 'eventSheet') {
@@ -450,14 +470,19 @@ export const ProjectExplorer: React.FC = () => {
             }
           }}
         >
-          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-eventSheet' ? '1px solid #007acc' : 'none', outlineOffset: '-1px' }}>
-            <span style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', color: '#666' }}>Event Sheets</span>
+          <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-eventSheet' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={12} />
+              <span>Event Sheets</span>
+            </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button onClick={() => addFolder('eventSheet', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
               <button style={miniIconButtonStyle} title="Add Event Sheet"><Plus size={12} /></button>
             </div>
           </div>
-          {renderFolderContent('eventSheet', null)}
+          <div style={{ padding: '4px 0' }}>
+            {renderFolderContent('eventSheet', null)}
+          </div>
         </section>
       </div>
 
@@ -481,7 +506,6 @@ export const ProjectExplorer: React.FC = () => {
                              project.families.find(f => f.id === contextMenu.itemId);
                 const name = await showDialog({ title: 'Rename', message: 'New name:', type: 'prompt', defaultValue: item?.name });
                 if (name && typeof name === 'string') {
-                   // Generic rename logic needed or specialized
                    if (contextMenu.type === 'layout') updateLayout(contextMenu.itemId!, { name });
                    else if (contextMenu.type === 'objectType') updateObjectType(contextMenu.itemId!, { name });
                    else if (contextMenu.type === 'family') updateFamily(contextMenu.itemId!, { name });

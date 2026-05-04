@@ -194,15 +194,39 @@ export const Inspector: React.FC = () => {
             <div style={{ padding: '4px 0', borderBottom: '1px solid #222' }}>
                <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Object Variables</span>
             </div>
-            {objectType?.instanceVariables?.map(v => (
-              <PropertyRow 
-                key={v.id} 
-                label={v.name} 
-                value={instance.properties?.[v.name] ?? v.initialValue} 
-                onChange={val => updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: val } })} 
-                icon={<Type size={12}/>}
-              />
-            ))}
+            {objectType?.instanceVariables?.map(v => {
+              const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
+              const val = instance.properties?.[v.name] ?? v.initialValue;
+              
+              let rowType: any = 'text';
+              let rowOptions: string[] = [];
+              if (v.type === 'number') rowType = 'number';
+              else if (v.type === 'boolean') {
+                rowType = 'select';
+                rowOptions = ['Yes', 'No'];
+              }
+
+              return (
+                <div key={v.id} style={{ position: 'relative' }}>
+                  <PropertyRow 
+                    label={v.name} 
+                    value={v.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                    type={rowType}
+                    options={rowOptions}
+                    onChange={newVal => {
+                      let finalVal = newVal;
+                      if (v.type === 'boolean') finalVal = newVal === 'Yes';
+                      if (v.type === 'number') finalVal = Number(newVal);
+                      updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: finalVal } });
+                    }} 
+                    icon={<Type size={12} color={isOverridden ? '#3498db' : '#666'} />}
+                  />
+                  <div style={{ position: 'absolute', right: '4px', top: '2px', display: 'flex', gap: '2px', opacity: 0.3 }} className="var-actions-hover">
+                    <button onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title="Edit definition"><Edit2 size={10} /></button>
+                  </div>
+                </div>
+              );
+            })}
             {(!objectType?.instanceVariables || objectType.instanceVariables.length === 0) && (
               <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No object variables.</div>
             )}
@@ -212,15 +236,39 @@ export const Inspector: React.FC = () => {
                 <div style={{ padding: '4px 0', borderBottom: '1px solid #222', marginTop: '8px' }}>
                   <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Family: {family.name}</span>
                 </div>
-                {family.instanceVariables.map(v => (
-                  <PropertyRow 
-                    key={v.id} 
-                    label={v.name} 
-                    value={instance.properties?.[v.name] ?? v.initialValue} 
-                    onChange={val => updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: val } })} 
-                    icon={<Type size={12} color="#f1c40f" />}
-                  />
-                ))}
+                {family.instanceVariables.map(v => {
+                  const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
+                  const val = instance.properties?.[v.name] ?? v.initialValue;
+                  
+                  let rowType: any = 'text';
+                  let rowOptions: string[] = [];
+                  if (v.type === 'number') rowType = 'number';
+                  else if (v.type === 'boolean') {
+                    rowType = 'select';
+                    rowOptions = ['Yes', 'No'];
+                  }
+
+                  return (
+                    <div key={v.id} style={{ position: 'relative' }}>
+                      <PropertyRow 
+                        label={v.name} 
+                        value={v.type === 'boolean' ? (val ? 'Yes' : 'No') : val} 
+                        type={rowType}
+                        options={rowOptions}
+                        onChange={newVal => {
+                          let finalVal = newVal;
+                          if (v.type === 'boolean') finalVal = newVal === 'Yes';
+                          if (v.type === 'number') finalVal = Number(newVal);
+                          updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: finalVal } });
+                        }} 
+                        icon={<Type size={12} color={isOverridden ? '#f1c40f' : '#666'} />}
+                      />
+                      <div style={{ position: 'absolute', right: '4px', top: '2px', display: 'flex', gap: '2px', opacity: 0.3 }} className="var-actions-hover">
+                        <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title="Edit definition"><Edit2 size={10} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
                 {family.instanceVariables.length === 0 && (
                   <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
                 )}
@@ -647,6 +695,7 @@ export const Inspector: React.FC = () => {
         .property-row-hover:hover { background-color: rgba(255,255,255,0.03); }
         .inspector select:hover, .inspector input:hover { border-color: #555; }
         .inspector select:focus, .inspector input:focus { border-color: #007acc; }
+        .var-actions-hover:hover { opacity: 1 !important; }
       `}</style>
       <div style={panelHeaderStyle}>Properties: {activeLayout?.name || 'Project'}</div>
       

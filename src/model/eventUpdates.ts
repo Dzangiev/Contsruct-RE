@@ -1,4 +1,4 @@
-import { Project, EventSheet, EventBlock, Condition, Action } from './project';
+import { Project, EventSheet, EventBlock, Condition, Action, GlobalVariable } from './project';
 import { generateId } from '../utils/id';
 
 /**
@@ -172,10 +172,24 @@ export function updateEventBlock(
       // Sync with globalVariables if it's a root block
       updatedProject = {
         ...project,
-        globalVariables: project.globalVariables.map(v => 
-          v.id === varId ? { ...v, ...updates.variable } : v
-        )
+        globalVariables: project.globalVariables.map(v => {
+          // If this is the renamed variable itself, update its name/props
+          if (v.id === varId) return { ...v, ...updates.variable };
+          // If this is another variable, update its initialValue expression if it uses the renamed variable
+          return {
+            ...v,
+            initialValue: replaceVariableNameInExpression(v.initialValue, oldName, newName)
+          };
+        })
       };
+
+      // CRITICAL: Update all references to this variable in ALL sheets if the name changed
+      if (newName !== oldName) {
+        updatedProject.eventSheets = updatedProject.eventSheets.map(sheet => ({
+          ...sheet,
+          events: updateVariableReferencesInTree(sheet.events, oldName, newName)
+        }));
+      }
     }
   }
 
@@ -231,6 +245,37 @@ export function removeEventBlock(
       };
     })
   };
+}
+
+/**
+ * Removes a global variable and syncs with all sheets.
+ */
+export function removeGlobalVariable(
+  project: Project,
+  variableId: string
+): Project {
+  // 1. Remove from globalVariables
+  let nextProject: Project = {
+    ...project,
+    globalVariables: project.globalVariables.filter(v => v.id !== variableId)
+  };
+
+  // 2. Remove all blocks referencing this variable ID from ALL sheets
+  nextProject.eventSheets = nextProject.eventSheets.map(es => ({
+    ...es,
+    events: removeVariableBlocksById(es.events, variableId)
+  }));
+
+  return nextProject;
+}
+
+function removeVariableBlocksById(blocks: EventBlock[], variableId: string): EventBlock[] {
+  return blocks
+    .filter(b => !(b.type === 'variable' && b.variable?.id === variableId))
+    .map(b => ({
+      ...b,
+      children: removeVariableBlocksById(b.children, variableId)
+    }));
 }
 
 /**
@@ -715,3 +760,353 @@ export function moveAction(
     })
   };
 }
+
+/**
+ * Toggles the disabled state of a condition.
+ */
+export function toggleConditionDisabled(
+  project: Project,
+  eventSheetId: string,
+  blockId: string,
+  conditionId: string
+): Project {
+  const es = project.eventSheets.find(s => s.id === eventSheetId);
+  const findCond = (blocks: EventBlock[]): any => {
+    for (const b of blocks) {
+      if (b.id === blockId) return b.conditions.find(c => c.id === conditionId);
+      const f = findCond(b.children);
+      if (f) return f;
+    }
+  };
+  const cond = es ? findCond(es.events) : null;
+  if (!cond) return project;
+  return updateCondition(project, eventSheetId, blockId, conditionId, { disabled: !cond.disabled });
+}
+
+/**
+ * Toggles the disabled state of an action.
+ */
+export function toggleActionDisabled(
+  project: Project,
+  eventSheetId: string,
+  blockId: string,
+  actionId: string
+): Project {
+  const es = project.eventSheets.find(s => s.id === eventSheetId);
+  const findAct = (blocks: EventBlock[]): any => {
+    for (const b of blocks) {
+      if (b.id === blockId) return b.actions.find(a => a.id === actionId);
+      const f = findAct(b.children);
+      if (f) return f;
+    }
+  };
+  const act = es ? findAct(es.events) : null;
+  if (!act) return project;
+  return updateAction(project, eventSheetId, blockId, actionId, { disabled: !act.disabled });
+}
+/**
+ * Recursively updates all logic items that reference a variable by name.
+ */
+function updateVariableReferencesInTree(blocks: EventBlock[], oldName: string, newName: string): EventBlock[] {
+  return blocks.map(block => {
+    const updatedBlock = { ...block };
+    
+    // Update conditions
+    updatedBlock.conditions = block.conditions.map(cond => {
+      let newParams = [...cond.params];
+      
+      // 1. Handle explicit variable parameters
+      if (['compareVariable', 'compareGlobalVariable'].includes(cond.type) && newParams[0] === oldName) {
+        newParams[0] = newName;
+      }
+      
+      // 2. Handle expressions in all parameters
+      newParams = newParams.map(p => replaceVariableNameInExpression(p, oldName, newName));
+      
+      return { ...cond, params: newParams };
+    });
+
+    // Update actions
+    updatedBlock.actions = block.actions.map(act => {
+      let newParams = [...act.params];
+
+      // 1. Handle explicit variable parameters
+      if (['setVariable', 'addVariable', 'subtractVariable'].includes(act.type) && newParams[0] === oldName) {
+        newParams[0] = newName;
+      }
+
+      // 2. Handle expressions in all parameters
+      newParams = newParams.map(p => replaceVariableNameInExpression(p, oldName, newName));
+
+      return { ...act, params: newParams };
+    });
+
+    // Recursive children
+    if (block.children.length > 0) {
+      updatedBlock.children = updateVariableReferencesInTree(block.children, oldName, newName);
+    }
+
+    // Update initial value if this is a variable block (for local variables referencing other variables)
+    if (updatedBlock.type === 'variable' && updatedBlock.variable) {
+      updatedBlock.variable = {
+        ...updatedBlock.variable,
+        initialValue: replaceVariableNameInExpression(updatedBlock.variable.initialValue, oldName, newName)
+      };
+    }
+
+    return updatedBlock;
+  });
+}
+
+/**
+ * Recursively updates all logic items and variables that reference an object type or family by name.
+ */
+export function updateObjectTypeReferencesInTree(blocks: EventBlock[], oldName: string, newName: string): EventBlock[] {
+  return blocks.map(block => {
+    const updatedBlock = { ...block };
+    
+    // Update conditions
+    updatedBlock.conditions = block.conditions.map(cond => {
+      const newParams = cond.params.map(p => replaceVariableNameInExpression(p, oldName, newName));
+      return { ...cond, params: newParams };
+    });
+
+    // Update actions
+    updatedBlock.actions = block.actions.map(act => {
+      const newParams = act.params.map(p => replaceVariableNameInExpression(p, oldName, newName));
+      return { ...act, params: newParams };
+    });
+
+    // Update variable blocks (initial values)
+    if (updatedBlock.type === 'variable' && updatedBlock.variable) {
+      updatedBlock.variable = {
+        ...updatedBlock.variable,
+        initialValue: replaceVariableNameInExpression(updatedBlock.variable.initialValue, oldName, newName)
+      };
+    }
+
+    // Recursive children
+    if (block.children.length > 0) {
+      updatedBlock.children = updateObjectTypeReferencesInTree(block.children, oldName, newName);
+    }
+
+    return updatedBlock;
+  });
+}
+
+/**
+ * Synchronizes object type or family renaming across the entire project.
+ */
+export function syncObjectTypeRenaming(project: Project, oldName: string, newName: string): Project {
+  if (oldName === newName) return project;
+
+  return {
+    ...project,
+    // Update variables initial values
+    globalVariables: project.globalVariables.map(v => ({
+      ...v,
+      initialValue: replaceVariableNameInExpression(v.initialValue, oldName, newName)
+    })),
+    // Update all event sheets
+    eventSheets: project.eventSheets.map(sheet => ({
+      ...sheet,
+      events: updateObjectTypeReferencesInTree(sheet.events, oldName, newName)
+    }))
+  };
+}
+
+/**
+ * Synchronizes instance variable renaming across the entire project.
+ * Handles the prefix format: ObjectName.VariableName
+ */
+export function syncInstanceVariableRenaming(
+  project: Project, 
+  targetName: string, // Object Type or Family name
+  oldVarName: string, 
+  newVarName: string
+): Project {
+  if (oldVarName === newVarName) return project;
+
+  const replaceInstanceVarInExpression = (expression: any) => {
+    if (typeof expression !== 'string') return expression;
+    
+    // Replace "ObjectName.OldVarName" with "ObjectName.NewVarName"
+    const escapedTarget = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedVar = oldVarName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedTarget}\\.${escapedVar}\\b`, 'g');
+    return expression.replace(regex, `${targetName}.${newVarName}`);
+  };
+
+  const updateTree = (blocks: EventBlock[]): EventBlock[] => {
+    return blocks.map(block => {
+      const updatedBlock = { ...block };
+      
+      // Update conditions
+      updatedBlock.conditions = block.conditions.map(cond => {
+        let newParams = [...cond.params];
+        
+        // Handle explicit instance variable parameter
+        // This usually applies if the condition is targetted at the specific object
+        if (cond.type === 'compareInstanceVariable' && newParams[0] === oldVarName) {
+           // We only update if this condition belongs to the object being renamed
+           // (or if we can't be sure, we update and assume the user knows what they're doing)
+           newParams[0] = newVarName;
+        }
+
+        newParams = newParams.map(p => replaceInstanceVarInExpression(p));
+        return { ...cond, params: newParams };
+      });
+
+      // Update actions
+      updatedBlock.actions = block.actions.map(act => {
+        let newParams = [...act.params];
+
+        // Handle explicit instance variable parameter
+        if (['setInstanceVariable', 'addInstanceVariable', 'subtractInstanceVariable'].includes(act.type) && newParams[0] === oldVarName) {
+          newParams[0] = newVarName;
+        }
+
+        newParams = newParams.map(p => replaceInstanceVarInExpression(p));
+        return { ...act, params: newParams };
+      });
+
+      // Update variable blocks
+      if (updatedBlock.type === 'variable' && updatedBlock.variable) {
+        updatedBlock.variable = {
+          ...updatedBlock.variable,
+          initialValue: replaceInstanceVarInExpression(updatedBlock.variable.initialValue)
+        };
+      }
+
+      if (block.children.length > 0) {
+        updatedBlock.children = updateTree(block.children);
+      }
+
+      return updatedBlock;
+    });
+  };
+
+  return {
+    ...project,
+    globalVariables: project.globalVariables.map(v => ({
+      ...v,
+      initialValue: replaceInstanceVarInExpression(v.initialValue)
+    })),
+    eventSheets: project.eventSheets.map(sheet => ({
+      ...sheet,
+      events: updateTree(sheet.events)
+    }))
+  };
+}
+
+/**
+ * Safely replaces a variable name within an expression string.
+ */
+function replaceVariableNameInExpression(expression: any, oldName: string, newName: string): any {
+  if (typeof expression !== 'string') return expression;
+  
+  // Note: we escape the oldName just in case it contains regex-special characters
+  const escapedName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  // Use regex with word boundaries (\b) to replace only the exact variable name.
+  // This prevents replacing "v" inside "variable" if we rename "v" to "x".
+  const regex = new RegExp(`\\b${escapedName}\\b`, 'g');
+  return expression.replace(regex, newName);
+}
+
+/**
+ * Adds a new global variable to the project.
+ */
+export function addGlobalVariable(project: Project, name: string, type: 'number' | 'string' | 'boolean' = 'number', initialValue: any = 0): Project {
+  const newVar: GlobalVariable = {
+    id: generateId(),
+    name,
+    type,
+    initialValue,
+    isStatic: false,
+    isConstant: false,
+    description: ''
+  };
+  return {
+    ...project,
+    globalVariables: [...project.globalVariables, newVar]
+  };
+}
+
+/**
+ * Updates a global variable and synchronizes references if the name changed.
+ */
+export function updateGlobalVariable(project: Project, variableId: string, updates: Partial<GlobalVariable>): Project {
+  const oldVar = project.globalVariables.find(v => v.id === variableId);
+  if (!oldVar) return project;
+
+  const oldName = oldVar.name;
+  const newName = updates.name || oldName;
+
+  // 1. Sync in globalVariables pool
+  let updatedProject = {
+    ...project,
+    globalVariables: project.globalVariables.map(v => {
+      if (v.id === variableId) return { ...v, ...updates };
+      // Also update initial values of other variables if they use this one
+      if (newName !== oldName) {
+        return {
+          ...v,
+          initialValue: replaceVariableNameInExpression(v.initialValue, oldName, newName)
+        };
+      }
+      return v;
+    })
+  };
+
+  // 2. Sync in all Event Sheets (both name references and the definition blocks)
+  updatedProject.eventSheets = updatedProject.eventSheets.map(sheet => ({
+    ...sheet,
+    events: syncVariableInTree(sheet.events, variableId, oldName, newName, updates)
+  }));
+
+  return updatedProject;
+}
+
+function syncVariableInTree(blocks: EventBlock[], variableId: string, oldName: string, newName: string, updates: Partial<GlobalVariable>): EventBlock[] {
+  return blocks.map(b => {
+    let nextB = b;
+    
+    // If this is the definition block for the variable, update its properties
+    if (b.type === 'variable' && b.variable?.id === variableId) {
+      nextB = { ...b, variable: { ...b.variable, ...updates } };
+    }
+
+    // If the name changed, sync references in expressions/params
+    if (newName !== oldName) {
+      nextB = updateVariableReferencesInBlock(nextB, oldName, newName);
+    }
+
+    // Recursively update children
+    if (nextB.children.length > 0) {
+      nextB = { ...nextB, children: syncVariableInTree(nextB.children, variableId, oldName, newName, updates) };
+    }
+
+    return nextB;
+  });
+}
+
+function updateVariableReferencesInBlock(block: EventBlock, oldName: string, newName: string): EventBlock {
+  return {
+    ...block,
+    conditions: block.conditions.map(c => ({
+      ...c,
+      params: c.params.map(p => replaceVariableNameInExpression(p, oldName, newName))
+    })),
+    actions: block.actions.map(a => ({
+      ...a,
+      params: a.params.map(p => replaceVariableNameInExpression(p, oldName, newName))
+    })),
+    // Also update variable's own initial value if it uses the renamed variable (for local vars or other global vars)
+    variable: block.variable ? {
+      ...block.variable,
+      initialValue: replaceVariableNameInExpression(block.variable.initialValue, oldName, newName)
+    } : undefined
+  };
+}
+

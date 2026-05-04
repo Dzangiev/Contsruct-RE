@@ -160,6 +160,7 @@ export interface LogicDefinition {
   target: 'system' | 'object' | 'both';
   requiredKind?: string | string[];
   behaviorType?: string;
+  isTrigger?: boolean;
 }
 
 export const CONDITIONS: LogicDefinition[] = [
@@ -178,14 +179,15 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'Runs once when the layout starts.',
     params: [],
     category: 'System',
-    target: 'system'
+    target: 'system',
+    isTrigger: true
   },
   {
     type: 'compareGlobalVariable',
     name: 'Compare variable',
     description: 'Compare the value of a global variable.',
     params: [
-      { name: 'Variable', type: 'string', defaultValue: 'Score' },
+      { name: 'Variable', type: 'globalVariable', defaultValue: '' },
       { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
       { name: 'Value', type: 'number', defaultValue: 0 }
     ],
@@ -214,7 +216,8 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True only during the frame the key was pressed.',
     params: [{ name: 'Key', type: 'string', defaultValue: 'Space' }],
     category: 'Keyboard',
-    target: 'system'
+    target: 'system',
+    isTrigger: true
   },
   {
     type: 'pointerDown',
@@ -230,7 +233,8 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True only during the frame the pointer was pressed.',
     params: [],
     category: 'Pointer',
-    target: 'system'
+    target: 'system',
+    isTrigger: true
   },
   {
     type: 'pointerReleased',
@@ -238,7 +242,8 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True only during the frame the pointer was released.',
     params: [],
     category: 'Pointer',
-    target: 'system'
+    target: 'system',
+    isTrigger: true
   },
   // Picking (System)
   {
@@ -292,7 +297,8 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True only if the pointer was pressed while over the object.',
     params: [],
     category: 'Pointer',
-    target: 'object'
+    target: 'object',
+    isTrigger: true
   },
   {
     type: 'isOverlapping',
@@ -308,7 +314,8 @@ export const CONDITIONS: LogicDefinition[] = [
     description: 'True only during the frame the object first overlaps another instance of a specific type.',
     params: [{ name: 'Object Type', type: 'objectType' }],
     category: 'Collisions',
-    target: 'object'
+    target: 'object',
+    isTrigger: true
   },
   {
     type: 'compareInstanceVariable',

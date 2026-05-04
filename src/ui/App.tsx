@@ -5,9 +5,11 @@ import { Viewport } from './components/Viewport';
 import { Inspector } from './components/Inspector';
 import { EventSheetEditor } from './components/EventSheetEditor';
 import { Runtime } from '../runtime/Runtime';
-import { Play, Monitor, FileText } from 'lucide-react';
+import { Play, Monitor, FileText, Info, Variable } from 'lucide-react';
 import { StatusBar } from './components/StatusBar';
 import { SpriteEditor } from './components/SpriteEditor';
+import { GlobalVariablesPanel } from './components/GlobalVariablesPanel';
+import { List as ListIcon } from 'lucide-react';
 
 import { LayersPanel } from './components/LayersPanel';
 import { SimpleModal } from './components/SimpleModal';
@@ -30,6 +32,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: s
 const App: React.FC = () => {
   const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog, setGridSettingsDialogOpen } = useEditorStore();
   const { currentTab, previewMode, gridSettingsDialogOpen } = editorState;
+  const [rightPanelTab, setRightPanelTab] = React.useState<'properties' | 'variables'>('properties');
 
   return (
     <div className="editor-root" style={{
@@ -124,9 +127,66 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <ErrorBoundary name="Inspector">
-          <Inspector />
-        </ErrorBoundary>
+        <div style={{ width: '300px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #1a1a1a', backgroundColor: '#1e1e1e' }}>
+          <div style={{ 
+            display: 'flex', 
+            height: '35px', 
+            backgroundColor: '#252526', 
+            borderBottom: '1px solid #1a1a1a',
+            userSelect: 'none'
+          }}>
+            <button 
+              onClick={() => setRightPanelTab('properties')}
+              style={{
+                flex: 1,
+                border: 'none',
+                backgroundColor: rightPanelTab === 'properties' ? '#1e1e1e' : 'transparent',
+                color: rightPanelTab === 'properties' ? '#fff' : '#888',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderBottom: rightPanelTab === 'properties' ? '2px solid #007acc' : 'none'
+              }}
+            >
+              <Info size={12} /> PROPERTIES
+            </button>
+            <button 
+              onClick={() => setRightPanelTab('variables')}
+              style={{
+                flex: 1,
+                border: 'none',
+                backgroundColor: rightPanelTab === 'variables' ? '#1e1e1e' : 'transparent',
+                color: rightPanelTab === 'variables' ? '#fff' : '#888',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderBottom: rightPanelTab === 'variables' ? '2px solid #007acc' : 'none'
+              }}
+            >
+              <Variable size={12} /> VARIABLES
+            </button>
+          </div>
+          
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            {rightPanelTab === 'properties' ? (
+              <ErrorBoundary name="Inspector">
+                <Inspector />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary name="GlobalVariablesPanel">
+                <GlobalVariablesPanel />
+              </ErrorBoundary>
+            )}
+          </div>
+        </div>
       </div>
 
       <StatusBar />
