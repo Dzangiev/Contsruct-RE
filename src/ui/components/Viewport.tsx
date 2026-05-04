@@ -5,6 +5,7 @@ import { generateId } from '../../utils/id';
 import { Rulers } from './Rulers';
 import { InsertObjectDialog } from './InsertObjectDialog';
 import { Trash2, Copy, Grid, Zap, Maximize, Settings, MousePointer2, Info, Layout as LayoutIcon, AlignLeft, AlignCenter, AlignRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { getEffectsFilter } from '../../utils/renderUtils';
 
 export const Viewport: React.FC = () => {
   const { 
@@ -45,6 +46,8 @@ export const Viewport: React.FC = () => {
   const [currentRotation, setCurrentRotation] = React.useState<number | null>(null);
 
   const { zoom, panX, panY, selectedInstanceIds, tool, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, snapToGrid, showGrid, showRulers } = editorState;
+  
+  
 
   // Global key handlers
   React.useEffect(() => {
@@ -831,7 +834,14 @@ export const Viewport: React.FC = () => {
             {layers.map(layer => {
               if (!layer.visible) return null;
               return (
-                <g key={layer.id} opacity={layer.opacity} style={{ pointerEvents: layer.locked ? 'none' : 'auto' }}>
+                <g 
+                  key={layer.id} 
+                  opacity={layer.opacity} 
+                  style={{ 
+                    pointerEvents: layer.locked ? 'none' : 'auto',
+                    filter: getEffectsFilter(layer.effects)
+                  }}
+                >
                   {instances.filter(inst => inst.layerId === layer.id).map(inst => {
                     const isSelected = selectedInstanceIds.includes(inst.id);
                     const objectType = project.objectTypes?.find(ot => ot.id === inst.objectTypeId);
@@ -924,7 +934,13 @@ export const Viewport: React.FC = () => {
                     };
 
                     return (
-                      <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} opacity={inst.opacity}>
+                      <g 
+                        key={inst.id} 
+                        transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} 
+                        onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} 
+                        opacity={inst.opacity}
+                        style={{ filter: getEffectsFilter([...(objectType?.effects || []), ...(inst.effects || [])]) }}
+                      >
                         {renderContent()}
                         {isSelected && (
                           <g>
@@ -1001,6 +1017,48 @@ export const Viewport: React.FC = () => {
                 </g>
               );
             })()}
+
+            {/* Live Watchers */}
+            {editorState.showWatchers && activeLayout.instances.map(inst => {
+              const objectType = project.objectTypes.find(ot => ot.id === inst.objectTypeId);
+              if (!objectType) return null;
+              
+              const families = project.families.filter(f => f.objectTypeIds.includes(inst.objectTypeId));
+              const watchedVars = [
+                ...(objectType.instanceVariables || []).filter(v => v.watcherEnabled),
+                ...families.flatMap(f => (f.instanceVariables || []).filter(v => v.watcherEnabled))
+              ];
+              
+              if (watchedVars.length === 0) return null;
+              
+              const totalHeight = watchedVars.length * 14 + 6;
+              const yPos = inst.y - totalHeight / zoom - (10 / zoom);
+
+              return (
+                <g key={`watcher-${inst.id}`} transform={`translate(${inst.x}, ${yPos}) scale(${1/zoom})`}>
+                  <rect 
+                    width={120} 
+                    height={totalHeight} 
+                    rx={4} 
+                    fill="rgba(0,0,0,0.75)" 
+                    stroke="rgba(255,255,255,0.2)" 
+                    strokeWidth={1} 
+                    style={{ backdropFilter: 'blur(8px)' }}
+                  />
+                  {watchedVars.map((v, i) => (
+                    <text 
+                      key={v.id}
+                      x={6} 
+                      y={14 + i * 14} 
+                      fill="#fff" 
+                      style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 600 }}
+                    >
+                      {v.name}: {inst.properties[v.name] ?? v.initialValue}
+                    </text>
+                  ))}
+                </g>
+              );
+            })}
 
             {/* Layout Boundary Outline */}
             <rect x={0} y={0} width={width} height={height} fill="none" stroke="#444" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} pointerEvents="none" />

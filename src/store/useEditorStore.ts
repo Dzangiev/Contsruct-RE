@@ -88,6 +88,7 @@ interface EditorStore {
   setGridSettingsDialogOpen: (isOpen: boolean) => void;
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
+  setShowWatchers: (show: boolean) => void;
   
   // Sprite Editor
   openSpriteEditor: (objectTypeId: string) => void;
@@ -119,6 +120,16 @@ interface EditorStore {
   addGlobalVariable: (name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
   updateGlobalVariable: (variableId: string, updates: any) => void;
   removeGlobalVariable: (variableId: string) => void;
+
+  // Effect Actions
+  addEffect: (targetType: 'layer' | 'objectType' | 'instance', targetId: string, type: string, name: string, properties?: Record<string, any>) => void;
+  removeEffect: (targetType: 'layer' | 'objectType' | 'instance', targetId: string, effectId: string) => void;
+  updateEffect: (targetType: 'layer' | 'objectType' | 'instance', targetId: string, effectId: string, updates: any) => void;
+
+  // State Machine Actions
+  addState: (objectTypeId: string, name: string) => void;
+  removeState: (objectTypeId: string, stateId: string) => void;
+  updateState: (objectTypeId: string, stateId: string, updates: any) => void;
 }
 
 const initialProject = projectUpdates.sanitizeProject(createEmptyProject());
@@ -491,6 +502,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setMousePosition: (x, y) => set((state) => ({
     editorState: { ...state.editorState, mousePosition: { x, y } }
   })),
+  setShowWatchers: (show) => set((state) => ({
+    editorState: { ...state.editorState, showWatchers: show }
+  })),
 
   // Clipboard
   copySelected: () => {
@@ -694,6 +708,43 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   removeGlobalVariable: (variableId) => {
     const next = eventUpdates.removeGlobalVariable(get().project, variableId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+
+  // Effect Actions
+  addEffect: (targetType, targetId, type, name, properties) => {
+    const layoutId = targetType === 'layer' || targetType === 'instance' ? get().editorState.activeLayoutId : null;
+    const next = projectUpdates.addEffect(get().project, targetType, targetId, layoutId, type, name, properties);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeEffect: (targetType, targetId, effectId) => {
+    const layoutId = targetType === 'layer' || targetType === 'instance' ? get().editorState.activeLayoutId : null;
+    const next = projectUpdates.removeEffect(get().project, targetType, targetId, layoutId, effectId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateEffect: (targetType, targetId, effectId, updates) => {
+    const layoutId = targetType === 'layer' || targetType === 'instance' ? get().editorState.activeLayoutId : null;
+    const next = projectUpdates.updateEffect(get().project, targetType, targetId, layoutId, effectId, updates);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+
+  // State Machine Actions
+  addState: (objectTypeId, name) => {
+    const next = projectUpdates.addState(get().project, objectTypeId, name);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  removeState: (objectTypeId, stateId) => {
+    const next = projectUpdates.removeState(get().project, objectTypeId, stateId);
+    set({ project: next });
+    get().pushHistory(next);
+  },
+  updateState: (objectTypeId, stateId, updates) => {
+    const next = projectUpdates.updateState(get().project, objectTypeId, stateId, updates);
     set({ project: next });
     get().pushHistory(next);
   },

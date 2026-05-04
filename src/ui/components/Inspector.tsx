@@ -1,10 +1,12 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
 import { FamilyMembersDialog } from './FamilyMembersDialog';
+import { EffectsDialog } from './EffectsDialog';
+import { StatesDialog } from './StatesDialog';
 
 export const Inspector: React.FC = () => {
   const { 
@@ -21,6 +23,10 @@ export const Inspector: React.FC = () => {
   const [showBehaviorsDialog, setShowBehaviorsDialog] = React.useState(false);
   const [showFamilyMembersDialog, setShowFamilyMembersDialog] = React.useState(false);
   const [variableEditor, setVariableEditor] = React.useState<{ isOpen: boolean, variable?: any, objectTypeId?: string, familyId?: string } | null>(null);
+  const [showEffectsDialog, setShowEffectsDialog] = React.useState<{ targetType: 'layer' | 'objectType' | 'instance', targetId: string } | null>(null);
+  const [showStatesDialog, setShowStatesDialog] = React.useState<{ objectTypeId: string } | null>(null);
+
+  let content: React.ReactNode = null;
 
   // 1. Inspect Selected Instance
   if (selectedInstanceIds.length === 1) {
@@ -30,8 +36,8 @@ export const Inspector: React.FC = () => {
       const objectType = project.objectTypes?.find(ot => ot.id === instance.objectTypeId);
       if (!objectType) return null;
       const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
-      return (
-        <div className="inspector" style={inspectorStyle}>
+      content = (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Package size={14} style={{ color: '#007acc' }} />
             Properties: {objectType?.name || 'Instance'}
@@ -62,6 +68,11 @@ export const Inspector: React.FC = () => {
             <PropertyRow label="Angle" value={instance.angle} onChange={v => updateInstance(activeLayoutId!, instanceId, { angle: Number(v) })} type="number" icon={<Hash size={12}/>} />
             <PropertyRow label="Opacity" value={instance.opacity} onChange={v => updateInstance(activeLayoutId!, instanceId, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
             <PropertyRow label="Visible" value={instance.visible ? 'Yes' : 'No'} onChange={v => updateInstance(activeLayoutId!, instanceId, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
+            <div style={{ padding: '4px 10px 8px', display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instanceId })} style={actionButtonStyle}>
+                <Zap size={12} /> Effects ({instance.effects?.length || 0})
+              </button>
+            </div>
           </Category>
 
           {(() => {
@@ -281,6 +292,19 @@ export const Inspector: React.FC = () => {
             ))}
           </Category>
 
+          <Category label="Effects" action={<button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instance.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+            {instance.effects?.map(e => (
+              <PropertyRow 
+                key={e.id} 
+                label={e.name} 
+                value={e.disabled ? 'Disabled' : 'Active'} 
+                readOnly 
+                icon={<Zap size={12} color={e.disabled ? '#444' : '#f1c40f'}/>} 
+              />
+            ))}
+            {(!instance.effects || instance.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No effects</div>}
+          </Category>
+
           {showBehaviorsDialog && objectType && (
             <BehaviorsDialog 
               objectType={objectType}
@@ -309,14 +333,91 @@ export const Inspector: React.FC = () => {
       );
     }
   }
+  
+  // 1.5. Inspect Multiple Selected Instances
+  if (!content && selectedInstanceIds.length > 1) {
+    const selectedInstances = activeLayout?.instances.filter(i => selectedInstanceIds.includes(i.id)) || [];
+    
+    const getCommonValue = (key: string, subKey?: string) => {
+      if (selectedInstances.length === 0) return undefined;
+      const first = subKey ? (selectedInstances[0] as any)[key][subKey] : (selectedInstances[0] as any)[key];
+      const allSame = selectedInstances.every(i => {
+        const val = subKey ? (i as any)[key][subKey] : (i as any)[key];
+        return val === first;
+      });
+      return allSame ? first : '';
+    };
+
+    const updateAll = (updates: any) => {
+      selectedInstanceIds.forEach(id => updateInstance(activeLayoutId!, id, updates));
+    };
+
+    content = (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={panelHeaderStyle}>
+          <Package size={14} style={{ color: '#007acc' }} />
+          Multiple Selection ({selectedInstanceIds.length})
+        </div>
+        
+        <Category label="Common Properties" icon={<ListIcon size={12} />}>
+           <PropertyRow label="X" value={getCommonValue('x')} onChange={v => updateAll({ x: Number(v) })} type="number" icon={<Hash size={12}/>} />
+           <PropertyRow label="Y" value={getCommonValue('y')} onChange={v => updateAll({ y: Number(v) })} type="number" icon={<Hash size={12}/>} />
+           <PropertyRow label="Width" value={getCommonValue('width')} onChange={v => updateAll({ width: Number(v) })} type="number" icon={<Hash size={12}/>} />
+           <PropertyRow label="Height" value={getCommonValue('height')} onChange={v => updateAll({ height: Number(v) })} type="number" icon={<Hash size={12}/>} />
+           <PropertyRow label="Angle" value={getCommonValue('angle')} onChange={v => updateAll({ angle: Number(v) })} type="number" icon={<Hash size={12}/>} />
+           <PropertyRow label="Opacity" value={getCommonValue('opacity')} onChange={v => updateAll({ opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
+           <PropertyRow 
+             label="Visible" 
+             value={getCommonValue('visible') === '' ? '' : (getCommonValue('visible') ? 'Yes' : 'No')} 
+             onChange={v => updateAll({ visible: v === 'Yes' })} 
+             type="select" 
+             options={['', 'Yes', 'No']} 
+             displayValues={['(Mixed)', 'Yes', 'No']} 
+             icon={<ToggleLeft size={12}/>} 
+           />
+        </Category>
+        
+        <Category label="Alignment Tools" icon={<AlignCenter size={12} />}>
+          <div style={{ padding: '8px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+             <button onClick={() => {
+                const minX = Math.min(...selectedInstances.map(i => i.x));
+                updateAll({ x: minX });
+             }} style={actionButtonStyle} title="Align Left"><AlignLeft size={12} /></button>
+             <button onClick={() => {
+                const minX = Math.min(...selectedInstances.map(i => i.x));
+                const maxX = Math.max(...selectedInstances.map(i => i.x + i.width));
+                selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { x: Math.round(minX + (maxX - minX) / 2 - inst.width / 2) }));
+             }} style={actionButtonStyle} title="Align Center"><AlignCenter size={12} /></button>
+             <button onClick={() => {
+                const maxX = Math.max(...selectedInstances.map(i => i.x + i.width));
+                selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { x: maxX - inst.width }));
+             }} style={actionButtonStyle} title="Align Right"><AlignRight size={12} /></button>
+             <button onClick={() => {
+                const minY = Math.min(...selectedInstances.map(i => i.y));
+                updateAll({ y: minY });
+             }} style={actionButtonStyle} title="Align Top"><ArrowUp size={12} /></button>
+             <button onClick={() => {
+                const minY = Math.min(...selectedInstances.map(i => i.y));
+                const maxY = Math.max(...selectedInstances.map(i => i.y + i.height));
+                selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { y: Math.round(minY + (maxY - minY) / 2 - inst.height / 2) }));
+             }} style={actionButtonStyle} title="Align Middle"><span style={{ fontWeight: 'bold' }}>—</span></button>
+             <button onClick={() => {
+                const maxY = Math.max(...selectedInstances.map(i => i.y + i.height));
+                selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { y: maxY - inst.height }));
+             }} style={actionButtonStyle} title="Align Bottom"><ArrowDown size={12} /></button>
+          </div>
+        </Category>
+      </div>
+    );
+  }
 
   // 2. Inspect Selected Object Type
-  if (selectedObjectTypeId) {
+  if (!content && selectedObjectTypeId) {
     const objectType = project.objectTypes?.find(ot => ot.id === selectedObjectTypeId);
     if (objectType) {
       const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
-      return (
-        <div className="inspector" style={inspectorStyle}>
+      content = (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Package size={14} style={{ color: '#007acc' }} />
             Object Type: {objectType.name}
@@ -484,6 +585,13 @@ export const Inspector: React.FC = () => {
                   style={{ ...inputStyle, height: '22px' }}
                 />
                 <button 
+                  onClick={() => updateInstanceVariable(objectType.id, v.id, { watcherEnabled: !v.watcherEnabled })} 
+                  style={{ background: 'none', border: 'none', color: v.watcherEnabled ? '#007acc' : '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  title="Toggle Live Watcher"
+                >
+                  {v.watcherEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
+                </button>
+                <button 
                   onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })} 
                   style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#007acc'}
@@ -550,6 +658,37 @@ export const Inspector: React.FC = () => {
             ))}
           </Category>
 
+          <Category label="State Machine" action={<button onClick={() => setShowStatesDialog({ objectTypeId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+             <div style={{ padding: '8px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                   <span style={{ fontSize: '11px', color: '#888' }}>Initial State:</span>
+                   <span style={{ fontSize: '11px', color: '#ccc', fontWeight: 600 }}>
+                      {objectType.states?.find(s => s.id === objectType.initialStateId)?.name || '(None)'}
+                   </span>
+                </div>
+                {objectType.states?.map(s => (
+                  <div key={s.id} style={{ fontSize: '11px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <Activity size={10} color={s.id === objectType.initialStateId ? '#3498db' : '#444'} />
+                    {s.name}
+                  </div>
+                ))}
+                {(!objectType.states || objectType.states.length === 0) && <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No states defined</div>}
+             </div>
+          </Category>
+
+          <Category label="Effects" action={<button onClick={() => setShowEffectsDialog({ targetType: 'objectType', targetId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+            {objectType.effects?.map(e => (
+              <PropertyRow 
+                key={e.id} 
+                label={e.name} 
+                value={e.disabled ? 'Disabled' : 'Active'} 
+                readOnly 
+                icon={<Zap size={12} color={e.disabled ? '#444' : '#f1c40f'}/>} 
+              />
+            ))}
+            {(!objectType.effects || objectType.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No effects</div>}
+          </Category>
+          
           {showBehaviorsDialog && (
             <BehaviorsDialog 
               objectType={objectType}
@@ -580,11 +719,11 @@ export const Inspector: React.FC = () => {
   }
 
   // 2.5. Inspect Selected Family
-  if (editorState.selectedFamilyId) {
+  if (!content && editorState.selectedFamilyId) {
     const family = project.families.find(f => f.id === editorState.selectedFamilyId);
     if (family) {
-      return (
-        <div className="inspector" style={inspectorStyle}>
+      content = (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Users size={14} style={{ color: '#007acc' }} />
             Family: {family.name}
@@ -660,6 +799,13 @@ export const Inspector: React.FC = () => {
                   }}
                   style={{ ...inputStyle, height: '22px' }}
                 />
+                <button 
+                  onClick={() => updateFamilyInstanceVariable(family.id, v.id, { watcherEnabled: !v.watcherEnabled })} 
+                  style={{ background: 'none', border: 'none', color: v.watcherEnabled ? '#007acc' : '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  title="Toggle Live Watcher"
+                >
+                  {v.watcherEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
+                </button>
                 <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
                   <Edit2 size={12} />
                 </button>
@@ -708,15 +854,8 @@ export const Inspector: React.FC = () => {
   // 3. Combined Layout/Layer/Project View (Default if nothing specific is selected)
   const layer = activeLayout?.layers.find(l => l.id === activeLayerId);
   
-  return (
-    <div className="inspector" style={inspectorStyle}>
-      <style>{`
-        .property-row-hover:hover { background-color: rgba(255,255,255,0.03); }
-        .inspector select:hover, .inspector input:hover { border-color: #555; }
-        .inspector select:focus, .inspector input:focus { border-color: #007acc; outline: none; }
-        .var-actions-hover:hover { opacity: 1 !important; }
-        .action-button:hover { background-color: #444 !important; color: #fff !important; }
-      `}</style>
+  const defaultContent = (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
       <div style={panelHeaderStyle}>
         <Info size={14} style={{ color: '#007acc' }} />
         Properties: {activeLayout?.name || 'Project'}
@@ -726,8 +865,15 @@ export const Inspector: React.FC = () => {
         <Category label="Active Layer" icon={<LayersIcon size={12} />}>
           <PropertyRow label="Name" value={layer.name} onChange={v => updateLayer(activeLayout!.id, layer.id, { name: String(v) })} icon={<Type size={12}/>} />
           <PropertyRow label="Opacity" value={layer.opacity} onChange={v => updateLayer(activeLayout!.id, layer.id, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
+          <PropertyRow label="Parallax X" value={layer.parallaxX} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxX: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
+          <PropertyRow label="Parallax Y" value={layer.parallaxY} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxY: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
           <PropertyRow label="Visible" value={layer.visible ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
           <PropertyRow label="Locked" value={layer.locked ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { locked: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
+          <div style={{ padding: '4px 10px' }}>
+             <button onClick={() => setShowEffectsDialog({ targetType: 'layer', targetId: layer.id })} style={actionButtonStyle}>
+               <Plus size={12} /> Effects ({layer.effects?.length || 0})
+             </button>
+          </div>
         </Category>
       )}
 
@@ -761,6 +907,48 @@ export const Inspector: React.FC = () => {
       </div>
     </div>
   );
+
+  return (
+    <div className="inspector" style={inspectorStyle}>
+      <style>{`
+        .property-row-hover:hover { background-color: rgba(255,255,255,0.03); }
+        .inspector select:hover, .inspector input:hover { border-color: #555; }
+        .inspector select:focus, .inspector input:focus { border-color: #007acc; outline: none; }
+        .var-actions-hover:hover { opacity: 1 !important; }
+        .action-button:hover { background-color: #444 !important; color: #fff !important; }
+      `}</style>
+      
+      {content || defaultContent}
+
+      {showEffectsDialog && (
+        <EffectsDialog 
+          effects={(() => {
+            const d = showEffectsDialog!;
+            if (d.targetType === 'layer') return project.layouts.find(l => l.id === activeLayoutId)?.layers.find(ly => ly.id === d.targetId)?.effects || [];
+            if (d.targetType === 'objectType') return project.objectTypes.find(ot => ot.id === d.targetId)?.effects || [];
+            if (d.targetType === 'instance') return project.layouts.find(l => l.id === activeLayoutId)?.instances.find(inst => inst.id === d.targetId)?.effects || [];
+            return [];
+          })()}
+          onAdd={(type, name, props) => useEditorStore.getState().addEffect(showEffectsDialog!.targetType, showEffectsDialog!.targetId, type, name, props)}
+          onRemove={id => useEditorStore.getState().removeEffect(showEffectsDialog!.targetType, showEffectsDialog!.targetId, id)}
+          onUpdate={(id, updates) => useEditorStore.getState().updateEffect(showEffectsDialog!.targetType, showEffectsDialog!.targetId, id, updates)}
+          onClose={() => setShowEffectsDialog(null)}
+        />
+      )}
+
+      {showStatesDialog && (
+        <StatesDialog 
+          states={project.objectTypes.find(ot => ot.id === showStatesDialog!.objectTypeId)?.states || []}
+          initialStateId={project.objectTypes.find(ot => ot.id === showStatesDialog!.objectTypeId)?.initialStateId}
+          onAdd={name => useEditorStore.getState().addState(showStatesDialog!.objectTypeId, name)}
+          onRemove={id => useEditorStore.getState().removeState(showStatesDialog!.objectTypeId, id)}
+          onUpdate={(id, updates) => useEditorStore.getState().updateState(showStatesDialog!.objectTypeId, id, updates)}
+          onSetInitial={id => useEditorStore.getState().updateObjectType(showStatesDialog!.objectTypeId, { initialStateId: id })}
+          onClose={() => setShowStatesDialog(null)}
+        />
+      )}
+    </div>
+  );
 };
 
 const Category: React.FC<{ label: string, children: React.ReactNode, action?: React.ReactNode, icon?: React.ReactNode }> = ({ label, children, action, icon }) => {
@@ -768,27 +956,32 @@ const Category: React.FC<{ label: string, children: React.ReactNode, action?: Re
   return (
     <div style={{ borderBottom: '1px solid #111' }}>
       <div 
-        onClick={() => setExpanded(!expanded)}
         style={{ 
           padding: '8px 10px', 
           backgroundColor: '#2d2d2e', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between',
-          cursor: 'pointer',
           userSelect: 'none',
           borderLeft: expanded ? '2px solid #007acc' : '2px solid transparent',
           transition: 'all 0.1s'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div 
+          onClick={() => setExpanded(!expanded)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, cursor: 'pointer' }}
+        >
           <div style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.1s', display: 'flex', alignItems: 'center' }}>
             <ChevronDown size={12} color={expanded ? '#aaa' : '#666'} />
           </div>
           {icon && <div style={{ color: '#888', display: 'flex', alignItems: 'center' }}>{icon}</div>}
           <span style={{ fontSize: '10px', fontWeight: 700, color: expanded ? '#eee' : '#888', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</span>
         </div>
-        {action}
+        {action && (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {action}
+          </div>
+        )}
       </div>
       {expanded && <div style={{ backgroundColor: '#1e1e1f', padding: '2px 0' }}>{children}</div>}
     </div>

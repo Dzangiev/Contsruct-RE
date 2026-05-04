@@ -40,6 +40,7 @@ export function addLayout(project: Project, name: string): Project {
       opacity: 1,
       parallaxX: 1,
       parallaxY: 1,
+      effects: []
     }],
     instances: [],
     eventSheetId,
@@ -96,6 +97,7 @@ export function addLayer(project: Project, layoutId: string, name: string): Proj
         opacity: 1,
         parallaxX: 1,
         parallaxY: 1,
+        effects: []
       };
       return { ...l, layers: [...l.layers, newLayer] };
     }),
@@ -164,7 +166,10 @@ export function addObjectType(project: Project, name: string, kind: ObjectTypeKi
         originY: 0.5,
         imagePoints: []
       }]
-    }] : []
+    }] : [],
+    effects: [],
+    states: [],
+    initialStateId: null
   };
   return {
     ...project,
@@ -396,6 +401,7 @@ export function addInstance(
     opacity: 1,
     visible: true,
     properties: { ...objectType.properties },
+    effects: []
   };
 
   return {
@@ -928,4 +934,173 @@ export function sanitizeProject(project: Project): Project {
   });
 
   return p;
+}
+
+/**
+ * Adds an effect to a layer, object type, or instance.
+ */
+export function addEffect(
+  project: Project,
+  targetType: 'layer' | 'objectType' | 'instance',
+  targetId: string,
+  layoutId: string | null,
+  type: string,
+  name: string,
+  properties: Record<string, any> = {}
+): Project {
+  const effect: any = {
+    id: generateId(),
+    type,
+    name,
+    properties,
+    disabled: false
+  };
+
+  if (targetType === 'layer' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        layers: l.layers.map(layer => layer.id === targetId ? { ...layer, effects: [...(layer.effects || []), effect] } : layer)
+      } : l)
+    };
+  } else if (targetType === 'objectType') {
+    return {
+      ...project,
+      objectTypes: project.objectTypes.map(ot => ot.id === targetId ? { ...ot, effects: [...(ot.effects || []), effect] } : ot)
+    };
+  } else if (targetType === 'instance' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        instances: l.instances.map(inst => inst.id === targetId ? { ...inst, effects: [...(inst.effects || []), effect] } : inst)
+      } : l)
+    };
+  }
+  return project;
+}
+
+/**
+ * Removes an effect.
+ */
+export function removeEffect(
+  project: Project,
+  targetType: 'layer' | 'objectType' | 'instance',
+  targetId: string,
+  layoutId: string | null,
+  effectId: string
+): Project {
+  if (targetType === 'layer' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        layers: l.layers.map(layer => layer.id === targetId ? { ...layer, effects: (layer.effects || []).filter(e => e.id !== effectId) } : layer)
+      } : l)
+    };
+  } else if (targetType === 'objectType') {
+    return {
+      ...project,
+      objectTypes: project.objectTypes.map(ot => ot.id === targetId ? { ...ot, effects: (ot.effects || []).filter(e => e.id !== effectId) } : ot)
+    };
+  } else if (targetType === 'instance' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        instances: l.instances.map(inst => inst.id === targetId ? { ...inst, effects: (inst.effects || []).filter(e => e.id !== effectId) } : inst)
+      } : l)
+    };
+  }
+  return project;
+}
+
+/**
+ * Updates an effect.
+ */
+export function updateEffect(
+  project: Project,
+  targetType: 'layer' | 'objectType' | 'instance',
+  targetId: string,
+  layoutId: string | null,
+  effectId: string,
+  updates: any
+): Project {
+  const updateMap = (effects: any[]) => (effects || []).map(e => e.id === effectId ? { ...e, ...updates } : e);
+
+  if (targetType === 'layer' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        layers: l.layers.map(layer => layer.id === targetId ? { ...layer, effects: updateMap(layer.effects) } : layer)
+      } : l)
+    };
+  } else if (targetType === 'objectType') {
+    return {
+      ...project,
+      objectTypes: project.objectTypes.map(ot => ot.id === targetId ? { ...ot, effects: updateMap(ot.effects) } : ot)
+    };
+  } else if (targetType === 'instance' && layoutId) {
+    return {
+      ...project,
+      layouts: project.layouts.map(l => l.id === layoutId ? {
+        ...l,
+        instances: l.instances.map(inst => inst.id === targetId ? { ...inst, effects: updateMap(inst.effects) } : inst)
+      } : l)
+    };
+  }
+  return project;
+}
+
+/**
+ * Adds a state to an object type.
+ */
+export function addState(project: Project, objectTypeId: string, name: string): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      const newState = { id: generateId(), name };
+      return { 
+        ...ot, 
+        states: [...(ot.states || []), newState],
+        initialStateId: ot.initialStateId || newState.id
+      };
+    })
+  };
+}
+
+/**
+ * Removes a state.
+ */
+export function removeState(project: Project, objectTypeId: string, stateId: string): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return { 
+        ...ot, 
+        states: (ot.states || []).filter(s => s.id !== stateId),
+        initialStateId: ot.initialStateId === stateId ? (ot.states?.[0]?.id || null) : ot.initialStateId
+      };
+    })
+  };
+}
+
+/**
+ * Updates a state.
+ */
+export function updateState(project: Project, objectTypeId: string, stateId: string, updates: any): Project {
+  return {
+    ...project,
+    objectTypes: project.objectTypes.map(ot => {
+      if (ot.id !== objectTypeId) return ot;
+      return { 
+        ...ot, 
+        states: (ot.states || []).map(s => s.id === stateId ? { ...s, ...updates } : s)
+      };
+    })
+  };
 }

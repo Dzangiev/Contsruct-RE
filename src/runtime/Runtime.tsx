@@ -5,6 +5,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
 import { evaluateExpression, EvaluationContext } from './expressionEvaluator';
 import { PLUGIN_DEFINITIONS } from '../model/definitions';
+import { getEffectsFilter } from '../utils/renderUtils';
 import { BEHAVIORS } from './behaviors';
 import { BehaviorContext } from './behaviors/types';
 
@@ -921,7 +922,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 layerId: targetLayerId,
                 x: spawnX, y: spawnY,
                 width: objectType.defaultWidth, height: objectType.defaultHeight,
-                angle: 0, opacity: 1, visible: true, properties: initialProps
+                angle: 0, opacity: 1, visible: true, properties: initialProps,
+                effects: []
               };
               
               // 3. Initialize Behaviors State
@@ -1541,7 +1543,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                       if (!layer.visible) return null;
                       const layerInstances = runtimeInstances.filter(inst => inst.layerId === layer.id);
                       return (
-                        <g key={layer.id} opacity={layer.opacity ?? 1}>
+                        <g key={layer.id} opacity={layer.opacity ?? 1} filter={getEffectsFilter(layer.effects)}>
                           {layerInstances.map(inst => {
                             const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
                             const kind = ot?.kind || 'sprite';
@@ -1630,7 +1632,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                             };
 
                             return (
-                              <g key={inst.id} transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle || 0}, ${inst.width/2}, ${inst.height/2})`}>
+                              <g 
+                                key={inst.id} 
+                                transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle || 0}, ${inst.width/2}, ${inst.height/2})`}
+                                filter={getEffectsFilter([...(ot?.effects || []), ...(inst.effects || [])])}
+                              >
                                 {renderContent()}
                                 {debugDraw && (
                                   <g>

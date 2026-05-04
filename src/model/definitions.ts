@@ -640,6 +640,64 @@ export const ACTIONS: LogicDefinition[] = [
   }
 ];
 
+export interface EffectDefinition {
+  type: string;
+  name: string;
+  description: string;
+  propertyDefinitions: PropertyDefinition[];
+}
+
+export const EFFECT_DEFINITIONS: EffectDefinition[] = [
+  {
+    type: 'blur',
+    name: 'Blur',
+    description: 'Blurs the object or layer.',
+    propertyDefinitions: [
+      { name: 'intensity', type: 'number', defaultValue: 5 }
+    ]
+  },
+  {
+    type: 'grayscale',
+    name: 'Grayscale',
+    description: 'Converts colors to shades of gray.',
+    propertyDefinitions: [
+      { name: 'amount', type: 'number', defaultValue: 1 }
+    ]
+  },
+  {
+    type: 'brightness-contrast',
+    name: 'Brightness/Contrast',
+    description: 'Adjust the brightness and contrast.',
+    propertyDefinitions: [
+      { name: 'brightness', type: 'number', defaultValue: 1 },
+      { name: 'contrast', type: 'number', defaultValue: 1 }
+    ]
+  },
+  {
+    type: 'hue-rotate',
+    name: 'Hue Rotate',
+    description: 'Rotates the color hue.',
+    propertyDefinitions: [
+      { name: 'angle', type: 'number', defaultValue: 0 }
+    ]
+  },
+  {
+    type: 'sepia',
+    name: 'Sepia',
+    description: 'Applies a sepia (vintage) tone.',
+    propertyDefinitions: [
+      { name: 'amount', type: 'number', defaultValue: 1 }
+    ]
+  }
+];
+
+export interface StateDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  isInitial?: boolean;
+}
+
 export function findConditionDefinition(type: string): LogicDefinition | undefined {
   return CONDITIONS.find(c => c.type === type);
 }

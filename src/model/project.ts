@@ -19,6 +19,15 @@ export interface Layer {
   opacity: number;
   parallaxX: number;
   parallaxY: number;
+  effects: Effect[];
+}
+
+export interface Effect {
+  id: string;
+  type: string;
+  name: string;
+  properties: Record<string, any>;
+  disabled: boolean;
 }
 
 export interface Instance {
@@ -33,6 +42,7 @@ export interface Instance {
   opacity: number;
   visible: boolean;
   properties: Record<string, any>;
+  effects: Effect[];
 }
 
 export interface Layout {
@@ -61,6 +71,7 @@ export interface InstanceVariable {
   description?: string;
   isStatic?: boolean;
   isConstant?: boolean;
+  watcherEnabled?: boolean;
 }
 
 export interface ImagePoint {
@@ -109,8 +120,18 @@ export interface ObjectType {
   properties: Record<string, any>;
   instanceVariables: InstanceVariable[];
   behaviors: Behavior[];
+  effects: Effect[];
+  states: State[];
+  initialStateId?: string | null;
   folderId?: string | null;
 }
+
+export interface State {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 
 export interface Condition {
   id: string;
@@ -138,6 +159,7 @@ export interface GlobalVariable {
   isStatic?: boolean;
   isConstant?: boolean;
   comment?: string;
+  watcherEnabled?: boolean;
   folderId?: string | null;
 }
 
@@ -229,6 +251,7 @@ export function createEmptyProject(name: string = 'New Project'): Project {
             opacity: 1,
             parallaxX: 1,
             parallaxY: 1,
+            effects: []
           },
         ],
         instances: [],
