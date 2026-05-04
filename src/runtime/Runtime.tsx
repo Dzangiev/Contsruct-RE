@@ -5,6 +5,8 @@ import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
 import { evaluateExpression, EvaluationContext } from './expressionEvaluator';
 import { PLUGIN_DEFINITIONS } from '../model/definitions';
+import { BEHAVIORS } from './behaviors';
+import { BehaviorContext } from './behaviors/types';
 
 interface RuntimeProps {
   project: Project;
@@ -1272,139 +1274,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           const state = behaviorsStateRef.current[inst.id][behavior.id];
           const props = behavior.properties;
 
-          switch (behavior.type) {
-            case 'bullet': {
-              const speed = Number(state.speed ?? props.speed ?? 400);
-              const angleRad = updatedInst.angle * (Math.PI / 180);
-              updatedInst.x += Math.cos(angleRad) * speed * dt;
-              updatedInst.y += Math.sin(angleRad) * speed * dt;
-              break;
-            }
-            case 'eight-direction': {
-              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 200);
-              let dx = 0, dy = 0;
-              if (keysDownRef.current.has('ArrowLeft')) dx -= 1;
-              if (keysDownRef.current.has('ArrowRight')) dx += 1;
-              if (keysDownRef.current.has('ArrowUp')) dy -= 1;
-              if (keysDownRef.current.has('ArrowDown')) dy += 1;
-              if (dx !== 0 || dy !== 0) {
-                const mag = Math.sqrt(dx * dx + dy * dy);
-                updatedInst.x += (dx / mag) * maxSpeed * dt;
-                updatedInst.y += (dy / mag) * maxSpeed * dt;
-                if (props.directions === '8-way') updatedInst.angle = Math.atan2(dy, dx) * (180 / Math.PI);
-              }
-              break;
-            }
-            case 'platform': {
-              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 330);
-              const acceleration = Number(state.acceleration ?? props.acceleration ?? 1500);
-              const deceleration = Number(state.deceleration ?? props.deceleration ?? 1500);
-              const gravity = Number(state.gravity ?? props.gravity ?? 1500);
-              const jumpStrength = Number(state.jumpStrength ?? props.jumpStrength ?? 650);
-
-              if (state.vx === undefined) { 
-                state.vx = 0; 
-                state.vy = 0; 
-                state.onFloor = false; 
-              }
-
-              // 1. Horizontal Movement
-              let targetVx = 0;
-              if (keysDownRef.current.has('ArrowLeft')) targetVx -= 1;
-              if (keysDownRef.current.has('ArrowRight')) targetVx += 1;
-              targetVx *= maxSpeed;
-
-              if (targetVx !== 0) {
-                // Accelerate
-                if (state.vx < targetVx) state.vx = Math.min(targetVx, state.vx + acceleration * dt);
-                else if (state.vx > targetVx) state.vx = Math.max(targetVx, state.vx - acceleration * dt);
-              } else {
-                // Decelerate
-                if (state.vx > 0) state.vx = Math.max(0, state.vx - deceleration * dt);
-                else if (state.vx < 0) state.vx = Math.min(0, state.vx - deceleration * dt);
-              }
-
-              // 2. Vertical Movement (Gravity & Jump)
-              state.vy += gravity * dt;
-              if (keysPressedRef.current.has('ArrowUp') && state.onFloor) {
-                state.vy = -jumpStrength;
-                state.onFloor = false;
-              }
-
-              // 3. Collision Resolution
-              const solids = nextInstances.filter(o => {
-                if (o.id === inst.id) return false;
-                const ot_o = project.objectTypes.find(type => type.id === o.objectTypeId);
-                return (ot_o?.behaviors.some(b => b.type === 'solid' && !b.disabled) || 
-                        project.families.some(f => f.objectTypeIds.includes(o.objectTypeId) && f.behaviors.some(b => b.type === 'solid' && !b.disabled)));
-              });
-
-              const checkCollision = (tx: number, ty: number) => {
-                return solids.some(s => {
-                  return tx < s.x + s.width && 
-                         tx + updatedInst.width > s.x && 
-                         ty < s.y + s.height && 
-                         ty + updatedInst.height > s.y;
-                });
-              };
-
-              // X Pass
-              let newX = updatedInst.x + state.vx * dt;
-              if (checkCollision(newX, updatedInst.y)) {
-                const step = state.vx > 0 ? 1 : -1;
-                while (checkCollision(updatedInst.x + step, updatedInst.y) === false && Math.abs(updatedInst.x - newX) > 1) {
-                  updatedInst.x += step;
-                }
-                state.vx = 0;
-                newX = updatedInst.x;
-              } else {
-                updatedInst.x = newX;
-              }
-
-              // Y Pass
-              let newY = updatedInst.y + state.vy * dt;
-              let onFloor = false;
-              if (checkCollision(updatedInst.x, newY)) {
-                if (state.vy > 0) {
-                  const step = 1;
-                  while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y < newY) {
-                    updatedInst.y += step;
-                  }
-                  onFloor = true;
-                } else if (state.vy < 0) {
-                  const step = -1;
-                  while (checkCollision(updatedInst.x, updatedInst.y + step) === false && updatedInst.y > newY) {
-                    updatedInst.y += step;
-                  }
-                }
-                state.vy = 0;
-              } else {
-                updatedInst.y = newY;
-              }
-
-              state.onFloor = onFloor;
-              break;
-            }
-            case 'pathfinding': {
-              const maxSpeed = Number(state.maxSpeed ?? props.maxSpeed ?? 200);
-              if (state.path && state.path.length > 0) {
-                const waypoint = state.path[0];
-                const dx = waypoint.x - (updatedInst.x + updatedInst.width / 2);
-                const dy = waypoint.y - (updatedInst.y + updatedInst.height / 2);
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 5) {
-                  state.path.shift();
-                } else {
-                  const moveDist = Math.min(dist, maxSpeed * dt);
-                  updatedInst.x += (dx / dist) * moveDist;
-                  updatedInst.y += (dy / dist) * moveDist;
-                  if (props.rotateSpeed > 0) {
-                    updatedInst.angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                  }
-                }
-              }
-              break;
-            }
+          const behaviorImpl = BEHAVIORS[behavior.type];
+          if (behaviorImpl) {
+            const context: BehaviorContext = {
+              dt,
+              project,
+              layout,
+              instances: nextInstances,
+              keysDown: keysDownRef.current,
+              keysPressed: keysPressedRef.current,
+              pointerPos: pointerPosRef.current,
+              behaviorsState: state
+            };
+            const result = behaviorImpl.tick(updatedInst, props, context);
+            updatedInst = result.updatedInstance;
+            behaviorsStateRef.current[inst.id][behavior.id] = result.behaviorState;
           }
         });
         return updatedInst;
