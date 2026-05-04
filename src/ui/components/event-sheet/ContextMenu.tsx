@@ -88,11 +88,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         </>
       ) : (
         <>
-          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, null); onClose(); }}><Clipboard size={14} /> Paste (Ctrl+V)</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); onClose(); }}><Plus size={14} /> Add Event (E)</div>
+          <div style={contextItemStyle} onClick={() => { onAddVariable(null); onClose(); }}><Variable size={14} /> Add Variable (V)</div>
           <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'function'); onClose(); }}><Zap size={14} /> Add Function (F)</div>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'include'); onClose(); }}><FilePlus size={14} /> Add Include</div>
           <div style={contextItemStyle} onClick={() => { onAddGroup(null); onClose(); }}><Folder size={14} /> Add Group (G)</div>
+          <div style={contextDividerStyle} />
+          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, null); onClose(); }}><Clipboard size={14} /> Paste (Ctrl+V)</div>
         </>
       )}
     </div>

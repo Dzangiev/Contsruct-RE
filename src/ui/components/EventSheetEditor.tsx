@@ -493,6 +493,12 @@ export const EventSheetEditor: React.FC = () => {
           ref={containerRef} 
           className="event-sheet-bg" 
           onClick={() => { setSelectedEventBlocks([]); setSelectedLogicItems([]); setContextMenu(null); }}
+          onContextMenu={(e) => { 
+            if (e.target === e.currentTarget) {
+              e.preventDefault(); 
+              setContextMenu({ x: e.clientX, y: e.clientY, blockId: null }); 
+            }
+          }}
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes('x-cre-variable-id') || e.dataTransfer.types.includes('objectTypeId')) {
               e.preventDefault();
