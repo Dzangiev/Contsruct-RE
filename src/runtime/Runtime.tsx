@@ -140,7 +140,9 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           ...inst.properties,
           _animId: defaultAnim?.id || '',
           _frameIdx: 0,
-          _animTimer: 0
+          _animTimer: 0,
+          _animPlaying: true,
+          _animSpeed: defaultAnim?.speed ?? 10
         } 
       };
     });
@@ -342,7 +344,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           if (b.conditions.length > 0) {
             const firstCond = b.conditions[0];
             // We need a way to check isTrigger. For now we use a hardcoded list or find it in CONDITIONS
-            const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision'];
+            const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision', 'onAnimFinished', 'onAnimFrameChanged'];
             if (triggerTypes.includes(firstCond.type)) {
               if (!index.has(firstCond.type)) index.set(firstCond.type, []);
               index.get(firstCond.type)!.push(b);
@@ -525,8 +527,33 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             const body = physicsBodiesRef.current.get(i.id);
             return body ? body.isStatic : false;
           }
-          case 'pickByIndex': {
-            return true; // Logic handled in bulk
+          case 'isAnimPlaying': {
+            const animName = String(evaluateExpression(condition.params[0], getEvaluationContext(dt, [i], pickedSets, i)));
+            const ot = project.objectTypes.find(o => o.id === i.objectTypeId);
+            const animId = i.properties._animId;
+            const anim = ot?.animations?.find(a => a.id === animId) || ot?.animations?.[0];
+            const isPlaying = i.properties._animPlaying !== false;
+            if (animName && animName !== '""') {
+              return isPlaying && anim?.name === animName;
+            }
+            return isPlaying;
+          }
+          case 'compareAnimFrame': {
+            const operator = condition.params[0];
+            const compareValue = Number(evaluateExpression(condition.params[1], getEvaluationContext(dt, [i], pickedSets, i)));
+            const val = i.properties._frameIdx || 0;
+            switch (operator) {
+              case '<': return val < compareValue;
+              case '<=': return val <= compareValue;
+              case '==': return val == compareValue;
+              case '>=': return val >= compareValue;
+              case '>': return val > compareValue;
+              default: return false;
+            }
+          }
+          case 'onAnimFinished': {
+            // Triggers are handled in the tick loop via emitTriggerRef
+            return true; 
           }
           default: return true;
         }
@@ -1115,15 +1142,34 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
               return inst;
             }
-            case 'setPathfindingAcceleration': {
+            case 'setAnim': {
+              const animName = String(evalParam(0));
+              const from = action.params[1];
               const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
-              const behavior = ot?.behaviors.find(b => b.type === 'pathfinding');
-              if (behavior) {
-                if (!behaviorsStateRef.current[inst.id]) behaviorsStateRef.current[inst.id] = {};
-                if (!behaviorsStateRef.current[inst.id][behavior.id]) behaviorsStateRef.current[inst.id][behavior.id] = { ...behavior.properties };
-                behaviorsStateRef.current[inst.id][behavior.id].acceleration = Number(evalParam(0) ?? 600);
+              const anim = ot?.animations?.find(a => a.name === animName);
+              if (anim) {
+                return { 
+                  ...inst, 
+                  properties: { 
+                    ...inst.properties, 
+                    _animId: anim.id, 
+                    _frameIdx: from === 'beginning' ? 0 : inst.properties._frameIdx,
+                    _animTimer: 0,
+                    _animPlaying: true,
+                    _animSpeed: anim.speed
+                  } 
+                };
               }
               return inst;
+            }
+            case 'setAnimFrame': {
+              return { ...inst, properties: { ...inst.properties, _frameIdx: Number(evalParam(0) ?? 0), _animTimer: 0 } };
+            }
+            case 'setAnimPlaying': {
+              return { ...inst, properties: { ...inst.properties, _animPlaying: !!evalParam(0) } };
+            }
+            case 'setAnimSpeed': {
+              return { ...inst, properties: { ...inst.properties, _animSpeed: Number(evalParam(0) ?? 10) } };
             }
             default: return inst;
           }
@@ -1191,10 +1237,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                  initialPickedSets[otherOtid] = [instB.id];
               }
            }
-        } else if (type === 'pointerPressedOnObject' && data) {
-            if (otid) initialPickedSets[otid] = [data.inst.id];
-        } else if (type === 'keyPressed' && data) {
-            // No specific instance to pick for key press usually
+        } else if (type === 'onAnimFinished' && data) {
+            if (otid) {
+              const ot = project.objectTypes.find(o => o.id === otid);
+              if (data.inst.objectTypeId === otid || (ot && data.inst.objectTypeId === otid)) {
+                // Filter by animation name if provided in condition
+                const animName = firstCond.params[0];
+                if (!animName || animName === '""' || animName === data.animation) {
+                   initialPickedSets[otid] = [data.inst.id];
+                }
+              }
+            }
+        } else if (type === 'onAnimFrameChanged' && data) {
+            if (otid && data.inst.objectTypeId === otid) {
+               initialPickedSets[otid] = [data.inst.id];
+            }
         }
 
         const res = processBlock(block, nextInsts, initialPickedSets, 0, true);
@@ -1301,19 +1358,38 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
         if (!ot || ot.kind !== 'sprite' || !ot.animations) return inst;
 
+        const isPlaying = inst.properties._animPlaying !== false;
+        if (!isPlaying) return inst;
+
         const animId = inst.properties._animId;
         const anim = ot.animations.find(a => a.id === animId) || ot.animations[0];
-        if (!anim || anim.frames.length <= 1 || anim.speed === 0) return inst;
+        if (!anim || anim.frames.length === 0) return inst;
 
         let frameIdx = inst.properties._frameIdx ?? 0;
         let timer = (inst.properties._animTimer ?? 0) + dt;
-        const frameDuration = 1 / anim.speed;
+        
+        const currentFrame = anim.frames[frameIdx];
+        const animSpeed = inst.properties._animSpeed ?? anim.speed ?? 10;
+        const frameDuration = (animSpeed > 0) ? (1 / animSpeed) * (currentFrame?.duration || 1) : Infinity;
 
-        if (timer >= frameDuration) {
+        if (timer >= frameDuration && frameDuration !== Infinity) {
           timer -= frameDuration;
+          const oldIdx = frameIdx;
           frameIdx++;
+          
           if (frameIdx >= anim.frames.length) {
-            frameIdx = anim.loop ? 0 : anim.frames.length - 1;
+            if (anim.loop) {
+              frameIdx = 0;
+            } else {
+              frameIdx = anim.frames.length - 1;
+              inst.properties._animPlaying = false;
+              // Trigger: Animation Finished
+              emitTriggerRef.current('onAnimFinished', { inst, animation: anim.name }, nextInstances);
+            }
+          }
+          
+          if (frameIdx !== oldIdx) {
+            emitTriggerRef.current('onAnimFrameChanged', { inst }, nextInstances);
           }
         }
 
@@ -1344,7 +1420,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       let lastRes = true;
       eventSheet.events.forEach(block => {
         const firstCond = block.conditions[0];
-        const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision'];
+        const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision', 'onAnimFinished', 'onAnimFrameChanged'];
         if (firstCond && triggerTypes.includes(firstCond.type)) return;
 
         const blockRes = processBlock(block, nextInstances, {}, dt, lastRes, false, undefined, {}, {}, 0);

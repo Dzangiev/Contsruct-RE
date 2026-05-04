@@ -300,6 +300,48 @@ export const CONDITIONS: LogicDefinition[] = [
     target: 'object',
     isTrigger: true
   },
+  // Animation Conditions
+  {
+    type: 'isAnimPlaying',
+    name: 'Is animation playing',
+    description: 'True if the specified animation is currently playing.',
+    params: [{ name: 'Animation', type: 'string', defaultValue: '""' }],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
+  },
+  {
+    type: 'compareAnimFrame',
+    name: 'Compare frame',
+    description: 'Compare the current animation frame index.',
+    params: [
+      { name: 'Comparison', type: 'enum', options: ['<', '<=', '==', '>=', '>'], defaultValue: '==' },
+      { name: 'Frame', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
+  },
+  {
+    type: 'onAnimFinished',
+    name: 'On animation finished',
+    description: 'Runs when the current animation reaches its end.',
+    params: [{ name: 'Animation', type: 'string', defaultValue: '""' }],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite',
+    isTrigger: true
+  },
+  {
+    type: 'onAnimFrameChanged',
+    name: 'On frame changed',
+    description: 'Runs whenever the animation frame switches.',
+    params: [],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite',
+    isTrigger: true
+  },
   {
     type: 'isOverlapping',
     name: 'Is overlapping another object',
@@ -637,6 +679,46 @@ export const ACTIONS: LogicDefinition[] = [
     category: 'Pathfinding',
     target: 'object',
     behaviorType: 'pathfinding'
+  },
+  // Animation Actions
+  {
+    type: 'setAnim',
+    name: 'Set animation',
+    description: 'Change the current animation.',
+    params: [
+      { name: 'Animation', type: 'string', defaultValue: '"Animation 1"' },
+      { name: 'From', type: 'enum', options: ['current frame', 'beginning'], defaultValue: 'beginning' }
+    ],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
+  },
+  {
+    type: 'setAnimFrame',
+    name: 'Set frame',
+    description: 'Set the current animation frame index.',
+    params: [{ name: 'Frame', type: 'number', defaultValue: 0 }],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
+  },
+  {
+    type: 'setAnimPlaying',
+    name: 'Set playing',
+    description: 'Start or stop the animation playback.',
+    params: [{ name: 'Playing', type: 'boolean', defaultValue: true }],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
+  },
+  {
+    type: 'setAnimSpeed',
+    name: 'Set speed',
+    description: 'Change the playback speed (FPS).',
+    params: [{ name: 'Speed', type: 'number', defaultValue: 10 }],
+    category: 'Animations',
+    target: 'object',
+    requiredKind: 'sprite'
   }
 ];
 
