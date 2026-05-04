@@ -1,9 +1,10 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity, MousePointer2 } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity, MousePointer2, Bug, Sparkles, Clock } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
+import { ObjectTypeKind } from '../../model/project';
 import { FamilyMembersDialog } from './FamilyMembersDialog';
 import { EffectsDialog } from './EffectsDialog';
 import { StatesDialog } from './StatesDialog';
@@ -238,6 +239,41 @@ export const Inspector: React.FC = () => {
               </button>
             </div>
           </Category>
+
+          {editorState.runtimeState && (
+            <Category label="Runtime Debugger" icon={<Bug size={12} color="#f1c40f" />}>
+              {(() => {
+                const rtInst = editorState.runtimeState.instances.find((i: any) => i.id === instance.id);
+                if (!rtInst) return <div style={infoTextStyle}>Instance not found in active runtime</div>;
+                return (
+                  <>
+                    <div style={{ fontSize: '10px', color: '#555', padding: '6px 10px', backgroundColor: '#1a1a1a', borderBottom: '1px solid #111' }}>
+                      LIVE VALUES FROM PREVIEW
+                    </div>
+                    <PropertyRow label="RT Pos" value={`${rtInst.x.toFixed(1)}, ${rtInst.y.toFixed(1)}`} readOnly icon={<MousePointer2 size={12} />} />
+                    <PropertyRow label="RT Angle" value={`${rtInst.angle.toFixed(1)}°`} readOnly icon={<Zap size={12} />} />
+                    {objectType.kind === ObjectTypeKind.Sprite && (
+                      <>
+                        <PropertyRow label="Anim" value={project.objectTypes.find(ot => ot.id === rtInst.objectTypeId)?.animations?.find(a => a.id === rtInst.properties._animId)?.name || 'default'} readOnly icon={<Sparkles size={12} />} />
+                        <PropertyRow label="Frame" value={rtInst.properties._frameIdx} readOnly icon={<Clock size={12} />} />
+                        <PropertyRow label="Playing" value={rtInst.properties._animPlaying !== false ? 'Yes' : 'No'} readOnly icon={<Activity size={12} />} />
+                      </>
+                    )}
+                    {Object.entries(rtInst.properties).filter(([k]) => !k.startsWith('_')).map(([k, v]) => (
+                      <PropertyRow 
+                        key={`rt-${k}`} 
+                        label={k.charAt(0).toUpperCase() + k.slice(1)} 
+                        value={String(v)} 
+                        readOnly 
+                        icon={<Bug size={10} style={{ opacity: 0.5 }} />}
+                      />
+                    ))}
+                    <div style={{ height: '8px' }} />
+                  </>
+                );
+              })()}
+            </Category>
+          )}
 
           {(() => {
             const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
@@ -1080,6 +1116,10 @@ export const Inspector: React.FC = () => {
         .inspector select:focus, .inspector input:focus { border-color: #007acc; outline: none; }
         .var-actions-hover:hover { opacity: 1 !important; }
         .action-button:hover { background-color: #444 !important; color: #fff !important; }
+        .inspector::-webkit-scrollbar { width: 6px; }
+        .inspector::-webkit-scrollbar-track { background: transparent; }
+        .inspector::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .inspector::-webkit-scrollbar-thumb:hover { background: #444; }
       `}</style>
 
       {content || defaultContent}
@@ -1195,10 +1235,11 @@ const PropertyRow: React.FC<{
       }}
       className="property-row-hover"
     >
-      <div style={{ width: '16px', display: 'flex', alignItems: 'center', color: '#666' }}>{icon}</div>
+      <div style={{ width: '16px', flexShrink: 0, display: 'flex', alignItems: 'center', color: '#666' }}>{icon}</div>
       <label
         style={{
           width: '90px',
+          flexShrink: 0,
           color: '#aaa',
           fontSize: '11px',
           overflow: 'hidden',
@@ -1264,6 +1305,8 @@ const PropertyRow: React.FC<{
 
 const inspectorStyle: React.CSSProperties = {
   width: '100%',
+  height: '100%',
+  flex: 1,
   backgroundColor: '#1e1e1e',
   borderLeft: '1px solid #111',
   display: 'flex',
@@ -1294,11 +1337,17 @@ const inputStyle: React.CSSProperties = {
   color: '#ccc',
   padding: '3px 8px',
   fontSize: '11px',
-  width: '100%',
   outline: 'none',
   transition: 'all 0.1s ease',
   boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
   margin: '1px 0'
+};
+
+const infoTextStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  fontSize: '11px',
+  color: '#888',
+  fontStyle: 'italic'
 };
 
 const miniButtonStyle: React.CSSProperties = {

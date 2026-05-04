@@ -5,13 +5,14 @@ import { Viewport } from './components/Viewport';
 import { Inspector } from './components/Inspector';
 import { EventSheetEditor } from './components/EventSheetEditor';
 import { Runtime } from '../runtime/Runtime';
-import { Play, Monitor, FileText, Info, Variable } from 'lucide-react';
+import { Play, Monitor, FileText, Info, Variable, Download, Upload, Bug, Sparkles, X } from 'lucide-react';
 import { StatusBar } from './components/StatusBar';
 import { SpriteEditor } from './components/SpriteEditor';
 import { GlobalVariablesPanel } from './components/GlobalVariablesPanel';
 import { List as ListIcon } from 'lucide-react';
 
 import { LayersPanel } from './components/LayersPanel';
+import { AssetPanel } from './components/AssetPanel';
 import { SimpleModal } from './components/SimpleModal';
 import { GridSettingsDialog } from './components/GridSettingsDialog';
 
@@ -47,14 +48,19 @@ const App: React.FC = () => {
     }}>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
         <div style={{ width: '260px', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1a1a1a', backgroundColor: '#1e1e1e', height: '100%' }}>
-          <div style={{ flex: 7, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1a1a1a' }}>
+          <div style={{ flex: 4, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1a1a1a' }}>
             <ErrorBoundary name="ProjectExplorer">
               <ProjectExplorer />
             </ErrorBoundary>
           </div>
-          <div style={{ flex: 3, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: '#252526' }}>
+          <div style={{ flex: 3, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1a1a1a', backgroundColor: '#252526' }}>
             <ErrorBoundary name="LayersPanel">
               <LayersPanel />
+            </ErrorBoundary>
+          </div>
+          <div style={{ flex: 3, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: '#1e1e1e' }}>
+            <ErrorBoundary name="AssetPanel">
+              <AssetPanel />
             </ErrorBoundary>
           </div>
         </div>
@@ -98,7 +104,49 @@ const App: React.FC = () => {
               </nav>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                onClick={() => {
+                  const data = JSON.stringify(project, null, 2);
+                  const blob = new Blob([data], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${project.settings.name || 'project'}.creproj`;
+                  a.click();
+                }}
+                style={secondaryToolbarButtonStyle}
+                title="Export Project"
+              >
+                <Download size={14} /> EXPORT
+              </button>
+              <label style={secondaryToolbarButtonStyle} title="Import Project">
+                <Upload size={14} /> IMPORT
+                <input 
+                  type="file" 
+                  hidden 
+                  accept=".creproj,application/json" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const imported = JSON.parse(event.target?.result as string);
+                        // Basic validation
+                        if (imported.schemaVersion) {
+                          useEditorStore.setState({ project: imported });
+                          alert('Project imported successfully!');
+                        }
+                      } catch (err) {
+                        alert('Failed to import project: Invalid JSON');
+                      }
+                    };
+                    reader.readAsText(file);
+                  }} 
+                />
+              </label>
+              <div style={{ width: '1px', height: '16px', backgroundColor: '#3d3d3d', margin: '0 4px' }} />
               <button 
                 onClick={() => setPreviewMode(true)}
                 style={{
@@ -269,4 +317,20 @@ const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string,
 );
 
 export default App;
+
+const secondaryToolbarButtonStyle: React.CSSProperties = {
+  backgroundColor: 'transparent',
+  color: '#ccc',
+  border: '1px solid #444',
+  padding: '4px 10px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  fontSize: '10px',
+  fontWeight: 600,
+  transition: 'all 0.1s',
+  height: '24px'
+};
 

@@ -132,6 +132,12 @@ interface EditorStore {
   removeState: (objectTypeId: string, stateId: string) => void;
   updateState: (objectTypeId: string, stateId: string, updates: any) => void;
   setHighlightedInstances: (instanceIds: string[]) => void;
+  
+  // Debugger & Assets
+  setRuntimeState: (runtimeState: any) => void;
+  addAsset: (asset: any) => void;
+  removeAsset: (id: string) => void;
+  updateAsset: (id: string, updates: any) => void;
 }
 
 const initialProject = projectUpdates.sanitizeProject(createEmptyProject());
@@ -546,9 +552,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     
     return { editorState: { ...nextEditorState, highlightedInstanceIds } };
   }),
-  setHighlightedInstances: (instanceIds) => set((state) => ({
-    editorState: { ...state.editorState, highlightedInstanceIds: instanceIds }
-  })),
+    setHighlightedInstances: (ids: string[]) => set(state => ({ editorState: { ...state.editorState, highlightedInstanceIds: ids } })),
+    
+    // Debugger actions
+    setRuntimeState: (runtimeState: any) => set(state => ({ editorState: { ...state.editorState, runtimeState } })),
+
+    // Asset actions
+    addAsset: (asset: any) => set(state => ({ project: { ...state.project, assets: [...state.project.assets, asset] } })),
+    removeAsset: (id: string) => set(state => ({ project: { ...state.project, assets: state.project.assets.filter(a => a.id !== id) } })),
+    updateAsset: (id: string, updates: any) => set(state => ({ project: { ...state.project, assets: state.project.assets.map(a => a.id === id ? { ...a, ...updates } : a) } })),
   setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) => {
     set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) }));
   },

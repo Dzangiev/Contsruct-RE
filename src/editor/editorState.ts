@@ -39,6 +39,13 @@ export interface EditorState {
   gridSettingsDialogOpen: boolean;
   showWatchers: boolean;
   highlightedInstanceIds: string[];
+  
+  // Debugger / Runtime Sync
+  runtimeState: {
+    instances: any[];
+    variables: Record<string, any>;
+    fps: number;
+  } | null;
 }
 
 /**
@@ -78,6 +85,7 @@ export function createInitialEditorState(project: Project): EditorState {
     gridSettingsDialogOpen: false,
     showWatchers: true,
     highlightedInstanceIds: [],
+    runtimeState: null,
   };
 }
 

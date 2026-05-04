@@ -1,6 +1,6 @@
 import { generateId } from '../utils/id';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export interface ProjectSettings {
   name: string;
@@ -9,6 +9,13 @@ export interface ProjectSettings {
   description: string;
   viewportWidth: number;
   viewportHeight: number;
+}
+
+export interface Asset {
+  id: string;
+  name: string;
+  type: 'image' | 'audio' | 'font' | 'video';
+  data: string; // base64 or URL
 }
 
 export interface Layer {
@@ -60,6 +67,7 @@ export enum ObjectTypeKind {
   Sprite = 'sprite',
   TiledBackground = 'tiled-background',
   Text = 'text',
+  Particles = 'particles',
   Plugin = 'plugin',
 }
 
@@ -221,6 +229,7 @@ export interface Project {
   eventSheets: EventSheet[];
   globalVariables: GlobalVariable[];
   folders: ProjectFolder[];
+  assets: Asset[];
 }
 
 export function createEmptyProject(name: string = 'New Project'): Project {
@@ -272,5 +281,6 @@ export function createEmptyProject(name: string = 'New Project'): Project {
     ],
     globalVariables: [],
     folders: [],
+    assets: [],
   };
 }

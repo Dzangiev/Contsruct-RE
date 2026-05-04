@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project, Instance, EventBlock } from '../model/project';
+import { Project, Instance, EventBlock, ObjectTypeKind } from '../model/project';
 import Matter from 'matter-js';
 import { useEditorStore } from '../store/useEditorStore';
 import { Play, Pause, RotateCcw, BarChart2, Maximize2, X, Settings, Bug, Clock, Monitor, Terminal, Grid } from 'lucide-react';
@@ -258,6 +258,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   // Physics Engine Refs
   const physicsEngineRef = React.useRef<Matter.Engine | null>(null);
   const physicsBodiesRef = React.useRef<Map<string, Matter.Body>>(new Map());
+  const particlesRef = React.useRef<Map<string, any[]>>(new Map());
   const triggerIndexRef = React.useRef<Map<string, EventBlock[]>>(new Map());
   const emitTriggerRef = React.useRef<(type: string, data?: any, currentInsts?: Instance[]) => Instance[]>(() => []);
 
@@ -1410,6 +1411,49 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
         });
       });
 
+      // 1.9 Process Particles
+      nextInstances.forEach(inst => {
+        const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+        if (ot?.kind !== ObjectTypeKind.Particles) return;
+
+        if (!particlesRef.current.has(inst.id)) particlesRef.current.set(inst.id, []);
+        const particles = particlesRef.current.get(inst.id)!;
+
+        // Update existing particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= dt;
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += (inst.properties.gravity || 0) * dt;
+        }
+
+        // Emit new particles
+        const rate = inst.properties.rate || 10;
+        const timerKey = `_p_timer_${inst.id}`;
+        if (!(inst as any)[timerKey]) (inst as any)[timerKey] = 0;
+        (inst as any)[timerKey] += dt;
+        
+        const spawnInterval = 1 / rate;
+        while ((inst as any)[timerKey] >= spawnInterval) {
+          (inst as any)[timerKey] -= spawnInterval;
+          const angle = (inst.angle + (Math.random() - 0.5) * (inst.properties.spread || 0)) * (Math.PI / 180);
+          const speed = inst.properties.speed || 100;
+          particles.push({
+            x: inst.x + inst.width / 2,
+            y: inst.y + inst.height / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: inst.properties.lifeTime || 2,
+            maxLife: inst.properties.lifeTime || 2
+          });
+        }
+      });
+
       if (!hasStartedRef.current) {
         nextInstances = emitTriggerRef.current('onStartOfLayout', undefined, nextInstances);
         hasStartedRef.current = true;
@@ -1450,11 +1494,23 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       pointerPressedRef.current = false;
       pointerReleasedRef.current = false;
 
+      // Sync with Editor (Debugger) - throttled to 10 fps for performance
+      if (frameCountRef.current % 6 === 0) {
+        useEditorStore.getState().setRuntimeState({
+          instances: nextInstances,
+          variables: runtimeVariablesRef.current,
+          fps: Math.round(1 / rawDt)
+        });
+      }
+
       animationFrameId = requestAnimationFrame(tick);
     };
 
     animationFrameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      useEditorStore.getState().setRuntimeState(null);
+    };
   }, [layout, eventSheet, isPaused, timeScale]);
 
   const restartGame = () => {
@@ -1729,6 +1785,34 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                   </g>
                 )}
               </g>
+              {/* Particles Layer */}
+              {runtimeInstances.filter(i => {
+                const ot = project.objectTypes.find(t => t.id === i.objectTypeId);
+                return ot?.kind === ObjectTypeKind.Particles;
+              }).map(inst => {
+                const particles = particlesRef.current.get(inst.id) || [];
+                const color = inst.properties.color || '#ff9900';
+                const startSize = inst.properties.startSize ?? 4;
+                const endSize = inst.properties.endSize ?? 0;
+
+                return (
+                  <g key={`p-container-${inst.id}`}>
+                    {particles.map((p, idx) => {
+                      const ratio = p.life / p.maxLife;
+                      const size = endSize + (startSize - endSize) * ratio;
+                      return (
+                        <circle 
+                          key={`p-${inst.id}-${idx}`}
+                          cx={p.x} cy={p.y}
+                          r={size / 2}
+                          fill={color}
+                          opacity={ratio}
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
             </g>
 
               {debugDraw && (

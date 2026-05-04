@@ -55,6 +55,24 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
       { name: 'horizontalAlign', type: 'enum', options: ['left', 'center', 'right'], defaultValue: 'left' },
       { name: 'verticalAlign', type: 'enum', options: ['top', 'center', 'bottom'], defaultValue: 'top' }
     ]
+  },
+  {
+    kind: 'particles',
+    name: 'Particles',
+    description: 'Emits small images or pixels to create effects like fire, smoke, and sparks.',
+    icon: 'sparkles',
+    defaultWidth: 32,
+    defaultHeight: 32,
+    propertyDefinitions: [
+      { name: 'rate', type: 'number', defaultValue: 10 },
+      { name: 'lifeTime', type: 'number', defaultValue: 2 },
+      { name: 'speed', type: 'number', defaultValue: 100 },
+      { name: 'spread', type: 'number', defaultValue: 360 },
+      { name: 'gravity', type: 'number', defaultValue: 0 },
+      { name: 'color', type: 'string', defaultValue: '#ff9900' },
+      { name: 'startSize', type: 'number', defaultValue: 4 },
+      { name: 'endSize', type: 'number', defaultValue: 0 }
+    ]
   }
 ];
 

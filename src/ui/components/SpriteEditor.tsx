@@ -247,10 +247,28 @@ export const SpriteEditor: React.FC = () => {
   const handleMouseUp = () => { if (isDrawing) { setIsDrawing(false); lastPos.current = null; saveCanvas(); } setDraggedPointIdx(null); };
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -1 : 1;
-      setZoom(Math.max(1, Math.min(100, zoom + delta)));
+    if (e.ctrlKey) { e.preventDefault(); setZoom(prev => Math.min(100, Math.max(1, prev + (e.deltaY < 0 ? 1 : -1)))); }
+  };
+
+  const handleDropAsset = (e: React.DragEvent) => {
+    e.preventDefault();
+    const assetData = e.dataTransfer.getData('assetData');
+    const assetType = e.dataTransfer.getData('assetType');
+    if (assetType !== 'image' || !assetData) return;
+
+    const newId = generateId();
+    const newFrame = { 
+      id: newId, 
+      assetId: assetData, 
+      duration: 1, 
+      originX: 0.5, 
+      originY: 0.5, 
+      imagePoints: [], 
+      collisionPolygon: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] 
+    };
+    if (selectedAnim) {
+      onUpdateAnim({ frames: [...selectedAnim.frames, newFrame] });
+      setSelectedFrameId(newId);
     }
   };
 
@@ -457,7 +475,7 @@ export const SpriteEditor: React.FC = () => {
                   {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" />}
                 </button>
               </div>
-              <div style={stripContainerStyle}>
+              <div style={stripContainerStyle} onDragOver={(e) => e.preventDefault()} onDrop={handleDropAsset}>
                 {selectedAnim?.frames.map((frame, idx, arr) => (
                   <div key={frame.id} onClick={() => setSelectedFrameId(frame.id)}
                     style={{ ...frameBoxStyle, borderColor: selectedFrameId === frame.id ? '#007acc' : '#222', backgroundColor: selectedFrameId === frame.id ? '#1a1a1a' : '#0a0a0a' }}>
