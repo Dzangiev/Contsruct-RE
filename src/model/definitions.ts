@@ -82,12 +82,43 @@ export const PLUGIN_DEFINITIONS: PluginDefinition[] = [
     defaultWidth: 0,
     defaultHeight: 0,
     propertyDefinitions: []
+  },
+  {
+    kind: 'tilemap',
+    name: 'Tilemap',
+    description: 'An object that displays a grid of tiles from a tileset.',
+    icon: 'layout-grid',
+    defaultWidth: 256,
+    defaultHeight: 256,
+    propertyDefinitions: [
+      { name: 'tileWidth', type: 'number', defaultValue: 32 },
+      { name: 'tileHeight', type: 'number', defaultValue: 32 },
+      { name: 'assetId', type: 'asset', defaultValue: '' }
+    ]
+  },
+  {
+    kind: 'touch',
+    name: 'Touch',
+    description: 'Input from touch-screen devices.',
+    icon: 'hand',
+    defaultWidth: 0,
+    defaultHeight: 0,
+    propertyDefinitions: []
+  },
+  {
+    kind: 'gamepad',
+    name: 'Gamepad',
+    description: 'Input from game controllers.',
+    icon: 'gamepad-2',
+    defaultWidth: 0,
+    defaultHeight: 0,
+    propertyDefinitions: []
   }
 ];
 
 export interface PropertyDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'enum';
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'asset';
   options?: string[];
   defaultValue: any;
 }
@@ -175,6 +206,12 @@ export const BEHAVIOR_DEFINITIONS: BehaviorDefinition[] = [
       { name: 'rotateSpeed', type: 'number', defaultValue: 180 },
       { name: 'cellSide', type: 'number', defaultValue: 32 }
     ]
+  },
+  {
+    type: 'tween',
+    name: 'Tween',
+    description: 'Smoothly interpolate properties over time.',
+    propertyDefinitions: []
   }
 ];
 
@@ -409,6 +446,48 @@ export const CONDITIONS: LogicDefinition[] = [
     category: 'Text',
     target: 'object',
     requiredKind: 'text'
+  },
+  // --- Input Conditions ---
+  {
+    type: 'onTouchStart',
+    name: 'On any touch start',
+    description: 'Triggered when a new touch contact is made.',
+    params: [],
+    category: 'Touch',
+    target: 'system',
+    isTrigger: true
+  },
+  {
+    type: 'onTouchEnd',
+    name: 'On any touch end',
+    description: 'Triggered when a touch contact is removed.',
+    params: [],
+    category: 'Touch',
+    target: 'system',
+    isTrigger: true
+  },
+  {
+    type: 'isGamepadButtonDown',
+    name: 'Is button down',
+    description: 'True if a specific gamepad button is currently held down.',
+    params: [
+      { name: 'Gamepad', type: 'number', defaultValue: 0 },
+      { name: 'Button', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Gamepad',
+    target: 'system'
+  },
+  {
+    type: 'onGamepadButtonDown',
+    name: 'On button pressed',
+    description: 'Triggered when a gamepad button is first pressed.',
+    params: [
+      { name: 'Gamepad', type: 'number', defaultValue: 0 },
+      { name: 'Button', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Gamepad',
+    target: 'system',
+    isTrigger: true
   },
   // Picking (Object)
   {
@@ -793,6 +872,36 @@ export const ACTIONS: LogicDefinition[] = [
     category: 'Audio',
     target: 'object',
     requiredKind: 'audio'
+  },
+  // Tween Actions
+  {
+    type: 'tweenProperty',
+    name: 'Tween property',
+    description: 'Smoothly change a property to a target value.',
+    params: [
+      { name: 'Property', type: 'enum', options: ['X', 'Y', 'Width', 'Height', 'Angle', 'Opacity'], defaultValue: 'X' },
+      { name: 'End value', type: 'number', defaultValue: 100 },
+      { name: 'Time', type: 'number', defaultValue: 1 },
+      { name: 'Easing', type: 'enum', options: ['Linear', 'EaseIn', 'EaseOut', 'EaseInOut'], defaultValue: 'Linear' },
+      { name: 'Tag', type: 'string', defaultValue: '""' }
+    ],
+    category: 'Tween',
+    target: 'object',
+    behaviorType: 'tween'
+  },
+  // Tilemap Actions
+  {
+    type: 'tilemapSetTile',
+    name: 'Set tile',
+    description: 'Change the tile at a specific grid coordinate.',
+    params: [
+      { name: 'X', type: 'number', defaultValue: 0 },
+      { name: 'Y', type: 'number', defaultValue: 0 },
+      { name: 'Tile index', type: 'number', defaultValue: 0 }
+    ],
+    category: 'Tilemap',
+    target: 'object',
+    requiredKind: 'tilemap'
   }
 ];
 

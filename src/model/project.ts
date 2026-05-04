@@ -68,6 +68,7 @@ export enum ObjectTypeKind {
   TiledBackground = 'tiled-background',
   Text = 'text',
   Particles = 'particles',
+  Tilemap = 'tilemap',
   Plugin = 'plugin',
 }
 
@@ -132,6 +133,7 @@ export interface ObjectType {
   states: State[];
   initialStateId?: string | null;
   folderId?: string | null;
+  tilemapData?: { width: number, height: number, tiles: number[][] }; // For tilemaps
 }
 
 export interface State {

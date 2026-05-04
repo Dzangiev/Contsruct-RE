@@ -133,6 +133,11 @@ interface EditorStore {
   updateState: (objectTypeId: string, stateId: string, updates: any) => void;
   setHighlightedInstances: (instanceIds: string[]) => void;
   
+  // Tilemap Editor
+  openTilemapEditor: (objectTypeId: string) => void;
+  closeTilemapEditor: () => void;
+  updateTilemapData: (objectTypeId: string, data: { width: number, height: number, tiles: number[][] }) => void;
+
   // Debugger & Assets
   setRuntimeState: (runtimeState: any) => void;
   addAsset: (asset: any) => void;
@@ -716,6 +721,19 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   closeSpriteEditor: () => set((state) => ({
     editorState: { ...state.editorState, spriteEditor: null }
   })),
+
+  // Tilemap Editor
+  openTilemapEditor: (objectTypeId) => set((state) => ({
+    editorState: { ...state.editorState, tilemapEditor: { objectTypeId, isOpen: true } }
+  })),
+  closeTilemapEditor: () => set((state) => ({
+    editorState: { ...state.editorState, tilemapEditor: null }
+  })),
+  updateTilemapData: (objectTypeId, data) => {
+    const next = projectUpdates.updateObjectType(get().project, objectTypeId, { tilemapData: data });
+    set({ project: next });
+    get().pushHistory(next);
+  },
  
   commitProject: () => {
     get().pushHistory(get().project);

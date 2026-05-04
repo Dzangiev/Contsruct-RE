@@ -15,6 +15,7 @@ import { LayersPanel } from './components/LayersPanel';
 import { AssetPanel } from './components/AssetPanel';
 import { SimpleModal } from './components/SimpleModal';
 import { GridSettingsDialog } from './components/GridSettingsDialog';
+import { TilemapEditor } from './components/TilemapEditor';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: string }, { hasError: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false }; }
@@ -284,6 +285,22 @@ const App: React.FC = () => {
         isOpen={gridSettingsDialogOpen} 
         onClose={() => setGridSettingsDialogOpen(false)} 
       />
+
+      {/* Tilemap Editor Overlay */}
+      {editorState.tilemapEditor?.isOpen && (() => {
+        const ot = project.objectTypes.find(o => o.id === editorState.tilemapEditor?.objectTypeId);
+        if (!ot) return null;
+        return (
+          <ErrorBoundary name="TilemapEditor">
+            <TilemapEditor 
+              project={project}
+              objectType={ot}
+              onUpdate={(data) => useEditorStore.getState().updateTilemapData(ot.id, data)}
+              onClose={() => useEditorStore.getState().closeTilemapEditor()}
+            />
+          </ErrorBoundary>
+        );
+      })()}
     </div>
   );
 };

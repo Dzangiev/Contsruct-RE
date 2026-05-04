@@ -36,6 +36,7 @@ export interface EditorState {
   showRulers: boolean;
   mousePosition: { x: number, y: number };
   spriteEditor: { objectTypeId: string, isOpen: boolean } | null;
+  tilemapEditor: { objectTypeId: string, isOpen: boolean } | null;
   gridSettingsDialogOpen: boolean;
   showWatchers: boolean;
   highlightedInstanceIds: string[];
@@ -82,6 +83,7 @@ export function createInitialEditorState(project: Project): EditorState {
     showRulers: false,
     mousePosition: { x: 0, y: 0 },
     spriteEditor: null,
+    tilemapEditor: null,
     gridSettingsDialogOpen: false,
     showWatchers: true,
     highlightedInstanceIds: [],

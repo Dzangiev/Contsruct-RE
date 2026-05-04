@@ -247,6 +247,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const pointerPressedRef = React.useRef(false);
   const pointerReleasedRef = React.useRef(false);
   const svgRef = React.useRef<SVGSVGElement>(null);
+  const gamepadsRef = React.useRef<Gamepad[]>([]);
+  const lastGamepadButtonsRef = React.useRef<boolean[][]>([]);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const behaviorsStateRef = React.useRef<Record<string, Record<string, any>>>({});
   const lastReturnValueRef = React.useRef<any>(0);
@@ -261,6 +263,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
   const particlesRef = React.useRef<Map<string, any[]>>(new Map());
   const triggerIndexRef = React.useRef<Map<string, EventBlock[]>>(new Map());
   const playingSoundsRef = React.useRef<Map<string, HTMLAudioElement[]>>(new Map());
+  const tweensRef = React.useRef<Map<string, any[]>>(new Map());
   const emitTriggerRef = React.useRef<(type: string, data?: any, currentInsts?: Instance[]) => Instance[]>(() => []);
 
   React.useEffect(() => {
@@ -317,11 +320,20 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       emitTriggerRef.current('pointerReleased', pointerPosRef.current);
     };
 
+    const onTouchStart = (e: TouchEvent) => {
+      emitTriggerRef.current('onTouchStart');
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      emitTriggerRef.current('onTouchEnd');
+    };
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('touchstart', onTouchStart);
+    window.addEventListener('touchend', onTouchEnd);
 
     return () => {
       window.removeEventListener('keydown', onKeyDown);
@@ -329,6 +341,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
     };
   }, [project.settings.viewportWidth, project.settings.viewportHeight]);
 
@@ -346,7 +360,11 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
           if (b.conditions.length > 0) {
             const firstCond = b.conditions[0];
             // We need a way to check isTrigger. For now we use a hardcoded list or find it in CONDITIONS
-            const triggerTypes = ['onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 'onCollision', 'onAnimFinished', 'onAnimFrameChanged'];
+            const triggerTypes = [
+              'onStartOfLayout', 'keyPressed', 'pointerPressed', 'pointerReleased', 'pointerPressedOnObject', 
+              'onCollision', 'onAnimFinished', 'onAnimFrameChanged',
+              'onTouchStart', 'onTouchEnd', 'onGamepadButtonDown'
+            ];
             if (triggerTypes.includes(firstCond.type)) {
               if (!index.has(firstCond.type)) index.set(firstCond.type, []);
               index.get(firstCond.type)!.push(b);
@@ -1226,6 +1244,49 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               }
               return inst;
             }
+            case 'tweenProperty': {
+              const prop = String(evalParam(0));
+              const endVal = Number(evalParam(1));
+              const duration = Number(evalParam(2));
+              const easing = String(evalParam(3));
+              const tag = String(evalParam(4) ?? "");
+              
+              if (!tweensRef.current.has(inst.id)) tweensRef.current.set(inst.id, []);
+              const objTweens = tweensRef.current.get(inst.id)!;
+              
+              const startVal = (inst as any)[prop.toLowerCase()] ?? inst.properties[prop.toLowerCase()] ?? 0;
+              
+              objTweens.push({
+                prop: prop.toLowerCase(),
+                startVal,
+                endVal,
+                duration,
+                elapsed: 0,
+                easing,
+                tag
+              });
+              return inst;
+            }
+            case 'tilemapSetTile': {
+              const tx = Math.floor(Number(evalParam(0)));
+              const ty = Math.floor(Number(evalParam(1)));
+              const tileIdx = Number(evalParam(2));
+              
+              const ot = project.objectTypes.find(o => o.id === inst.objectTypeId);
+              if (ot && ot.tilemapData) {
+                if (tx >= 0 && tx < ot.tilemapData.width && ty >= 0 && ty < ot.tilemapData.height) {
+                  if (ot.tilemapData.tiles[ty][tx] !== tileIdx) {
+                    ot.tilemapData = { 
+                      ...ot.tilemapData, 
+                      tiles: ot.tilemapData.tiles.map((row, rIdx) => 
+                        rIdx === ty ? row.map((t, cIdx) => cIdx === tx ? tileIdx : t) : row
+                      )
+                    };
+                  }
+                }
+              }
+              return inst;
+            }
             default: return inst;
           }
         });
@@ -1330,6 +1391,21 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
       lastTimeRef.current = now;
 
       frameCountRef.current++;
+      
+      // Update Gamepads
+      const gps = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+      gamepadsRef.current = gps.filter(Boolean) as Gamepad[];
+      
+      gamepadsRef.current.forEach((gp, idx) => {
+        if (!lastGamepadButtonsRef.current[idx]) lastGamepadButtonsRef.current[idx] = [];
+        gp.buttons.forEach((btn, bIdx) => {
+          if (btn.pressed && !lastGamepadButtonsRef.current[idx][bIdx]) {
+            emitTriggerRef.current('onGamepadButtonDown', { gamepad: idx, button: bIdx });
+          }
+          lastGamepadButtonsRef.current[idx][bIdx] = btn.pressed;
+        });
+      });
+
       if (now - lastFpsUpdateRef.current > 1000) {
         const currentFps = Math.round((frameCountRef.current * 1000) / (now - lastFpsUpdateRef.current));
         setFps(currentFps);
@@ -1405,6 +1481,38 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             behaviorsStateRef.current[inst.id][behavior.id] = result.behaviorState;
           }
         });
+        return updatedInst;
+      });
+
+      // 1.1 Process Tweens
+      nextInstances = nextInstances.map(inst => {
+        const objTweens = tweensRef.current.get(inst.id);
+        if (!objTweens || objTweens.length === 0) return inst;
+
+        let updatedInst = { ...inst };
+        const stillActive: any[] = [];
+
+        objTweens.forEach(t => {
+          t.elapsed += dt;
+          const progress = Math.min(1, t.elapsed / t.duration);
+          
+          let eased = progress;
+          if (t.easing === 'EaseIn') eased = progress * progress;
+          else if (t.easing === 'EaseOut') eased = 1 - (1 - progress) * (1 - progress);
+          else if (t.easing === 'EaseInOut') eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          const val = t.startVal + (t.endVal - t.startVal) * eased;
+          
+          if (['x', 'y', 'width', 'height', 'angle', 'opacity'].includes(t.prop)) {
+            (updatedInst as any)[t.prop] = val;
+          } else {
+            updatedInst.properties = { ...updatedInst.properties, [t.prop]: val };
+          }
+
+          if (progress < 1) stillActive.push(t);
+        });
+
+        tweensRef.current.set(inst.id, stillActive);
         return updatedInst;
       });
 
@@ -1788,6 +1896,30 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                                         </pattern>
                                       </defs>
                                       <rect width={inst.width} height={inst.height} fill={`url(#rt-tiled-${inst.id})`} stroke={debugDraw ? "#f0f" : "none"} strokeWidth={1} />
+                                    </g>
+                                  );
+                                }
+                                case 'tilemap': {
+                                  const tileW = inst.properties.tileWidth || 32;
+                                  const tileH = inst.properties.tileHeight || 32;
+                                  const data = ot?.tilemapData;
+
+                                  if (!data) return <rect width={inst.width} height={inst.height} fill="rgba(0,0,255,0.1)" stroke="#00f" strokeDasharray="2,2" />;
+
+                                  return (
+                                    <g>
+                                      {data.tiles.map((row, y) => row.map((tileIdx, x) => {
+                                        if (tileIdx === -1) return null;
+                                        return (
+                                          <rect 
+                                            key={`${x}-${y}`}
+                                            x={x * tileW} y={y * tileH}
+                                            width={tileW} height={tileH}
+                                            fill={tileIdx === 0 ? "#333" : (tileIdx % 2 === 0 ? "#555" : "#777")}
+                                            stroke="rgba(255,255,255,0.05)"
+                                          />
+                                        );
+                                      }))}
                                     </g>
                                   );
                                 }

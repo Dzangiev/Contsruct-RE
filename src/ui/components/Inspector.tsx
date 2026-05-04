@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity, MousePointer2, Bug, Sparkles, Clock } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity, MousePointer2, Bug, Sparkles, Clock, LayoutGrid } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
@@ -15,7 +15,7 @@ export const Inspector: React.FC = () => {
     addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog, openSpriteEditor,
     updateFamily, addFamilyObjectType, removeFamilyObjectType, addFamilyInstanceVariable, updateFamilyInstanceVariable, removeFamilyInstanceVariable,
     addFamilyBehavior, updateFamilyBehavior, removeFamilyBehavior,
-    moveEntityToFolder, setSelectedInstances, reorderInstance
+    moveEntityToFolder, setSelectedInstances, reorderInstance, openTilemapEditor
   } = useEditorStore();
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
@@ -220,6 +220,11 @@ export const Inspector: React.FC = () => {
               <button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instanceId })} style={actionButtonStyle}>
                 <Zap size={12} /> Effects ({instance.effects?.length || 0})
               </button>
+              {objectType.kind === 'tilemap' && (
+                <button onClick={() => openTilemapEditor(objectType.id)} style={actionButtonStyle}>
+                  <LayoutGrid size={12} /> Edit Tilemap
+                </button>
+              )}
             </div>
           </Category>
 
@@ -642,6 +647,11 @@ export const Inspector: React.FC = () => {
               {objectType.kind === 'sprite' && (
                 <button onClick={() => openSpriteEditor(objectType.id)} style={actionButtonStyle}>
                   <Edit2 size={12} /> Edit Animations
+                </button>
+              )}
+              {objectType.kind === 'tilemap' && (
+                <button onClick={() => openTilemapEditor(objectType.id)} style={actionButtonStyle}>
+                  <LayoutGrid size={12} /> Edit Tilemap
                 </button>
               )}
             </div>
