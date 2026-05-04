@@ -8,7 +8,7 @@ describe('Project Update Helpers', () => {
     const updated = updates.addLayout(project, 'New Layout');
     
     expect(updated.layouts.length).toBe(2);
-    expect(updated.layouts[1].name).toBe('New Layout');
+    expect(updated.layouts[1].name).toBe('New_Layout');
     expect(updated.eventSheets.length).toBe(2);
     expect(updated.eventSheets[1].id).toBe(updated.layouts[1].eventSheetId);
     expect(updated).not.toBe(project); // Immutable

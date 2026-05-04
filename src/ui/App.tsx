@@ -132,7 +132,7 @@ const App: React.FC = () => {
             display: 'flex', 
             height: '35px', 
             backgroundColor: '#252526', 
-            borderBottom: '1px solid #1a1a1a',
+            borderBottom: '1px solid #111',
             userSelect: 'none'
           }}>
             <button 
@@ -143,16 +143,18 @@ const App: React.FC = () => {
                 backgroundColor: rightPanelTab === 'properties' ? '#1e1e1e' : 'transparent',
                 color: rightPanelTab === 'properties' ? '#fff' : '#888',
                 fontSize: '11px',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                borderBottom: rightPanelTab === 'properties' ? '2px solid #007acc' : 'none'
+                gap: '8px',
+                letterSpacing: '0.5px',
+                transition: 'all 0.1s',
+                borderBottom: rightPanelTab === 'properties' ? '2px solid #007acc' : '2px solid transparent'
               }}
             >
-              <Info size={12} /> PROPERTIES
+              <Info size={14} style={{ opacity: rightPanelTab === 'properties' ? 1 : 0.6 }} /> PROPERTIES
             </button>
             <button 
               onClick={() => setRightPanelTab('variables')}
@@ -162,16 +164,18 @@ const App: React.FC = () => {
                 backgroundColor: rightPanelTab === 'variables' ? '#1e1e1e' : 'transparent',
                 color: rightPanelTab === 'variables' ? '#fff' : '#888',
                 fontSize: '11px',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                borderBottom: rightPanelTab === 'variables' ? '2px solid #007acc' : 'none'
+                gap: '8px',
+                letterSpacing: '0.5px',
+                transition: 'all 0.1s',
+                borderBottom: rightPanelTab === 'variables' ? '2px solid #007acc' : '2px solid transparent'
               }}
             >
-              <Variable size={12} /> VARIABLES
+              <Variable size={14} style={{ opacity: rightPanelTab === 'variables' ? 1 : 0.6 }} /> VARIABLES
             </button>
           </div>
           

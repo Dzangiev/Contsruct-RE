@@ -107,6 +107,8 @@ export function setActiveLayout(state: EditorState, layoutId: string, layerId?: 
     activeLayoutId: layoutId,
     activeLayerId: layerId !== undefined ? layerId : state.activeLayerId,
     selectedInstanceIds: [],
+    selectedObjectTypeId: null,
+    selectedFamilyId: null,
   };
 }
 

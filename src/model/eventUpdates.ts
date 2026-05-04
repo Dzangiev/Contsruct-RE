@@ -1,5 +1,7 @@
 import { Project, EventSheet, EventBlock, Condition, Action, GlobalVariable } from './project';
 import { generateId } from '../utils/id';
+import { sanitizeName, getUniqueName } from '../utils/naming';
+import { getAllUsedNames } from './projectUpdates';
 
 /**
  * Recursive helper to update a block within a list of blocks.
@@ -52,14 +54,8 @@ export function getAllVariableNames(project: Project): string[] {
  * Helper to generate a unique variable name.
  */
 export function getUniqueVariableName(project: Project, baseName: string): string {
-  const names = getAllVariableNames(project);
-  let name = baseName;
-  let counter = 1;
-  while (names.includes(name)) {
-    name = `${baseName}${counter}`;
-    counter++;
-  }
-  return name;
+  const allNames = getAllUsedNames(project);
+  return getUniqueName(baseName, allNames);
 }
 
 /**
@@ -1018,9 +1014,10 @@ function replaceVariableNameInExpression(expression: any, oldName: string, newNa
  * Adds a new global variable to the project.
  */
 export function addGlobalVariable(project: Project, name: string, type: 'number' | 'string' | 'boolean' = 'number', initialValue: any = 0): Project {
+  const sanitized = sanitizeName(name);
   const newVar: GlobalVariable = {
     id: generateId(),
-    name,
+    name: sanitized,
     type,
     initialValue,
     isStatic: false,
@@ -1036,12 +1033,20 @@ export function addGlobalVariable(project: Project, name: string, type: 'number'
 /**
  * Updates a global variable and synchronizes references if the name changed.
  */
-export function updateGlobalVariable(project: Project, variableId: string, updates: Partial<GlobalVariable>): Project {
+export function updateGlobalVariable(project: Project, variableId: string, updates: Partial<Omit<GlobalVariable, 'id'>>): Project {
   const oldVar = project.globalVariables.find(v => v.id === variableId);
   if (!oldVar) return project;
-
   const oldName = oldVar.name;
-  const newName = updates.name || oldName;
+  
+  let newName = updates.name;
+  if (newName && newName !== oldName) {
+    const allNames = getAllUsedNames(project);
+    newName = getUniqueName(newName, allNames);
+  } else {
+    newName = oldName;
+  }
+  
+  const finalUpdates = { ...updates, name: newName };
 
   // 1. Sync in globalVariables pool
   let updatedProject = {

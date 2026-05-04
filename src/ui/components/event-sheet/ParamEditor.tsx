@@ -1,7 +1,9 @@
 import React from 'react';
-import { ChevronUp, Settings, Search, Terminal, Box, Users, Layout, Code, Variable, Zap } from 'lucide-react';
+import { ChevronUp, Settings, Search, Terminal, Box, Users, Layout, Code, Variable, Zap, AlertCircle } from 'lucide-react';
 import { Project, EventBlock } from '../../../model/project';
 import { LogicDefinition } from '../../../model/definitions';
+
+import { ExpressionParser } from '../../../model/expressionParser';
 
 interface ParamEditorProps {
   project: Project;
@@ -108,7 +110,8 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
 
   const [activeParamIndex, setActiveParamIndex] = React.useState(0);
   const [filter, setFilter] = React.useState('');
-  const [suggestionState, setSuggestionState] = React.useState<{ isOpen: boolean, items: any[], activeIndex: number, rect: DOMRect | null } | null>(null);
+  const [suggestionState, setSuggestionState] = React.useState<{ isOpen: boolean, items: any[], activeIndex: number, rect: DOMRect | null, cursorPosition: number } | null>(null);
+  const [validationErrors, setValidationErrors] = React.useState<Record<number, { syntax: string, warnings: string[] }>>({});
 
   const { globals: inScopeGlobals, locals: inScopeLocals } = getInScopeVariables(project, eventSheetId, blockId);
 
@@ -162,16 +165,42 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
   ].filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) || i.category.toLowerCase().includes(filter.toLowerCase()));
 
   const categories = Array.from(new Set(assistantItems.map(i => i.category)));
+  
+  const performValidation = (val: string) => {
+    const { globals, locals } = getInScopeVariables(project, eventSheetId, blockId);
+    const context = {
+      variables: Object.fromEntries(globals.map(v => [v.name, v.initialValue])),
+      locals: Object.fromEntries(locals.map(v => [v.name, v.initialValue])),
+      objects: Object.fromEntries(project.objectTypes.map(ot => [ot.name, ot])),
+      system: { dt: 0.016, time: 0, fps: 60, pointerx: 0, pointery: 0, functionparams: [], returnvalue: 0 }
+    };
 
-  const updateSuggestions = (val: string, rect: DOMRect) => {
-    const parts = val.split(/[\s+\-*/(),]/);
-    const lastPart = parts.pop() || '';
-    if (lastPart.length < 1) { setSuggestionState(null); return; }
+    const pDef = def.params[activeParamIndex];
+    const expectedType = (pDef as any)?.type || 'any';
     
-    let filtered = [];
-    if (lastPart.includes('.')) {
-      const [objName, search] = lastPart.split('.');
-      const ot = project.objectTypes.find(o => o.name.toLowerCase() === objName.toLowerCase());
+    import('../../../model/expressionParser').then(m => {
+      const result = m.validateExpression(val, expectedType, context);
+      setValidationErrors(prev => ({
+        ...prev,
+        [activeParamIndex]: {
+          syntax: result.syntaxError || '',
+          warnings: result.typeWarnings || []
+        }
+      }));
+    });
+  };
+
+  const updateSuggestions = (val: string, cursorPosition: number, rect: DOMRect) => {
+    performValidation(val);
+
+    // Context-aware suggestions based on cursor
+    const beforeCursor = val.slice(0, cursorPosition);
+    
+    // Check if we are typing a property (Object.Prop)
+    const memberMatch = beforeCursor.match(/([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z0-9_]*)$/);
+    if (memberMatch) {
+      const [_, objName, search] = memberMatch;
+      const ot = project.objectTypes.find(o => o.name.toLowerCase() === objName!.toLowerCase());
       if (ot) {
         const props = [
           { name: 'X', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
@@ -182,26 +211,77 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
           { name: 'Opacity', type: 'property', category: 'Properties', icon: <Settings size={12} color="#3498db" /> },
           ...ot.instanceVariables.map(v => ({ name: v.name, type: 'variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))
         ];
-        filtered = props.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => ({ ...p, name: `${ot.name}.${p.name}` }));
+        const filtered = props.filter(p => p.name.toLowerCase().startsWith(search!.toLowerCase()));
+        if (filtered.length > 0) {
+          setSuggestionState({ isOpen: true, items: filtered.map(p => ({ ...p, insertText: p.name })), activeIndex: 0, rect, cursorPosition });
+          return;
+        }
       }
-    } else {
-      filtered = assistantItems.filter(i => i.name.toLowerCase().includes(lastPart.toLowerCase())).slice(0, 10);
     }
-    if (filtered.length > 0) setSuggestionState({ isOpen: true, items: filtered, activeIndex: 0, rect });
-    else setSuggestionState(null);
+
+    const parts = beforeCursor.split(/[\s+\-*/(),]/);
+    const lastPart = parts.pop() || '';
+    if (lastPart.length < 1) { setSuggestionState(null); return; }
+    
+    const filtered = assistantItems.filter(i => i.name.toLowerCase().includes(lastPart.toLowerCase())).slice(0, 10);
+    if (filtered.length > 0) {
+      setSuggestionState({ isOpen: true, items: filtered.map(i => ({ ...i, insertText: i.name })), activeIndex: 0, rect, cursorPosition });
+    } else {
+      setSuggestionState(null);
+    }
   };
 
-  const insertAtCaret = (text: string) => {
+  const insertAtCaret = (text: string, stateOverride?: any) => {
+    const state = stateOverride || suggestionState;
+    if (!state) return;
+
     const n = [...params];
     const current = String(n[activeParamIndex] || '');
-    const parts = current.split(/([\s+\-*/(),])/);
-    if (parts.length > 0) {
-      parts[parts.length - 1] = text;
-      n[activeParamIndex] = parts.join('');
+    const pos = state.cursorPosition;
+    const before = current.slice(0, pos);
+    const after = current.slice(pos);
+    
+    // If it's a property insert (after a dot)
+    const memberMatch = before.match(/([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z0-9_]*)$/);
+    if (memberMatch) {
+      const [fullMatch, objName] = memberMatch;
+      const base = before.slice(0, before.length - fullMatch!.length);
+      n[activeParamIndex] = base + objName + '.' + text + after;
     } else {
-      n[activeParamIndex] = text;
+      const parts = before.split(/([\s+\-*/(),])/);
+      if (parts.length > 0) {
+        parts[parts.length - 1] = text;
+        n[activeParamIndex] = parts.join('') + after;
+      } else {
+        n[activeParamIndex] = text + after;
+      }
     }
+    const newVal = n[activeParamIndex];
     setParams(n);
+    setSuggestionState(null);
+    performValidation(newVal);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (suggestionState?.isOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSuggestionState(prev => prev ? { ...prev, activeIndex: (prev.activeIndex + 1) % prev.items.length } : null);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSuggestionState(prev => prev ? { ...prev, activeIndex: (prev.activeIndex - 1 + prev.items.length) % prev.items.length } : null);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const activeItem = suggestionState.items[suggestionState.activeIndex];
+        if (activeItem) insertAtCaret(activeItem.insertText || activeItem.name);
+      } else if (e.key === 'Escape') {
+        setSuggestionState(null);
+      }
+    } else if (e.key === 'Enter' && e.ctrlKey) {
+      onSave(params);
+    } else if (e.key === 'Escape') {
+      onCancel();
+    }
   };
 
   const [mouseDownOnOverlay, setMouseDownOnOverlay] = React.useState(false);
@@ -287,11 +367,38 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
                   </select>
                 ) : (pDef.type as any) === 'number' || (pDef.type as any) === 'string' ? (
                   <div style={{ position: 'relative' }}>
-                    <input type="text" onFocus={(e) => { setActiveParamIndex(i); updateSuggestions(e.target.value, e.target.getBoundingClientRect()); }} value={params[i]} onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); updateSuggestions(e.target.value, e.target.getBoundingClientRect()); }} onBlur={() => setTimeout(() => setSuggestionState(null), 200)} style={{ ...paramInputStyle, width: '100%', border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333', borderLeft: activeParamIndex === i ? '4px solid #007acc' : '1px solid #333' }} />
+                    <input 
+                      type="text" 
+                      onFocus={(e) => { setActiveParamIndex(i); updateSuggestions(e.target.value, e.target.selectionStart || 0, e.target.getBoundingClientRect()); }} 
+                      value={params[i]} 
+                      onChange={(e) => { 
+                        const n = [...params]; n[i] = e.target.value; 
+                        setParams(n); 
+                        updateSuggestions(e.target.value, e.target.selectionStart || 0, e.target.getBoundingClientRect()); 
+                      }} 
+                      onKeyDown={handleKeyDown}
+                      onBlur={() => setTimeout(() => setSuggestionState(null), 200)} 
+                      style={{ 
+                        ...paramInputStyle, 
+                        width: '100%', 
+                        border: validationErrors[i]?.syntax ? '1px solid #e74c3c' : (validationErrors[i]?.warnings?.length > 0 ? '1px solid #f1c40f' : (activeParamIndex === i ? '1px solid #007acc' : '1px solid #333')),
+                        borderLeft: activeParamIndex === i ? '4px solid #007acc' : '1px solid #333'
+                      }} 
+                    />
+                    {validationErrors[i]?.syntax && (
+                      <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#e74c3c', fontSize: '10px', pointerEvents: 'none' }}>
+                        {validationErrors[i].syntax}
+                      </div>
+                    )}
+                    {validationErrors[i]?.warnings?.length > 0 && !validationErrors[i]?.syntax && (
+                      <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#f1c40f', fontSize: '10px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={10} /> {validationErrors[i].warnings[0]}
+                      </div>
+                    )}
                     {suggestionState?.isOpen && activeParamIndex === i && (
                       <div style={{ position: 'fixed', top: (suggestionState.rect?.bottom || 0) + 4, left: suggestionState.rect?.left || 0, width: suggestionState.rect?.width || 200, backgroundColor: '#252526', border: '1px solid #444', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', zIndex: 3000, maxHeight: '200px', overflowY: 'auto' }}>
                         {suggestionState.items.map((item, idx) => (
-                          <div key={idx} onClick={() => { insertAtCaret(item.name); setSuggestionState(null); }} style={{ padding: '6px 10px', fontSize: '12px', cursor: 'pointer', backgroundColor: suggestionState.activeIndex === idx ? '#007acc' : 'transparent', color: suggestionState.activeIndex === idx ? '#fff' : '#ccc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div key={idx} onClick={() => { insertAtCaret(item.insertText || item.name); setSuggestionState(null); }} style={{ padding: '6px 10px', fontSize: '12px', cursor: 'pointer', backgroundColor: suggestionState.activeIndex === idx ? '#007acc' : 'transparent', color: suggestionState.activeIndex === idx ? '#fff' : '#ccc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{ opacity: 0.7 }}>{item.icon}</div>
                             <span>{item.name}</span>
                           </div>

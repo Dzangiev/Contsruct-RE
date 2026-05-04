@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square } from 'lucide-react';
+import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText } from 'lucide-react';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
@@ -32,14 +32,19 @@ export const Inspector: React.FC = () => {
       const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
       return (
         <div className="inspector" style={inspectorStyle}>
-          <div style={panelHeaderStyle}>Properties: {objectType?.name || 'Instance'}</div>
+          <div style={panelHeaderStyle}>
+            <Package size={14} style={{ color: '#007acc' }} />
+            Properties: {objectType?.name || 'Instance'}
+          </div>
           
-          <Category label="Common">
+          <Category label="Common" icon={<ListIcon size={12} />}>
             <PropertyRow label="Name" value={objectType?.name || ''} readOnly icon={<Type size={12}/>} />
-            <PropertyRow label="Plugin" value={objectType?.kind || ''} readOnly />
-            <PropertyRow label="Layer" value={activeLayout?.layers.find(l => l.id === instance.layerId)?.name || ''} readOnly />
-            <div style={{ padding: '8px 10px' }}>
-              <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({objectType?.behaviors?.length || 0})</button>
+            <PropertyRow label="Plugin" value={objectType?.kind || ''} readOnly icon={<Package size={12}/>} />
+            <PropertyRow label="Layer" value={activeLayout?.layers.find(l => l.id === instance.layerId)?.name || ''} readOnly icon={<LayersIcon size={12}/>} />
+            <div style={{ padding: '4px 10px 8px' }}>
+              <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
+                <Plus size={12} /> Behaviors ({objectType?.behaviors?.length || 0})
+              </button>
             </div>
           </Category>
 
@@ -103,7 +108,7 @@ export const Inspector: React.FC = () => {
           {objectType?.behaviors?.map(b => {
             const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
             return (
-              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#666', marginRight: '8px', fontWeight: 600 }}>OBJECT</span>}>
                 {def?.propertyDefinitions.map(pDef => {
                   const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
@@ -147,7 +152,7 @@ export const Inspector: React.FC = () => {
           {families.map(family => family.behaviors.map(b => {
             const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
             return (
-              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#007acc', marginRight: '8px', fontWeight: 600 }}>FAMILY: {family.name.toUpperCase()}</span>}>
                 {def?.propertyDefinitions.map(pDef => {
                   const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
@@ -191,8 +196,8 @@ export const Inspector: React.FC = () => {
               } 
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
-            <div style={{ padding: '4px 0', borderBottom: '1px solid #222' }}>
-               <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Object Variables</span>
+            <div style={{ padding: '6px 10px', backgroundColor: '#222' }}>
+               <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Object Variables</span>
             </div>
             {objectType?.instanceVariables?.map(v => {
               const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
@@ -228,13 +233,13 @@ export const Inspector: React.FC = () => {
               );
             })}
             {(!objectType?.instanceVariables || objectType.instanceVariables.length === 0) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No object variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>No object variables.</div>
             )}
 
             {families.map(family => (
               <React.Fragment key={family.id}>
-                <div style={{ padding: '4px 0', borderBottom: '1px solid #222', marginTop: '8px' }}>
-                  <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Family: {family.name}</span>
+                <div style={{ padding: '6px 10px', backgroundColor: '#222', marginTop: '2px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Family: {family.name}</span>
                 </div>
                 {family.instanceVariables.map(v => {
                   const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
@@ -270,7 +275,7 @@ export const Inspector: React.FC = () => {
                   );
                 })}
                 {family.instanceVariables.length === 0 && (
-                  <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+                  <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>No family variables.</div>
                 )}
               </React.Fragment>
             ))}
@@ -312,11 +317,14 @@ export const Inspector: React.FC = () => {
       const families = project.families.filter(f => f.objectTypeIds.includes(objectType.id));
       return (
         <div className="inspector" style={inspectorStyle}>
-          <div style={panelHeaderStyle}>Object Type: {objectType.name}</div>
+          <div style={panelHeaderStyle}>
+            <Package size={14} style={{ color: '#007acc' }} />
+            Object Type: {objectType.name}
+          </div>
           
-          <Category label="General">
-            <PropertyRow label="Name" value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Package size={12}/>} />
-            <PropertyRow label="Kind" value={objectType.kind} readOnly />
+          <Category label="General" icon={<ListIcon size={12} />}>
+            <PropertyRow label="Name" value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Type size={12}/>} />
+            <PropertyRow label="Kind" value={objectType.kind} readOnly icon={<Package size={12}/>} />
             <PropertyRow 
               label="Folder" 
               value={objectType.folderId || ''} 
@@ -327,9 +335,13 @@ export const Inspector: React.FC = () => {
               icon={<Folder size={12}/>}
             />
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({objectType.behaviors?.length || 0})</button>
+              <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
+                <Plus size={12} /> Behaviors ({objectType.behaviors?.length || 0})
+              </button>
               {objectType.kind === 'sprite' && (
-                <button onClick={() => openSpriteEditor(objectType.id)} style={linkButtonStyle}>Edit Animations</button>
+                <button onClick={() => openSpriteEditor(objectType.id)} style={actionButtonStyle}>
+                  <Edit2 size={12} /> Edit Animations
+                </button>
               )}
             </div>
           </Category>
@@ -573,13 +585,20 @@ export const Inspector: React.FC = () => {
     if (family) {
       return (
         <div className="inspector" style={inspectorStyle}>
-          <div style={panelHeaderStyle}>Family: {family.name}</div>
+          <div style={panelHeaderStyle}>
+            <Users size={14} style={{ color: '#007acc' }} />
+            Family: {family.name}
+          </div>
           
-          <Category label="General">
+          <Category label="General" icon={<ListIcon size={12} />}>
             <PropertyRow label="Name" value={family.name} onChange={v => updateFamily(family.id, { name: String(v) })} icon={<Users size={12}/>} />
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={() => setShowFamilyMembersDialog(true)} style={linkButtonStyle}>Manage Members ({family.objectTypeIds.length})</button>
-              <button onClick={() => setShowBehaviorsDialog(true)} style={linkButtonStyle}>Behaviors ({family.behaviors?.length || 0})</button>
+              <button onClick={() => setShowFamilyMembersDialog(true)} style={actionButtonStyle}>
+                <Users size={12} /> Manage Members ({family.objectTypeIds.length})
+              </button>
+              <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
+                <Plus size={12} /> Behaviors ({family.behaviors?.length || 0})
+              </button>
             </div>
           </Category>
 
@@ -694,23 +713,27 @@ export const Inspector: React.FC = () => {
       <style>{`
         .property-row-hover:hover { background-color: rgba(255,255,255,0.03); }
         .inspector select:hover, .inspector input:hover { border-color: #555; }
-        .inspector select:focus, .inspector input:focus { border-color: #007acc; }
+        .inspector select:focus, .inspector input:focus { border-color: #007acc; outline: none; }
         .var-actions-hover:hover { opacity: 1 !important; }
+        .action-button:hover { background-color: #444 !important; color: #fff !important; }
       `}</style>
-      <div style={panelHeaderStyle}>Properties: {activeLayout?.name || 'Project'}</div>
+      <div style={panelHeaderStyle}>
+        <Info size={14} style={{ color: '#007acc' }} />
+        Properties: {activeLayout?.name || 'Project'}
+      </div>
       
       {layer && (
-        <Category label="Active Layer">
-          <PropertyRow label="Name" value={layer.name} onChange={v => updateLayer(activeLayout!.id, layer.id, { name: String(v) })} />
-          <PropertyRow label="Opacity" value={layer.opacity} onChange={v => updateLayer(activeLayout!.id, layer.id, { opacity: Number(v) })} type="number" step={0.1} />
-          <PropertyRow label="Visible" value={layer.visible ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} />
-          <PropertyRow label="Locked" value={layer.locked ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { locked: v === 'Yes' })} type="select" options={['Yes', 'No']} />
+        <Category label="Active Layer" icon={<LayersIcon size={12} />}>
+          <PropertyRow label="Name" value={layer.name} onChange={v => updateLayer(activeLayout!.id, layer.id, { name: String(v) })} icon={<Type size={12}/>} />
+          <PropertyRow label="Opacity" value={layer.opacity} onChange={v => updateLayer(activeLayout!.id, layer.id, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12}/>} />
+          <PropertyRow label="Visible" value={layer.visible ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
+          <PropertyRow label="Locked" value={layer.locked ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { locked: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12}/>} />
         </Category>
       )}
 
       {activeLayout && (
         <Category label="Layout Settings">
-          <PropertyRow label="Name" value={activeLayout.name} onChange={v => updateLayout(activeLayout.id, { name: String(v) })} />
+          <PropertyRow label="Name" value={activeLayout.name} onChange={v => updateLayout(activeLayout.id, { name: String(v) })} icon={<Type size={12}/>} />
           <PropertyRow label="Width" value={activeLayout.width} onChange={v => updateLayout(activeLayout.id, { width: Number(v) })} type="number" icon={<Hash size={12}/>} />
           <PropertyRow label="Height" value={activeLayout.height} onChange={v => updateLayout(activeLayout.id, { height: Number(v) })} type="number" icon={<Hash size={12}/>} />
           <PropertyRow 
@@ -722,49 +745,73 @@ export const Inspector: React.FC = () => {
             onChange={v => moveEntityToFolder('layout', activeLayout.id, v === '' ? null : String(v))} 
             icon={<Folder size={12}/>}
           />
-          <PropertyRow label="Event Sheet" value={project.eventSheets.find(es => es.id === activeLayout.eventSheetId)?.name || 'None'} readOnly />
+          <PropertyRow label="Event Sheet" value={project.eventSheets.find(es => es.id === activeLayout.eventSheetId)?.name || 'None'} readOnly icon={<FileText size={12} />} />
         </Category>
       )}
 
       <Category label="Project Settings">
-        <PropertyRow label="Name" value={project.settings.name} onChange={v => updateProjectSettings({ name: String(v) })} />
-        <PropertyRow label="Author" value={project.settings.author} onChange={v => updateProjectSettings({ author: String(v) })} />
+        <PropertyRow label="Name" value={project.settings.name} onChange={v => updateProjectSettings({ name: String(v) })} icon={<Type size={12}/>} />
+        <PropertyRow label="Author" value={project.settings.author} onChange={v => updateProjectSettings({ author: String(v) })} icon={<Type size={12}/>} />
         <PropertyRow label="Viewport Width" value={project.settings.viewportWidth} onChange={v => updateProjectSettings({ viewportWidth: Number(v) })} type="number" icon={<Hash size={12}/>} />
         <PropertyRow label="Viewport Height" value={project.settings.viewportHeight} onChange={v => updateProjectSettings({ viewportHeight: Number(v) })} type="number" icon={<Hash size={12}/>} />
       </Category>
 
-      <div style={{ padding: '20px', fontSize: '11px', color: '#444', textAlign: 'center', borderTop: '1px solid #111', marginTop: 'auto', backgroundColor: '#1e1e1e' }}>
+      <div style={{ padding: '16px 20px', fontSize: '10px', color: '#444', textAlign: 'center', borderTop: '1px solid #111', marginTop: 'auto', backgroundColor: '#181818', letterSpacing: '1px' }}>
         v{project.settings.version}
       </div>
     </div>
   );
 };
 
-const Category: React.FC<{ label: string, children: React.ReactNode, action?: React.ReactNode }> = ({ label, children, action }) => {
+const Category: React.FC<{ label: string, children: React.ReactNode, action?: React.ReactNode, icon?: React.ReactNode }> = ({ label, children, action, icon }) => {
   const [expanded, setExpanded] = React.useState(true);
   return (
     <div style={{ borderBottom: '1px solid #111' }}>
       <div 
         onClick={() => setExpanded(!expanded)}
         style={{ 
-          padding: '6px 10px', 
-          backgroundColor: '#383839', 
+          padding: '8px 10px', 
+          backgroundColor: '#2d2d2e', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between',
           cursor: 'pointer',
-          userSelect: 'none'
+          userSelect: 'none',
+          borderLeft: expanded ? '2px solid #007acc' : '2px solid transparent',
+          transition: 'all 0.1s'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {expanded ? <ChevronDown size={14} color="#888" /> : <ChevronRight size={14} color="#888" />}
-          <span style={{ fontSize: '10px', fontWeight: 800, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.1s', display: 'flex', alignItems: 'center' }}>
+            <ChevronDown size={12} color={expanded ? '#aaa' : '#666'} />
+          </div>
+          {icon && <div style={{ color: '#888', display: 'flex', alignItems: 'center' }}>{icon}</div>}
+          <span style={{ fontSize: '10px', fontWeight: 700, color: expanded ? '#eee' : '#888', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</span>
         </div>
         {action}
       </div>
-      {expanded && <div style={{ backgroundColor: '#1a1a1b', padding: '2px 0' }}>{children}</div>}
+      {expanded && <div style={{ backgroundColor: '#1e1e1f', padding: '2px 0' }}>{children}</div>}
     </div>
   );
+};
+
+
+// Styles (Moving them to end for cleanliness)
+const actionButtonStyle: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: '#383839',
+  border: '1px solid #444',
+  color: '#aaa',
+  fontSize: '10px',
+  fontWeight: 600,
+  padding: '4px 8px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '6px',
+  transition: 'all 0.1s'
 };
 
 const PropertyRow: React.FC<{ 
@@ -808,14 +855,14 @@ const PropertyRow: React.FC<{
         {label}
       </label>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
         {readOnly ? (
-          <div style={{ fontSize: '11px', color: '#666', padding: '2px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+          <div style={{ fontSize: '11px', color: '#666', padding: '2px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{value}</div>
         ) : type === 'select' ? (
           <select 
             value={value} 
             onChange={e => onChange?.(e.target.value)} 
-            style={{ ...inputStyle, padding: '1px 4px' }}
+            style={{ ...inputStyle, padding: '1px 4px', width: '100%' }}
           >
             {options.map((opt, i) => <option key={opt} value={opt}>{displayValues[i] || opt}</option>)}
           </select>
@@ -825,13 +872,13 @@ const PropertyRow: React.FC<{
               type="color" 
               value={value || '#ffffff'} 
               onChange={e => onChange?.(e.target.value)} 
-              style={{ width: '20px', height: '18px', padding: 0, border: '1px solid #333', background: 'none', cursor: 'pointer', borderRadius: '2px' }}
+              style={{ width: '20px', height: '18px', padding: 0, border: '1px solid #333', background: 'none', cursor: 'pointer', borderRadius: '2px', flexShrink: 0 }}
             />
             <input 
               type="text" 
               value={value || ''} 
               onChange={e => onChange?.(e.target.value)} 
-              style={inputStyle}
+              style={{ ...inputStyle, flex: 1 }}
             />
           </div>
         ) : (
@@ -850,7 +897,7 @@ const PropertyRow: React.FC<{
               e.currentTarget.style.backgroundColor = '#3c3c3c';
               e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.2)';
             }}
-            style={{ ...inputStyle, height: '18px' }}
+            style={{ ...inputStyle, height: '18px', width: '100%' }}
           />
         )}
       </div>
@@ -859,26 +906,28 @@ const PropertyRow: React.FC<{
 };
 
 const inspectorStyle: React.CSSProperties = {
-  width: '280px',
-  backgroundColor: '#2d2d2d',
-  borderLeft: '1px solid #1a1a1a',
+  width: '100%',
+  backgroundColor: '#1e1e1e',
+  borderLeft: '1px solid #111',
   display: 'flex',
   flexDirection: 'column',
   overflowY: 'auto',
-  color: '#aaa',
-  userSelect: 'none',
-  boxShadow: '-5px 0 15px rgba(0,0,0,0.1)'
+  color: '#ccc',
+  userSelect: 'none'
 };
 
 const panelHeaderStyle: React.CSSProperties = {
-  padding: '10px 16px',
+  padding: '12px 16px',
   backgroundColor: '#383839',
   fontSize: '11px',
   fontWeight: 800,
   color: '#eee',
   borderBottom: '1px solid #1a1a1a',
   textTransform: 'uppercase',
-  letterSpacing: '1px'
+  letterSpacing: '1px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px'
 };
 
 const inputStyle: React.CSSProperties = {
@@ -896,9 +945,25 @@ const inputStyle: React.CSSProperties = {
 };
 
 const miniButtonStyle: React.CSSProperties = {
-  background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', transition: 'color 0.2s'
+  background: 'none',
+  border: 'none',
+  color: '#888',
+  cursor: 'pointer',
+  padding: '2px',
+  display: 'flex',
+  alignItems: 'center',
+  borderRadius: '3px',
+  transition: 'color 0.2s'
 };
 
 const linkButtonStyle: React.CSSProperties = {
-  width: '100%', backgroundColor: '#333', border: '1px solid #444', color: '#ccc', padding: '6px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', transition: 'all 0.2s'
+  width: '100%', 
+  backgroundColor: '#333', 
+  border: '1px solid #444', 
+  color: '#ccc', 
+  padding: '6px', 
+  fontSize: '11px', 
+  cursor: 'pointer', 
+  borderRadius: '4px', 
+  transition: 'all 0.2s'
 };

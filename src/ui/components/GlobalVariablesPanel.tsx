@@ -27,17 +27,17 @@ const panelStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  padding: '8px 12px',
+  padding: '12px 16px',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   backgroundColor: '#252526',
-  borderBottom: '1px solid #1a1a1a',
+  borderBottom: '1px solid #111',
   fontWeight: 700,
   fontSize: '11px',
   textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  color: '#888'
+  letterSpacing: '1px',
+  color: '#aaa'
 };
 
 const itemStyle: React.CSSProperties = {
@@ -129,22 +129,23 @@ export const GlobalVariablesPanel: React.FC = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 600, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</span>
-              {v.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#444', padding: '1px 4px', borderRadius: '2px', color: '#aaa' }}>CONST</span>}
+              <span style={{ fontWeight: 600, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' }}>{v.name}</span>
+              {v.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#3498db33', padding: '1px 5px', borderRadius: '4px', color: '#3498db', fontWeight: 800 }}>CONST</span>}
               {usageCount > 0 && (
                 <div 
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '3px', 
+                    gap: '4px', 
                     marginLeft: 'auto', 
                     marginRight: '4px', 
                     fontSize: '10px', 
-                    color: isExpanded ? '#3498db' : '#666', 
-                    backgroundColor: isExpanded ? 'rgba(52, 152, 219, 0.15)' : 'transparent', 
-                    padding: '1px 5px', 
+                    color: isExpanded ? '#007acc' : '#555', 
+                    backgroundColor: isExpanded ? 'rgba(0, 122, 204, 0.1)' : 'transparent', 
+                    padding: '1px 6px', 
                     borderRadius: '10px',
-                    fontWeight: isExpanded ? 700 : 400
+                    fontWeight: isExpanded ? 700 : 500,
+                    border: isExpanded ? '1px solid rgba(0, 122, 204, 0.2)' : '1px solid transparent'
                   }}
                 >
                   <BarChart2 size={10} />
@@ -152,9 +153,9 @@ export const GlobalVariablesPanel: React.FC = () => {
                 </div>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-              <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase' }}>{v.type}</span>
-              <span style={{ color: '#444' }}>•</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
+              <span style={{ fontSize: '9px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>{v.type}</span>
+              <span style={{ color: '#333' }}>•</span>
               <span style={{ fontSize: '11px', color: v.type === 'number' ? '#569cd6' : '#ce9178', fontWeight: 500 }}>
                 {JSON.stringify(v.initialValue)}
               </span>
@@ -416,7 +417,7 @@ export const GlobalVariablesPanel: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ padding: '8px 12px', borderTop: '1px solid #1a1a1a', backgroundColor: '#252526', fontSize: '10px', color: '#666' }}>
+      <div style={{ padding: '8px 12px', borderTop: '1px solid #111', backgroundColor: '#181818', fontSize: '10px', color: '#444', letterSpacing: '0.5px' }}>
         Total: {project.globalVariables.length} variables
       </div>
 
@@ -438,14 +439,14 @@ export const GlobalVariablesPanel: React.FC = () => {
 
       <style>{`
         .var-item-hover:hover {
-          background-color: #2a2d2e;
+          background-color: #252526;
         }
         .var-item-hover:hover button {
-          color: #ccc;
+          color: #aaa;
         }
         .usage-item:hover {
-          background-color: #252526;
-          border-left-color: #3498db !important;
+          background-color: #222;
+          border-left-color: #007acc !important;
         }
       `}</style>
     </div>

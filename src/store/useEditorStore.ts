@@ -121,7 +121,7 @@ interface EditorStore {
   removeGlobalVariable: (variableId: string) => void;
 }
 
-const initialProject = createEmptyProject();
+const initialProject = projectUpdates.sanitizeProject(createEmptyProject());
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
   project: initialProject,

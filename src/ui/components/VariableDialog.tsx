@@ -1,6 +1,7 @@
 import React from 'react';
 import { Variable, X } from 'lucide-react';
 import { InstanceVariable, GlobalVariable } from '../../model/project';
+import { sanitizeName, isValidName } from '../../utils/naming';
 
 interface VariableDialogProps {
   title: string;
@@ -40,7 +41,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!name.trim()) return setError('Name cannot be empty');
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return setError('Invalid name (start with letter, no spaces)');
+    if (!isValidName(name)) return setError('Invalid name (must start with a letter and contain only letters, numbers, and underscores)');
     
     // Check for uniqueness (excluding current name if editing)
     if (name !== variable?.name && existingNames.includes(name)) {
