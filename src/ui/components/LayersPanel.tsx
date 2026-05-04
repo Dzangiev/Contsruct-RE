@@ -10,7 +10,9 @@ import {
   ChevronUp, 
   ChevronDown,
   Trash2,
-  Settings2
+  Settings2,
+  Box,
+  MousePointer2
 } from 'lucide-react';
 
 export const LayersPanel: React.FC = () => {
@@ -20,7 +22,9 @@ export const LayersPanel: React.FC = () => {
     setActiveLayer, 
     addLayer, 
     updateLayer, 
-    moveLayer 
+    moveLayer,
+    reorderInstance,
+    setSelectedInstances
   } = useEditorStore();
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
@@ -103,6 +107,69 @@ export const LayersPanel: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      <div style={{ ...headerStyle, borderTop: '1px solid #333' }}>
+        <span style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', color: '#aaa' }}>Objects in Layer</span>
+      </div>
+
+      <div style={{ ...listStyle, flex: 1.5 }}>
+        {activeLayout.instances
+          .filter(inst => inst.layerId === editorState.activeLayerId)
+          .reverse() // Show top to bottom
+          .map((inst, idx, arr) => {
+            const isSelected = editorState.selectedInstanceIds.includes(inst.id);
+            const objectType = project.objectTypes.find(ot => ot.id === inst.objectTypeId);
+            const isTop = idx === 0;
+            const isBottom = idx === arr.length - 1;
+
+            return (
+              <div 
+                key={inst.id}
+                onClick={() => setSelectedInstances([inst.id])}
+                style={{
+                  ...rowStyle,
+                  backgroundColor: isSelected ? 'rgba(0, 122, 204, 0.2)' : 'transparent',
+                  padding: '4px 8px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                  <Box size={12} color={isSelected ? '#007acc' : '#555'} />
+                  <span style={{ 
+                    flex: 1, 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    whiteSpace: 'nowrap',
+                    color: isSelected ? '#fff' : '#aaa',
+                    fontSize: '11px'
+                  }}>
+                    {objectType?.name || 'Instance'}
+                  </span>
+                </div>
+                <div style={controlsStyle}>
+                   <button 
+                    disabled={isTop}
+                    onClick={(e) => { e.stopPropagation(); reorderInstance(activeLayout.id, inst.id, 'forward'); }}
+                    style={{ ...iconButtonStyle, opacity: isTop ? 0.2 : 0.8 }}
+                  >
+                    <ChevronUp size={12} />
+                  </button>
+                  <button 
+                    disabled={isBottom}
+                    onClick={(e) => { e.stopPropagation(); reorderInstance(activeLayout.id, inst.id, 'backward'); }}
+                    style={{ ...iconButtonStyle, opacity: isBottom ? 0.2 : 0.8 }}
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        {activeLayout.instances.filter(i => i.layerId === editorState.activeLayerId).length === 0 && (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#555', fontSize: '11px' }}>
+            No objects in this layer
+          </div>
+        )}
       </div>
     </div>
   );

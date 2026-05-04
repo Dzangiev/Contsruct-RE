@@ -29,6 +29,7 @@ interface EditorStore {
   cloneInstance: (layoutId: string, instanceId: string) => void;
   updateInstance: (layoutId: string, instanceId: string, updates: any) => void;
   updateInstanceSilently: (layoutId: string, instanceId: string, updates: any) => void;
+  updateInstancesSilently: (layoutId: string, updatesMap: Record<string, any>) => void;
   removeInstance: (layoutId: string, instanceId: string) => void;
   reorderInstance: (layoutId: string, instanceId: string, direction: 'front' | 'back' | 'forward' | 'backward') => void;
   addInstanceVariable: (objectTypeId: string, name: string, type: 'number' | 'string' | 'boolean', initialValue: any) => void;
@@ -146,7 +147,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   historyIndex: 0,
 
   pushHistory: (newProject) => {
-    const { history, historyIndex } = get();
+    const { history, historyIndex, project: currentProject } = get();
+    
+    // Quick check if anything actually changed to avoid redundant history entries
+    if (history.length > 0) {
+      const last = history[historyIndex];
+      // Note: In a production app we'd use a more efficient hash or change detection,
+      // but for this editor, a JSON check is reliable for undo/redo.
+      if (JSON.stringify(last) === JSON.stringify(newProject)) return;
+    }
+
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(JSON.parse(JSON.stringify(newProject))); 
     if (newHistory.length > 50) newHistory.shift(); 
@@ -232,6 +242,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         layouts: state.project.layouts.map(l => l.id === layoutId ? {
           ...l,
           instances: l.instances.map(i => i.id === instanceId ? { ...i, ...updates } : i)
+        } : l)
+      }
+    }));
+  },
+  updateInstancesSilently: (layoutId, updatesMap) => {
+    set(state => ({
+      project: {
+        ...state.project,
+        layouts: state.project.layouts.map(l => l.id === layoutId ? {
+          ...l,
+          instances: l.instances.map(i => updatesMap[i.id] ? { ...i, ...updatesMap[i.id] } : i)
         } : l)
       }
     }));

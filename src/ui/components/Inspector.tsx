@@ -14,7 +14,7 @@ export const Inspector: React.FC = () => {
     addBehavior, removeBehavior, updateBehavior, updateLayout, updateProjectSettings, showDialog, openSpriteEditor,
     updateFamily, addFamilyObjectType, removeFamilyObjectType, addFamilyInstanceVariable, updateFamilyInstanceVariable, removeFamilyInstanceVariable,
     addFamilyBehavior, updateFamilyBehavior, removeFamilyBehavior,
-    moveEntityToFolder, setSelectedInstances
+    moveEntityToFolder, setSelectedInstances, reorderInstance
   } = useEditorStore();
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
@@ -218,6 +218,23 @@ export const Inspector: React.FC = () => {
             <div style={{ padding: '4px 10px 8px', display: 'flex', gap: '8px' }}>
               <button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instanceId })} style={actionButtonStyle}>
                 <Zap size={12} /> Effects ({instance.effects?.length || 0})
+              </button>
+            </div>
+          </Category>
+
+          <Category label="Z Order">
+            <div style={{ padding: '0 10px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'front')} style={actionButtonStyle} title="Move to very top">
+                <ArrowUp size={12} color="#2ecc71" /> Top
+              </button>
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'forward')} style={actionButtonStyle} title="Move forward one step">
+                <ArrowUp size={12} /> Forward
+              </button>
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'back')} style={actionButtonStyle} title="Move to very bottom">
+                <ArrowDown size={12} color="#e74c3c" /> Bottom
+              </button>
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'backward')} style={actionButtonStyle} title="Move backward one step">
+                <ArrowDown size={12} /> Backward
               </button>
             </div>
           </Category>

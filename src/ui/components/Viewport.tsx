@@ -13,6 +13,7 @@ export const Viewport: React.FC = () => {
     editorState,
     setSelectedInstances,
     updateInstanceSilently,
+    updateInstancesSilently,
     commitProject,
     addInstance,
     addObjectType,
@@ -75,13 +76,17 @@ export const Viewport: React.FC = () => {
           const dy = e.key === 'ArrowUp' ? -amountY : e.key === 'ArrowDown' ? amountY : 0;
           
           if (activeLayout) {
+            const updates: Record<string, any> = {};
             selectedInstanceIds.forEach(id => {
               const inst = activeLayout.instances.find(i => i.id === id);
               if (inst) {
-                updateInstanceSilently(activeLayout.id, id, { x: inst.x + dx, y: inst.y + dy });
+                updates[id] = { x: inst.x + dx, y: inst.y + dy };
               }
             });
-            commitProject();
+            if (Object.keys(updates).length > 0) {
+              updateInstancesSilently(activeLayout.id, updates);
+              commitProject();
+            }
           }
         }
       }
@@ -247,12 +252,14 @@ export const Viewport: React.FC = () => {
         const snappedDeltaX = targetX - refPos.x;
         const snappedDeltaY = targetY - refPos.y;
 
+        const updates: Record<string, any> = {};
         initialPositions.forEach((pos, id) => {
-          updateInstanceSilently(activeLayout.id, id, { 
+          updates[id] = { 
             x: Math.round(pos.x + snappedDeltaX), 
             y: Math.round(pos.y + snappedDeltaY) 
-          });
+          };
         });
+        updateInstancesSilently(activeLayout.id, updates);
       }
       setSnapLines(activeSnaps);
     };
@@ -370,39 +377,37 @@ export const Viewport: React.FC = () => {
         const startAngle = Math.atan2((stationaryPoint.y - pivotY), (stationaryPoint.x - pivotX)) * (180 / Math.PI);
         // Wait, stationaryPoint for rotate is the start mouse pos.
         
+        const updates: Record<string, any> = {};
         ids.forEach(id => {
           const init = initialInstances.get(id);
           if (!init) return;
           
           if (ids.length === 1) {
-            updateInstanceSilently(activeLayout.id, id, { angle: Math.round(targetAngle) });
+            updates[id] = { angle: Math.round(targetAngle) };
             setCurrentRotation(Math.round(targetAngle));
           } else {
             const rad = targetAngle * (Math.PI / 180);
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
             
-            // Rotate each object around the group pivot
             const instCenterX = init.x + init.w / 2;
             const instCenterY = init.y + init.h / 2;
             
             const dx = instCenterX - pivotX;
             const dy = instCenterY - pivotY;
             
-            // This is a bit complex because initial state might already be rotated.
-            // For now, let's just do individual rotation if more than 1.
-            // Actually, let's do the proper math.
             const newCenterX = pivotX + (dx * cos - dy * sin);
             const newCenterY = pivotY + (dx * sin + dy * cos);
             
-            updateInstanceSilently(activeLayout.id, id, {
+            updates[id] = {
               x: Math.round(newCenterX - init.w / 2),
               y: Math.round(newCenterY - init.h / 2),
               angle: init.angle + targetAngle
-            });
+            };
             setCurrentRotation(Math.round(targetAngle));
           }
         });
+        updateInstancesSilently(activeLayout.id, updates);
         return;
       }
 
@@ -435,6 +440,7 @@ export const Viewport: React.FC = () => {
       const currentAABBX = handle.includes('l') ? stationaryPoint.x - currentAABBW : initialAABB.x;
       const currentAABBY = handle.includes('t') ? stationaryPoint.y - currentAABBH : initialAABB.y;
 
+      const updates: Record<string, any> = {};
       ids.forEach(id => {
         const init = initialInstances.get(id);
         if (!init) return;
@@ -444,13 +450,14 @@ export const Viewport: React.FC = () => {
         const offsetW = init.w / initialAABB.w;
         const offsetH = init.h / initialAABB.h;
 
-        updateInstanceSilently(activeLayout.id, id, {
+        updates[id] = {
           x: Math.round(currentAABBX + offsetX * currentAABBW),
           y: Math.round(currentAABBY + offsetY * currentAABBH),
           width: Math.max(1, Math.round(offsetW * currentAABBW)),
           height: Math.max(1, Math.round(offsetH * currentAABBH))
-        });
+        };
       });
+      updateInstancesSilently(activeLayout.id, updates);
     };
     const handleMouseUp = () => {
       setResizing(null);
@@ -656,6 +663,7 @@ export const Viewport: React.FC = () => {
       maxY = Math.max(maxY, inst.y + inst.height);
     });
 
+    const updates: Record<string, any> = {};
     selectedInstances.forEach(inst => {
       let newX = inst.x;
       let newY = inst.y;
@@ -667,8 +675,9 @@ export const Viewport: React.FC = () => {
         case 'middle': newY = minY + (maxY - minY) / 2 - inst.height / 2; break;
         case 'bottom': newY = maxY - inst.height; break;
       }
-      updateInstanceSilently(activeLayout.id, inst.id, { x: Math.round(newX), y: Math.round(newY) });
+      updates[inst.id] = { x: Math.round(newX), y: Math.round(newY) };
     });
+    updateInstancesSilently(activeLayout.id, updates);
     commitProject();
     setContextMenu(null);
   };
@@ -1128,6 +1137,25 @@ export const Viewport: React.FC = () => {
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
                     <Copy size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
                     <span style={{ flex: 1 }}>Clone</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
+                  </div>
+
+                  <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
+                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>Z ORDER</div>
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>
+                    <ArrowUp size={12} style={{ marginRight: '8px', color: '#2ecc71' }} />
+                    <span style={{ flex: 1 }}>Send to Top</span>
+                  </div>
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'back'); setContextMenu(null); }}>
+                    <ArrowDown size={12} style={{ marginRight: '8px', color: '#e74c3c' }} />
+                    <span style={{ flex: 1 }}>Send to Bottom</span>
+                  </div>
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'forward'); setContextMenu(null); }}>
+                    <ArrowUp size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
+                    <span style={{ flex: 1 }}>Move Forward</span>
+                  </div>
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'backward'); setContextMenu(null); }}>
+                    <ArrowDown size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
+                    <span style={{ flex: 1 }}>Move Backward</span>
                   </div>
                   
                   {selectedInstanceIds.length > 1 && (

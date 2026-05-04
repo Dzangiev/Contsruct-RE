@@ -6,7 +6,7 @@ import {
   Droplet, FlipHorizontal, FlipVertical, RotateCw, 
   Crop, Crosshair, ZoomIn, ZoomOut, Eye, EyeOff, 
   Pentagon, MousePointer2, Move, Maximize2, Scissors, 
-  Copy, Clipboard, MousePointer, Sparkles, Maximize
+  Copy, Clipboard, MousePointer, Sparkles, Maximize, ChevronUp
 } from 'lucide-react';
 import { generateId } from '../../utils/id';
 
@@ -64,17 +64,35 @@ export const SpriteEditor: React.FC = () => {
     return () => clearTimeout(timer);
   }, [autoFitZoom]);
 
-  // Animation playback
+  // Animation playback (respecting per-frame duration)
   React.useEffect(() => {
     if (!isPlaying || !selectedAnim || selectedAnim.frames.length === 0) return;
-    const interval = setInterval(() => {
-      setPreviewFrameIdx(prev => {
-        const next = prev + 1;
-        return next >= selectedAnim.frames.length ? (selectedAnim.loop ? 0 : prev) : next;
-      });
-    }, 1000 / selectedAnim.speed);
-    return () => clearInterval(interval);
-  }, [isPlaying, selectedAnim]);
+    
+    let timeoutId: any;
+    const playNext = (idx: number) => {
+      const frame = selectedAnim.frames[idx];
+      const duration = (frame?.duration || 1) * (1000 / selectedAnim.speed);
+      
+      timeoutId = setTimeout(() => {
+        setPreviewFrameIdx(current => {
+          const next = current + 1;
+          if (next >= selectedAnim.frames.length) {
+            if (selectedAnim.loop) {
+              playNext(0);
+              return 0;
+            }
+            setIsPlaying(false);
+            return current;
+          }
+          playNext(next);
+          return next;
+        });
+      }, duration);
+    };
+
+    playNext(previewFrameIdx);
+    return () => clearTimeout(timeoutId);
+  }, [isPlaying, selectedAnimId, selectedAnim?.speed, selectedAnim?.loop]);
 
   // Load image into canvas
   React.useEffect(() => {
@@ -290,12 +308,52 @@ export const SpriteEditor: React.FC = () => {
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
           <div style={sidePanelStyle}>
-            <div style={sectionHeaderStyle}>Animations</div>
-            <div style={{ height: '140px', overflowY: 'auto', padding: '8px' }}>
+            <div style={headerWithActionStyle}>
+              <span style={sectionHeaderStyle}>Animations</span>
+              <button 
+                onClick={() => {
+                  const newId = generateId();
+                  const newAnim = { 
+                    id: newId, 
+                    name: `Animation ${objectType.animations.length + 1}`, 
+                    speed: 5, 
+                    loop: true, 
+                    repeatCount: 0, 
+                    frames: [{ id: generateId(), assetId: '', duration: 1, originX: 0.5, originY: 0.5, imagePoints: [] }] 
+                  };
+                  updateObjectType(objectType.id, { animations: [...objectType.animations, newAnim] });
+                  setSelectedAnimId(newId);
+                  setSelectedFrameId(newAnim.frames[0].id);
+                }}
+                style={smallActionButtonStyle}
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+            <div style={{ height: '140px', overflowY: 'auto', padding: '8px', borderBottom: '1px solid #222' }}>
               {objectType.animations.map(anim => (
-                <div key={anim.id} onClick={() => { setSelectedAnimId(anim.id); setSelectedFrameId(anim.frames[0]?.id || ''); setPreviewFrameIdx(0); }}
-                  style={{ ...animItemStyle, backgroundColor: selectedAnimId === anim.id ? '#3e3e42' : 'transparent', borderColor: selectedAnimId === anim.id ? '#007acc' : 'transparent' }}>
-                  <span style={{ flex: 1 }}>{anim.name}</span>
+                <div 
+                  key={anim.id} 
+                  onClick={() => { setSelectedAnimId(anim.id); setSelectedFrameId(anim.frames[0]?.id || ''); setPreviewFrameIdx(0); }}
+                  style={{ ...animItemStyle, backgroundColor: selectedAnimId === anim.id ? '#3e3e42' : 'transparent', borderColor: selectedAnimId === anim.id ? '#007acc' : 'transparent' }}
+                >
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{anim.name}</span>
+                  {objectType.animations.length > 1 && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextAnims = objectType.animations.filter(a => a.id !== anim.id);
+                        updateObjectType(objectType.id, { animations: nextAnims });
+                        if (selectedAnimId === anim.id) {
+                          setSelectedAnimId(nextAnims[0].id);
+                          setSelectedFrameId(nextAnims[0].frames[0]?.id || '');
+                        }
+                      }}
+                      style={iconButtonStyle}
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -400,16 +458,44 @@ export const SpriteEditor: React.FC = () => {
                 </button>
               </div>
               <div style={stripContainerStyle}>
-                {selectedAnim?.frames.map((frame, idx) => (
+                {selectedAnim?.frames.map((frame, idx, arr) => (
                   <div key={frame.id} onClick={() => setSelectedFrameId(frame.id)}
                     style={{ ...frameBoxStyle, borderColor: selectedFrameId === frame.id ? '#007acc' : '#222', backgroundColor: selectedFrameId === frame.id ? '#1a1a1a' : '#0a0a0a' }}>
                     <div style={frameNumberStyle}>{idx}</div>
-                    {frame.assetId ? <img src={frame.assetId} style={{ width: '80%', height: '80%', objectFit: 'contain', imageRendering: 'pixelated' }} alt="F" /> : <ImageIcon size={20} color="#222" />}
-                    <button onClick={(e) => { e.stopPropagation(); 
-                      if (!selectedAnim || selectedAnim.frames.length <= 1) return;
-                      const nextFrames = selectedAnim.frames.filter(f => f.id !== frame.id);
-                      onUpdateAnim({ frames: nextFrames }); if (selectedFrameId === frame.id) setSelectedFrameId(nextFrames[0].id);
-                    }} style={deleteFrameButtonStyle}><Trash2 size={12} /></button>
+                    {frame.duration > 1 && <div style={frameBadgeDurationStyle}>x{frame.duration}</div>}
+                    {frame.assetId ? <img src={frame.assetId} style={{ width: '70%', height: '70%', objectFit: 'contain', imageRendering: 'pixelated' }} alt="F" /> : <ImageIcon size={20} color="#222" />}
+                    
+                    <div style={{ position: 'absolute', top: '2px', right: '2px', display: 'flex', gap: '2px' }}>
+                      <button onClick={(e) => {
+                        e.stopPropagation();
+                        const newFrame = { ...frame, id: generateId() };
+                        const nextFrames = [...selectedAnim!.frames];
+                        nextFrames.splice(idx + 1, 0, newFrame);
+                        onUpdateAnim({ frames: nextFrames });
+                      }} style={iconButtonStyle} title="Duplicate"><Copy size={10} /></button>
+                      
+                      {selectedAnim!.frames.length > 1 && (
+                        <button onClick={(e) => { e.stopPropagation(); 
+                          const nextFrames = selectedAnim!.frames.filter(f => f.id !== frame.id);
+                          onUpdateAnim({ frames: nextFrames }); if (selectedFrameId === frame.id) setSelectedFrameId(nextFrames[Math.max(0, idx - 1)].id);
+                        }} style={iconButtonStyle} title="Delete"><Trash2 size={10} /></button>
+                      )}
+                    </div>
+
+                    <div style={{ position: 'absolute', bottom: '2px', right: '2px', display: 'flex', gap: '2px' }}>
+                       {idx > 0 && (
+                         <button onClick={(e) => { e.stopPropagation();
+                           const next = [...selectedAnim!.frames]; [next[idx-1], next[idx]] = [next[idx], next[idx-1]];
+                           onUpdateAnim({ frames: next });
+                         }} style={iconButtonStyle}><ChevronUp size={10} style={{ transform: 'rotate(-90deg)' }} /></button>
+                       )}
+                       {idx < arr.length - 1 && (
+                         <button onClick={(e) => { e.stopPropagation();
+                           const next = [...selectedAnim!.frames]; [next[idx+1], next[idx]] = [next[idx], next[idx+1]];
+                           onUpdateAnim({ frames: next });
+                         }} style={iconButtonStyle}><ChevronUp size={10} style={{ transform: 'rotate(90deg)' }} /></button>
+                       )}
+                    </div>
                   </div>
                 ))}
                 <button style={addFrameButtonStyle} onClick={() => {
@@ -437,7 +523,30 @@ export const SpriteEditor: React.FC = () => {
                     <div style={{ ...checkboxStyle, backgroundColor: selectedAnim.loop ? '#007acc' : '#000' }}>{selectedAnim.loop && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}</div>
                     <span style={{ fontSize: '12px', color: '#aaa' }}>Loop</span>
                   </div>
+                  <button 
+                    onClick={() => onUpdateAnim({ frames: [...selectedAnim.frames].reverse() })}
+                    style={secondaryButtonStyle}
+                  >
+                    Reverse Sequence
+                  </button>
                 </>
+              )}
+              {selectedFrame && (
+                <div style={propertyBlockStyle}>
+                  <div style={sectionHeaderStyle}>Frame Properties</div>
+                  <div style={{ padding: '10px' }}>
+                    <label style={labelStyle}>Frame Duration (Multiplier)</label>
+                    <input 
+                      type="number" 
+                      min={0.1} 
+                      step={0.1} 
+                      value={selectedFrame.duration} 
+                      onChange={e => onUpdateFrame(selectedFrame.id, { duration: Number(e.target.value) })} 
+                      style={propInputStyle} 
+                    />
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Higher = stays longer on screen</div>
+                  </div>
+                </div>
               )}
               {tool === 'collision' && (
                 <div style={propertyBlockStyle}>
@@ -570,3 +679,9 @@ const primaryButtonStyle: React.CSSProperties = { backgroundColor: '#007acc', co
 const secondaryButtonStyle: React.CSSProperties = { backgroundColor: 'transparent', color: '#666', border: '1px solid #333', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer' };
 const infoTextStyle: React.CSSProperties = { fontSize: '11px', color: '#444', padding: '10px', fontStyle: 'italic' };
 const propertyBlockStyle: React.CSSProperties = { marginTop: '10px', borderTop: '1px solid #222', paddingTop: '10px' };
+
+const headerWithActionStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1a1a1b', borderBottom: '1px solid #222' };
+const smallActionButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '10px' };
+const iconButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const frameBadgeStyle: React.CSSProperties = { position: 'absolute', bottom: '2px', right: '2px', backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: '8px', padding: '1px 3px', borderRadius: '2px', pointerEvents: 'none' };
+const frameBadgeDurationStyle: React.CSSProperties = { position: 'absolute', bottom: '2px', left: '2px', backgroundColor: 'rgba(0,122,204,0.5)', color: '#fff', fontSize: '8px', padding: '1px 3px', borderRadius: '2px', pointerEvents: 'none' };
