@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   EyeOff, Eye, Copy, Scissors, Clipboard, 
-  Plus, Variable, Zap, Trash2, FilePlus, GitBranch 
+  Plus, Variable, Zap, Trash2, FilePlus, GitBranch, Folder
 } from 'lucide-react';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { Project, EventBlock } from '../../../model/project';
@@ -14,12 +14,14 @@ interface ContextMenuProps {
   logicItemId: string | null | undefined;
   eventSheetId: string;
   onAddVariable: (parentId?: string | null) => void;
+  onAddGroup: (parentId?: string | null) => void;
+  onEditGroup: (eventSheetId: string, blockId: string, block: EventBlock) => void;
   onClose: () => void;
   setBrowserState: (state: any) => void;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({ 
-  project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onClose, setBrowserState 
+  project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onAddGroup, onEditGroup, onClose, setBrowserState 
 }) => {
   const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem } = useEditorStore();
   const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
@@ -57,6 +59,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         <>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> Add sub-event (S)</div>
           <div style={contextItemStyle} onClick={() => { onAddVariable(blockId); onClose(); }}><Variable size={14} /> Add local variable (V)</div>
+          <div style={contextItemStyle} onClick={() => { onAddGroup(blockId); onClose(); }}><Folder size={14} /> Add sub-group (G)</div>
+          {currentBlock?.type === 'group' && (
+            <div style={contextItemStyle} onClick={() => { onEditGroup(eventSheetId, blockId, currentBlock); onClose(); }}><Folder size={14} /> Edit group properties</div>
+          )}
           <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'condition', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add condition (C)</div>
           <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'action', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add action (A)</div>
@@ -86,6 +92,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           <div style={contextDividerStyle} />
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'function'); onClose(); }}><Zap size={14} /> Add Function (F)</div>
           <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'include'); onClose(); }}><FilePlus size={14} /> Add Include</div>
+          <div style={contextItemStyle} onClick={() => { onAddGroup(null); onClose(); }}><Folder size={14} /> Add Group (G)</div>
         </>
       )}
     </div>

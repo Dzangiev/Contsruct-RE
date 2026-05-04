@@ -172,6 +172,8 @@ export interface EventBlock {
   children: EventBlock[];
   groupName?: string;
   groupExpanded?: boolean;
+  groupDescription?: string;
+  groupActiveOnStart?: boolean;
   commentText?: string;
   variable?: GlobalVariable;
   functionName?: string;

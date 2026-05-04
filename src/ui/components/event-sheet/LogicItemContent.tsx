@@ -20,42 +20,46 @@ export const LogicItemContent: React.FC<{
   def?: any, 
   project: Project,
   type: 'condition' | 'action',
-  searchTerm: string
-}> = ({ item, def, project, type, searchTerm }) => {
+  searchTerm: string,
+  isSelected?: boolean
+}> = ({ item, def, project, type, searchTerm, isSelected }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
   const ot = project.objectTypes.find(o => o.id === item.targetObjectTypeId);
   
   const renderFormattedLogic = () => {
     if (!def) return <HighlightText text={item.type} highlight={searchTerm} />;
     const p = item.params;
+    const txtColor = isSelected ? '#121212' : '#bbb';
+    const subColor = isSelected ? 'rgba(0,0,0,0.5)' : '#888';
     
     switch (item.type) {
       case 'compareInstanceVariable':
       case 'compareVariable': {
         const op = p[1] === '==' ? '=' : p[1];
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, color: '#eee', letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
-          <span style={{ color: '#888', fontSize: '11px', marginTop: '1px' }}>{op}</span>
-          <span style={{ color: '#f1c40f', fontWeight: 600 }}>{p[2]}</span>
+          <span style={{ fontWeight: 700, color: txtColor, letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
+          <span style={{ color: subColor, fontSize: '11px', marginTop: '1px' }}>{op}</span>
+          <span style={{ color: txtColor, fontWeight: 600 }}>{p[2]}</span>
         </div>;
       }
       case 'setInstanceVariable':
       case 'setVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, color: '#eee', letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
-          <span style={{ color: '#888', fontSize: '11px', marginTop: '1px' }}>=</span>
-          <span style={{ color: '#f1c40f', fontWeight: 600 }}>{p[1]}</span>
+          <span style={{ fontWeight: 700, color: txtColor, letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
+          <span style={{ color: subColor, fontSize: '11px', marginTop: '1px' }}>=</span>
+          <span style={{ color: txtColor, fontWeight: 600 }}>{p[1]}</span>
         </div>;
       case 'subtractInstanceVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, color: '#eee', letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
-          <span style={{ color: '#888', fontSize: '11px', marginTop: '1px' }}>-=</span>
-          <span style={{ color: '#f1c40f', fontWeight: 600 }}>{p[1]}</span>
+          <span style={{ fontWeight: 700, color: txtColor, letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
+          <span style={{ color: subColor, fontSize: '11px', marginTop: '1px' }}>-=</span>
+          <span style={{ color: txtColor, fontWeight: 600 }}>{p[1]}</span>
         </div>;
       case 'addInstanceVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, color: '#eee', letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
-          <span style={{ color: '#888', fontSize: '11px', marginTop: '1px' }}>+=</span>
-          <span style={{ color: '#f1c40f', fontWeight: 600 }}>{p[1]}</span>
+          <span style={{ fontWeight: 700, color: txtColor, letterSpacing: '0.2px' }}><HighlightText text={String(p[0])} highlight={searchTerm} /></span>
+          <span style={{ color: subColor, fontSize: '11px', marginTop: '1px' }}>+=</span>
+          <span style={{ color: txtColor, fontWeight: 600 }}>{p[1]}</span>
         </div>;
       case 'callFunction': {
         const funcName = p[0];
@@ -76,21 +80,21 @@ export const LogicItemContent: React.FC<{
         }).join(', ');
 
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ color: '#aaa' }}>Call</span>
-          <span style={{ fontWeight: 700, color: '#9b59b6', letterSpacing: '0.2px' }}>{funcName}</span>
-          {formattedParams && <span style={{ color: '#888', fontStyle: 'italic', fontSize: '11px' }}>({formattedParams})</span>}
+          <span style={{ color: subColor }}>Call</span>
+          <span style={{ fontWeight: 700, color: txtColor, letterSpacing: '0.2px' }}>{funcName}</span>
+          {formattedParams && <span style={{ color: subColor, fontStyle: 'italic', fontSize: '11px' }}>({formattedParams})</span>}
         </div>;
       }
       case 'destroy':
-        return <span style={{ color: '#ddd' }}>Destroy</span>;
+        return <span style={{ color: txtColor }}>Destroy</span>;
       case 'onPointerPressedOnObject':
-        return <span style={{ color: '#ddd' }}>On clicked</span>;
+        return <span style={{ color: txtColor }}>On clicked</span>;
       default:
         return (
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <span style={{ color: '#ccc', fontWeight: 500 }}><HighlightText text={def.name} highlight={searchTerm} /></span>
+            <span style={{ color: txtColor, fontWeight: 500 }}><HighlightText text={def.name} highlight={searchTerm} /></span>
             {p.length > 0 && (
-              <span style={{ color: '#f1c40f', fontSize: '10px', fontWeight: 700 }}>
+              <span style={{ color: txtColor, fontSize: '10px', fontWeight: 700 }}>
                 ({p.map((val: any) => {
                   const targetOt = project.objectTypes.find(o => o.id === val);
                   if (targetOt) return targetOt.name;
@@ -105,15 +109,43 @@ export const LogicItemContent: React.FC<{
     }
   };
 
+  const getBgColor = () => {
+    if (isSelected) return '#ccc';
+    if (isHovered) return type === 'condition' ? '#3e3e3e' : '#2e2e2e';
+    return type === 'condition' ? '#353535' : 'transparent';
+  };
+
+  const getTextColor = () => {
+    if (isSelected) return '#121212';
+    return '#bbb';
+  };
+
   return (
-    <div className="logic-row-container" style={{ display: 'flex', alignItems: 'stretch', minHeight: '26px', fontSize: '13px', width: '100%', backgroundColor: type === 'condition' ? '#353535' : 'transparent', borderBottom: 'none', opacity: item.disabled ? 0.35 : 1 }}>
+    <div 
+      className="logic-row-container" 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ 
+        display: 'flex', 
+        alignItems: 'stretch', 
+        minHeight: '26px', 
+        fontSize: '12px', 
+        width: '100%', 
+        backgroundColor: getBgColor(), 
+        color: getTextColor(),
+        borderBottom: 'none', 
+        padding: '1px 0', 
+        opacity: item.disabled ? 0.35 : 1,
+        transition: 'background-color 0.1s, color 0.1s'
+      }}
+    >
       <div style={{ 
         width: '120px', 
         display: 'flex', 
         alignItems: 'center', 
         gap: '6px', 
         padding: '4px 8px',
-        borderRight: '1px solid #1a1a1a',
+        borderRight: type === 'condition' ? '2px solid #2b2b2b' : '2px solid #333',
         backgroundColor: 'transparent',
         flexShrink: 0
       }}>
@@ -133,8 +165,8 @@ export const LogicItemContent: React.FC<{
       </div>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 10px', gap: '6px', overflow: 'hidden', lineHeight: '1.4' }}>
-        {type === 'condition' && item.inverted && <span style={{ color: '#e67e22', fontWeight: 800, marginRight: '2px' }}>!</span>}
-        {type === 'condition' && def?.isTrigger && <Zap size={10} fill="#2ecc71" color="#2ecc71" style={{ marginRight: '4px' }} />}
+        {type === 'condition' && item.inverted && <span style={{ color: isSelected ? '#121212' : '#bbb', fontWeight: 800, marginRight: '2px' }}>!</span>}
+        {type === 'condition' && def?.isTrigger && <Zap size={10} fill={isSelected ? '#121212' : '#2ecc71'} color={isSelected ? '#121212' : '#2ecc71'} style={{ marginRight: '4px' }} />}
         {renderFormattedLogic()}
       </div>
     </div>

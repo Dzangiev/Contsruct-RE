@@ -8,6 +8,7 @@ export interface EventBlockItemProps {
   onOpenParamEditor: (mode: 'condition' | 'action', blockId: string, itemId: string, def: any, params: any[], targetObjectTypeId?: string) => void;
   onOpenVariableEditor: (eventSheetId: string, blockId: string, variable: any) => void;
   onOpenFunctionEditor: (eventSheetId: string, block: EventBlock) => void;
+  onOpenGroupDialog: (eventSheetId: string, blockId: string, block: EventBlock) => void;
   onContextMenu: (e: React.MouseEvent, blockId: string, logicItemId?: string) => void;
   draggedBlockId: string | null;
   setDraggedBlockId: (id: string | null) => void;

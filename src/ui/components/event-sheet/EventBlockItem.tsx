@@ -17,7 +17,7 @@ const BASE_GUTTER_WIDTH = 50;
 const INDENT_STEP = 24;
 
 export const EventBlockItem: React.FC<EventBlockItemProps> = ({ 
-  eventSheetId, block, onOpenBrowser, onOpenParamEditor, onOpenVariableEditor, onOpenFunctionEditor, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices 
+  eventSheetId, block, onOpenBrowser, onOpenParamEditor, onOpenVariableEditor, onOpenFunctionEditor, onOpenGroupDialog, onContextMenu, draggedBlockId, setDraggedBlockId, draggedLogicItem, setDraggedLogicItem, depth = 0, searchTerm = '', blockIndices 
 }) => {
   const gutterWidth = BASE_GUTTER_WIDTH + (depth * INDENT_STEP);
 
@@ -143,9 +143,9 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ color: isSelected ? '#fff' : '#555', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
           {blockIndices.get(block.id)}
         </div>
-        <div style={{ padding: '6px 12px 0 12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
+        <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
           <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? 'Local' : 'Global'}</div>
-          <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
+          <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '12px' }}>
             <VariableIcon size={14} color={isLocal ? '#e67e22' : '#3498db'} /> 
             <span>{block.variable.name}</span>
             <span style={{ color: '#888' }}>=</span>
@@ -192,8 +192,8 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           </div>
           <div style={{ backgroundColor: '#2d2d2d', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderRight: '1px solid #333', borderRadius: '4px 0 0 0', gridColumn: '2 / 4' }}>
             <Zap size={14} color="#9b59b6" />
-            <div style={{ fontWeight: 'bold', color: '#9b59b6' }}>Function: {block.functionName}</div>
-            <div style={{ color: '#888', fontSize: '11px' }}>({paramsSummary})</div>
+            <div style={{ fontWeight: 'bold', color: '#9b59b6', fontSize: '12px' }}>Function: {block.functionName}</div>
+            <div style={{ color: '#888', fontSize: '10px' }}>({paramsSummary})</div>
             {block.functionReturnType && block.functionReturnType !== 'none' && (
               <span style={{ fontSize: '10px', backgroundColor: '#333', padding: '1px 4px', borderRadius: '2px', color: '#8e44ad', border: '1px solid #8e44ad' }}>RETURNS {block.functionReturnType.toUpperCase()}</span>
             )}
@@ -236,7 +236,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px 0 0 0', borderTop: '1px solid #333', position: 'relative' }}>
             <div style={{ position: 'absolute', left: `${gutterWidth + INDENT_STEP / 2 - 10}px`, top: 0, bottom: 0, width: '2px', backgroundColor: '#444', zIndex: 0 }} />
             {block.children.map((child) => (
-              <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />
+              <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onOpenGroupDialog={onOpenGroupDialog} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />
             ))}
           </div>
         )}
@@ -252,9 +252,9 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ color: isSelected ? '#fff' : '#555', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
           {blockIndices.get(block.id)}
         </div>
-        <div style={{ padding: '8px 12px 0 12px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
+        <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
           <FilePlus size={14} color="#2ecc71" />
-          <div style={{ fontWeight: 'bold', flex: 1 }}>Include sheet: <span style={{ color: '#2ecc71' }}>{includedSheet?.name || 'Unknown'}</span></div>
+          <div style={{ fontWeight: 'bold', flex: 1, fontSize: '12px' }}>Include sheet: <span style={{ color: '#2ecc71' }}>{includedSheet?.name || 'Unknown'}</span></div>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
       </div>
@@ -268,9 +268,9 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         <div style={{ color: isSelected ? '#fff' : '#888', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
           {blockIndices.get(block.id)}
         </div>
-        <div style={{ flex: 1, padding: '8px 12px 0 12px', display: 'flex', backgroundColor: isSelected ? '#333' : '#feffc1', border: isSelected ? '1px solid #007acc' : '1px solid #dcdde1', borderRadius: '2px' }}>
+        <div style={{ flex: 1, padding: '8px 12px', display: 'flex', backgroundColor: isSelected ? '#333' : '#feffc1', border: isSelected ? '1px solid #007acc' : '1px solid #dcdde1', borderRadius: '2px' }}>
           <div style={{ flex: 1 }}>
-            <input value={block.commentText} onChange={(e) => updateEventBlock(eventSheetId, block.id, { commentText: e.target.value })} style={{ backgroundColor: 'transparent', border: 'none', color: isSelected ? '#fff' : '#000', fontStyle: 'italic', outline: 'none', width: '100%' }} />
+            <input value={block.commentText} onChange={(e) => updateEventBlock(eventSheetId, block.id, { commentText: e.target.value })} style={{ backgroundColor: 'transparent', border: 'none', color: isSelected ? '#fff' : '#000', fontStyle: 'italic', outline: 'none', width: '100%', fontSize: '12px' }} />
           </div>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
@@ -295,9 +295,12 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
               ▶
             </span>
           </div>
-          <div style={{ padding: '6px 12px 0 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: isSelected ? '#007acc' : '#2d2d2d', border: isSelected ? '1px solid #005a9e' : '1px solid #333', borderRadius: '2px' }} onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}>
-            <div style={{ fontWeight: 'bold', flex: 1 }}>
-              <input value={block.groupName} onChange={(e) => updateEventBlock(eventSheetId, block.id, { groupName: e.target.value })} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'transparent', border: 'none', color: '#fff', fontWeight: 'bold', outline: 'none', width: '100%' }} />
+          <div 
+            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: isSelected ? '#007acc' : '#2d2d2d', border: isSelected ? '1px solid #005a9e' : '1px solid #333', borderRadius: '2px', cursor: 'default' }} 
+            onClick={(e) => { e.stopPropagation(); updateEventBlock(eventSheetId, block.id, { groupExpanded: !isExpanded }); }}
+          >
+            <div style={{ fontWeight: 'bold', flex: 1, userSelect: 'none', color: '#fff', fontSize: '12px' }}>
+              {block.groupName}
             </div>
             {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
           </div>
@@ -305,7 +308,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         {isExpanded && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', position: 'relative' }}>
             <div style={{ position: 'absolute', left: `${gutterWidth + INDENT_STEP / 2 - 10}px`, top: 0, bottom: 0, width: '2px', backgroundColor: '#444', zIndex: 0 }} />
-            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
+            {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onOpenGroupDialog={onOpenGroupDialog} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
           </div>
         )}
       </div>
@@ -361,8 +364,8 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
       </div>
       {isExpanded && block.children.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', marginTop: '0px', position: 'relative', paddingBottom: 0 }}>
-          <div style={{ position: 'absolute', left: `${gutterWidth + INDENT_STEP / 2 - 10}px`, top: 0, bottom: 0, width: '2px', backgroundColor: '#444', zIndex: 0 }} />
-          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
+          <div style={{ position: 'absolute', left: `${gutterWidth + INDENT_STEP / 2 - 10}px`, top: 0, bottom: 0, width: '2px', backgroundColor: '#333', zIndex: 0 }} />
+          {block.children.map((child) => <EventBlockItem key={child.id} eventSheetId={eventSheetId} block={child} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onOpenVariableEditor={onOpenVariableEditor} onOpenFunctionEditor={onOpenFunctionEditor} onOpenGroupDialog={onOpenGroupDialog} onContextMenu={onContextMenu} draggedBlockId={draggedBlockId} setDraggedBlockId={setDraggedBlockId} draggedLogicItem={draggedLogicItem} setDraggedLogicItem={setDraggedLogicItem} depth={depth + 1} searchTerm={searchTerm} blockIndices={blockIndices} />)}
         </div>
       )}
     </div>

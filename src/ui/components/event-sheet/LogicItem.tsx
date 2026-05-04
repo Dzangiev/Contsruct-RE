@@ -40,7 +40,7 @@ export const ConditionItem: React.FC<LogicItemProps> = ({
       className={`logic-item-hover ${isSelected ? 'selected' : ''}`}
       style={{ opacity: (draggedLogicItem?.itemId === condition.id) ? 0.3 : 1, width: '100%' }}
     >
-      <LogicItemContent item={condition} def={def} project={project} type="condition" searchTerm={searchTerm} />
+      <LogicItemContent item={condition} def={def} project={project} type="condition" searchTerm={searchTerm} isSelected={isSelected} />
     </div>
   );
 };
@@ -81,7 +81,7 @@ export const ActionItem: React.FC<LogicItemProps> = ({
       className={`logic-item-hover ${isSelected ? 'selected' : ''}`}
       style={{ opacity: (draggedLogicItem?.itemId === action.id) ? 0.3 : 1, width: '100%' }}
     >
-      <LogicItemContent item={action} def={def} project={project} type="action" searchTerm={searchTerm} />
+      <LogicItemContent item={action} def={def} project={project} type="action" searchTerm={searchTerm} isSelected={isSelected} />
     </div>
   );
 };

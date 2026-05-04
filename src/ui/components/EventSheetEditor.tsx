@@ -10,6 +10,7 @@ import { EventBlockItem } from './event-sheet/EventBlockItem';
 import { ParamEditor } from './event-sheet/ParamEditor';
 import { FunctionEditor } from './event-sheet/FunctionEditor';
 import { ContextMenu } from './event-sheet/ContextMenu';
+import { GroupDialog } from './event-sheet/GroupDialog';
 
 export const EventSheetEditor: React.FC = () => {
   const { 
@@ -88,6 +89,9 @@ export const EventSheetEditor: React.FC = () => {
   const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
   const [draggedLogicItem, setDraggedLogicItem] = React.useState<{ type: 'condition' | 'action', blockId: string, itemId: string } | null>(null);
   const [variableEditorState, setVariableEditorState] = React.useState<{ isOpen: boolean, eventSheetId: string, blockId: string, variable: any, isNew?: boolean, parentId?: string | null } | null>(null);
+  const [groupDialogState, setGroupDialogState] = React.useState<{
+    isOpen: boolean, eventSheetId: string, blockId: string, initialName: string, initialDescription: string, initialActiveOnStart: boolean, isNew?: boolean, parentId?: string | null
+  } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
@@ -111,6 +115,32 @@ export const EventSheetEditor: React.FC = () => {
       variable: { name: '', type: 'number', initialValue: 0 },
       isNew: true,
       parentId
+    });
+  };
+
+  const onAddGroup = (parentId: string | null = null) => {
+    if (!eventSheet) return;
+    setGroupDialogState({
+      isOpen: true,
+      eventSheetId: eventSheet.id,
+      blockId: 'NEW',
+      initialName: 'Group',
+      initialDescription: '',
+      initialActiveOnStart: true,
+      isNew: true,
+      parentId
+    });
+  };
+
+  const onEditGroup = (eventSheetId: string, blockId: string, block: EventBlock) => {
+    setGroupDialogState({
+      isOpen: true,
+      eventSheetId,
+      blockId,
+      initialName: block.groupName || 'Group',
+      initialDescription: block.groupDescription || '',
+      initialActiveOnStart: block.groupActiveOnStart !== false,
+      isNew: false
     });
   };
 
@@ -163,7 +193,7 @@ export const EventSheetEditor: React.FC = () => {
           if (b) {
             if (b.type === 'variable' && b.variable) setVariableEditorState({ isOpen: true, eventSheetId: eventSheet.id, blockId: b.id, variable: b.variable });
             else if (b.type === 'function') onOpenFunctionEditor(eventSheet.id, b);
-            else if (b.type === 'group') { /* Focus group name input? */ }
+            else if (b.type === 'group') onEditGroup(eventSheet.id, b.id, b);
             else setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: b.id });
           }
         } else if (selectedLogicId) {
@@ -199,7 +229,7 @@ export const EventSheetEditor: React.FC = () => {
       if (e.key === 'e' && !e.ctrlKey) { addEventBlock(eventSheet.id, null, 'event'); }
       if (e.key === 'a' && !e.ctrlKey) { if (selectedBlockId) setBrowserState({ isOpen: true, mode: 'action', eventSheetId: eventSheet.id, blockId: selectedBlockId }); }
       if (e.key === 'c' && !e.ctrlKey && !e.shiftKey) { if (selectedBlockId) setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: eventSheet.id, blockId: selectedBlockId }); else addEventBlock(eventSheet.id, null, 'comment'); }
-      if (e.key === 'g' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'group'); }
+      if (e.key === 'g' && !e.ctrlKey) { onAddGroup(selectedBlockId || null); }
       if (e.key === 'v' && !e.ctrlKey) { onAddVariable(selectedBlockId || null); }
       if (e.key === 'f' && !e.ctrlKey) { addEventBlock(eventSheet.id, selectedBlockId || null, 'function'); }
       if (e.key === 'x' && !e.ctrlKey) {
@@ -356,7 +386,7 @@ export const EventSheetEditor: React.FC = () => {
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'event'); }} style={toolbarButtonStyle} title="Add Event (A)"><Plus size={14} /> Event</button>
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'function'); }} style={toolbarButtonStyle} title="Add Function (F)"><Zap size={14} /> Function</button>
           <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'include'); }} style={toolbarButtonStyle} title="Include Sheet"><FilePlus size={14} /> Include</button>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'group'); }} style={toolbarButtonStyle} title="Add Group (G)"> Group</button>
+          <button onClick={(e) => { e.stopPropagation(); onAddGroup(); }} style={toolbarButtonStyle}><List size={14} /> Add Group (G)</button>
           <button onClick={(e) => { e.stopPropagation(); onAddVariable(); }} style={toolbarButtonStyle} title="Add Variable (V)"> Var</button>
         </div>
       </div>
@@ -495,6 +525,7 @@ export const EventSheetEditor: React.FC = () => {
                 onOpenParamEditor={(m, b, i, d, p, t) => setParamEditorState({ isOpen: true, mode: m, eventSheetId: eventSheet.id, blockId: b, itemId: i, def: d, params: p, targetObjectTypeId: t })} 
                 onOpenVariableEditor={(esId, bId, v) => setVariableEditorState({ isOpen: true, eventSheetId: esId, blockId: bId, variable: v })}
                 onOpenFunctionEditor={onOpenFunctionEditor}
+                onOpenGroupDialog={onEditGroup}
                 onContextMenu={(e, id, logicId) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, blockId: id, logicItemId: logicId }); }} 
                 draggedBlockId={draggedBlockId} 
                 setDraggedBlockId={setDraggedBlockId} 
@@ -619,7 +650,7 @@ export const EventSheetEditor: React.FC = () => {
           onCancel={() => setVariableEditorState(null)}
         />
       )}
-      {contextMenu && (
+      {contextMenu && eventSheet && (
         <ContextMenu 
           project={project} 
           x={contextMenu.x} 
@@ -628,8 +659,38 @@ export const EventSheetEditor: React.FC = () => {
           logicItemId={contextMenu.logicItemId} 
           eventSheetId={eventSheet.id} 
           onAddVariable={onAddVariable} 
+          onAddGroup={onAddGroup}
+          onEditGroup={onEditGroup}
           onClose={() => setContextMenu(null)} 
           setBrowserState={setBrowserState}
+        />
+      )}
+      {groupDialogState?.isOpen && (
+        <GroupDialog 
+          key={groupDialogState.blockId + (groupDialogState.isNew ? '_new' : '_edit')}
+          isOpen={groupDialogState.isOpen}
+          initialName={groupDialogState.initialName}
+          initialDescription={groupDialogState.initialDescription}
+          initialActiveOnStart={groupDialogState.initialActiveOnStart}
+          onSave={(name, desc, active) => {
+            if (groupDialogState.isNew) {
+              const newId = addEventBlock(groupDialogState.eventSheetId, groupDialogState.parentId || null, 'group');
+              updateEventBlock(groupDialogState.eventSheetId, newId, { 
+                groupName: name, 
+                groupDescription: desc, 
+                groupActiveOnStart: active,
+                groupExpanded: true 
+              });
+            } else {
+              updateEventBlock(groupDialogState.eventSheetId, groupDialogState.blockId, { 
+                groupName: name, 
+                groupDescription: desc, 
+                groupActiveOnStart: active 
+              });
+            }
+            setGroupDialogState(null);
+          }}
+          onCancel={() => setGroupDialogState(null)}
         />
       )}
     </div>
