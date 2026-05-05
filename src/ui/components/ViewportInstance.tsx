@@ -1,6 +1,8 @@
 import React, { memo } from 'react';
 import { Instance, ObjectTypeKind, Project } from '../../model/project';
 import { getEffectsFilter } from '../../utils/renderUtils';
+import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface ViewportInstanceProps {
   inst: Instance;
@@ -25,6 +27,8 @@ const ViewportInstanceComponent: React.FC<ViewportInstanceProps> = ({
   getHandleCursor,
   selectedInstanceIdsCount
 }) => {
+  const { editorState } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const objectType = project.objectTypes?.find(ot => ot.id === inst.objectTypeId);
   const kind = objectType?.kind || ObjectTypeKind.Sprite;
 
@@ -79,7 +83,7 @@ const ViewportInstanceComponent: React.FC<ViewportInstanceProps> = ({
               </pattern>
             </defs>
             <rect width={inst.width} height={inst.height} fill={`url(#tiled-${inst.id})`} stroke={isSelected ? "#0099ff" : "#444"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
-            <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="rgba(255,255,255,0.2)" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>Tiled</text>
+            <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="rgba(255,255,255,0.2)" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{t.TILED_BACKGROUND}</text>
           </g>
         );
       }
@@ -107,7 +111,7 @@ const ViewportInstanceComponent: React.FC<ViewportInstanceProps> = ({
               transform={`translate(${inst.width/2 - 12}, ${inst.height/2 - 12}) scale(${Math.min(inst.width, inst.height)/48})`}
               fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}
             />
-            <text x={inst.width/2} y={inst.height - (isSelected ? 10/zoom : 5/zoom)} fontSize={Math.max(8 / zoom, 2)} fill="#888" textAnchor="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Sprite'}</text>
+            <text x={inst.width/2} y={inst.height - (isSelected ? 10/zoom : 5/zoom)} fontSize={Math.max(8 / zoom, 2)} fill="#888" textAnchor="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || t.SPRITE}</text>
           </g>
         );
       }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Hash, Type, ToggleLeft, Plus, Trash2, Package, ChevronDown, ChevronRight, Edit2, Users, Folder, CheckSquare, Square, Info, Layers as LayersIcon, List as ListIcon, FileText, AlignCenter, AlignLeft, AlignRight, ArrowUp, ArrowDown, Eye, EyeOff, Zap, Activity, MousePointer2, Bug, Sparkles, Clock, LayoutGrid } from 'lucide-react';
+import { getTranslation } from '../../i18n';
 import { BehaviorsDialog } from './BehaviorsDialog';
 import { BEHAVIOR_DEFINITIONS, PLUGIN_DEFINITIONS } from '../../model/definitions';
 import { VariableDialog } from './VariableDialog';
@@ -17,6 +18,7 @@ export const Inspector: React.FC = () => {
     addFamilyBehavior, updateFamilyBehavior, removeFamilyBehavior,
     moveEntityToFolder, setSelectedInstances, reorderInstance, openTilemapEditor
   } = useEditorStore();
+  const t = getTranslation(editorState.language);
 
   const { selectedInstanceIds, selectedObjectTypeId, activeLayoutId, activeLayerId } = editorState;
   const activeLayout = project.layouts.find(l => l.id === activeLayoutId);
@@ -57,35 +59,36 @@ export const Inspector: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             {itemType === 'condition' ? <Zap size={14} style={{ color: '#f1c40f' }} /> : <Activity size={14} style={{ color: '#3498db' }} />}
-            {itemType === 'condition' ? 'Condition' : 'Action'}: {foundItem.type}
+            {itemType === 'condition' ? t.CONDITION : t.ACTION}: {foundItem.type}
           </div>
           
-          <Category label="Common" icon={<ListIcon size={12} />}>
-            <PropertyRow label="ID" value={foundItem.id} readOnly />
+          <Category label={t.COMMON} icon={<ListIcon size={12} />}>
+            <PropertyRow label={t.ID} value={foundItem.id} readOnly />
             <PropertyRow 
-              label="Disabled" 
-              value={foundItem.disabled ? 'Yes' : 'No'} 
+              label={t.DISABLED} 
+              value={foundItem.disabled ? t.YES : t.NO} 
               onChange={v => {
                 if (itemType === 'condition') useEditorStore.getState().toggleConditionDisabled(selectedEventSheet.id, selectedBlock.id, foundItem.id);
                 else useEditorStore.getState().toggleActionDisabled(selectedEventSheet.id, selectedBlock.id, foundItem.id);
               }} 
               type="select" 
-              options={['Yes', 'No']} 
+              options={[t.YES, t.NO]} 
             />
           </Category>
 
           {highlightedInstanceIds.length > 0 && (
-            <Category label="Object Picking Visualizer" icon={<Eye size={12} color="#f1c40f" />}>
+            <Category label={t.OBJECT_PICKING_VISUALIZER} icon={<Eye size={12} color="#f1c40f" />}>
                <div style={{ padding: '8px 12px', fontSize: '11px', color: '#ccc', lineHeight: '1.4' }}>
-                  This logic targets <span style={{ color: '#f1c40f', fontWeight: 700 }}>{highlightedInstanceIds.length}</span> instances of 
-                  <span style={{ color: '#2ecc71', fontWeight: 700 }}> {project.objectTypes.find(o => o.id === foundItem.targetObjectTypeId)?.name || 'System'}</span> in the current layout.
+                  {t.LOGIC_TARGETS_INSTANCES
+                    .replace('{count}', String(highlightedInstanceIds.length))
+                    .replace('{name}', project.objectTypes.find(o => o.id === foundItem.targetObjectTypeId)?.name || t.SYSTEM)}
                </div>
                <div style={{ padding: '0 10px 10px' }}>
                   <button 
                     onClick={() => setSelectedInstances(highlightedInstanceIds)}
                     style={{ ...actionButtonStyle, width: '100%', justifyContent: 'center' }}
                   >
-                    <MousePointer2 size={12} /> Select all targeted
+                    <MousePointer2 size={12} /> {t.SELECT_ALL_TARGETED}
                   </button>
                </div>
             </Category>
@@ -115,53 +118,59 @@ export const Inspector: React.FC = () => {
     });
 
     if (selectedBlock) {
+      const typeLabel = selectedBlock.type === 'group' ? t.GROUP : 
+                        selectedBlock.type === 'comment' ? t.COMMENT : 
+                        selectedBlock.type === 'event' ? t.EVENT :
+                        selectedBlock.type === 'include' ? t.INCLUDE :
+                        selectedBlock.type === 'function' ? t.FUNCTION :
+                        selectedBlock.type.charAt(0).toUpperCase() + selectedBlock.type.slice(1);
       content = (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <ListIcon size={14} style={{ color: '#007acc' }} />
-            Event: {selectedBlock.type.charAt(0).toUpperCase() + selectedBlock.type.slice(1)}
+            {t.EVENT_SHEET}: {typeLabel}
           </div>
           
-          <Category label="Common" icon={<ListIcon size={12} />}>
-            <PropertyRow label="ID" value={selectedBlock.id} readOnly />
-            <PropertyRow label="Type" value={selectedBlock.type} readOnly />
+          <Category label={t.COMMON} icon={<ListIcon size={12} />}>
+            <PropertyRow label={t.ID} value={selectedBlock.id} readOnly />
+            <PropertyRow label={t.TYPE} value={typeLabel} readOnly />
             <PropertyRow 
-              label="Disabled" 
-              value={selectedBlock.disabled ? 'Yes' : 'No'} 
-              onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { disabled: v === 'Yes' })} 
+              label={t.DISABLED} 
+              value={selectedBlock.disabled ? t.YES : t.NO} 
+              onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { disabled: v === t.YES })} 
               type="select" 
-              options={['Yes', 'No']} 
+              options={[t.YES, t.NO]} 
               icon={<EyeOff size={12}/>} 
             />
             <PropertyRow 
-              label="Bookmark" 
-              value={selectedBlock.bookmarked ? 'Yes' : 'No'} 
-              onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { bookmarked: v === 'Yes' })} 
+              label={t.BOOKMARK} 
+              value={selectedBlock.bookmarked ? t.YES : t.NO} 
+              onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { bookmarked: v === t.YES })} 
               type="select" 
-              options={['Yes', 'No']} 
+              options={[t.YES, t.NO]} 
               icon={<Activity size={12}/>} 
             />
           </Category>
 
           {selectedBlock.type === 'group' && (
-            <Category label="Group Properties">
+            <Category label={t.GROUP_PROPERTIES}>
               <PropertyRow 
-                label="Name" 
+                label={t.NAME} 
                 value={selectedBlock.groupName || ''} 
                 onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { groupName: String(v) })} 
               />
               <PropertyRow 
-                label="Active on start" 
-                value={selectedBlock.groupActiveOnStart !== false ? 'Yes' : 'No'} 
-                onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { groupActiveOnStart: v === 'Yes' })} 
+                label={t.ACTIVE_ON_START} 
+                value={selectedBlock.groupActiveOnStart !== false ? t.YES : t.NO} 
+                onChange={v => useEditorStore.getState().updateEventBlock(selectedEventSheet.id, selectedBlock.id, { groupActiveOnStart: v === t.YES })} 
                 type="select" 
-                options={['Yes', 'No']} 
+                options={[t.YES, t.NO]} 
               />
             </Category>
           )}
 
           {selectedBlock.type === 'comment' && (
-            <Category label="Comment">
+            <Category label={t.COMMENT}>
                <div style={{ padding: '8px 10px' }}>
                 <textarea 
                   value={selectedBlock.commentText || ''} 
@@ -188,80 +197,96 @@ export const Inspector: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Package size={14} style={{ color: '#007acc' }} />
-            Properties: {objectType?.name || 'Instance'}
+            {t.PROPERTIES_TITLE}: {objectType?.name || t.INSTANCE}
           </div>
 
-          <Category label="Common" icon={<ListIcon size={12} />}>
-            <PropertyRow label="Name" value={objectType?.name || ''} readOnly icon={<Type size={12} />} />
-            <PropertyRow label="Plugin" value={objectType?.kind || ''} readOnly icon={<Package size={12} />} />
-            <PropertyRow label="Layer" value={activeLayout?.layers.find(l => l.id === instance.layerId)?.name || ''} readOnly icon={<LayersIcon size={12} />} />
+          <Category label={t.COMMON} icon={<ListIcon size={12} />}>
+            <PropertyRow label={t.NAME} value={objectType?.name || ''} readOnly icon={<Type size={12} />} />
+            <PropertyRow 
+              label={t.KIND} 
+              value={(() => {
+                const kind = objectType?.kind;
+                if (kind === ObjectTypeKind.Sprite) return t.SPRITE;
+                if (kind === ObjectTypeKind.TiledBackground) return t.TILED_BACKGROUND;
+                if (kind === ObjectTypeKind.Text) return t.TEXT_PLUGIN;
+                if (kind === ObjectTypeKind.Particles) return t.PARTICLES;
+                if (kind === ObjectTypeKind.Tilemap) return t.TILEMAP;
+                if (kind === 'touch' as any) return t.TOUCH;
+                if (kind === 'gamepad' as any) return t.GAMEPAD;
+                if (kind === 'audio' as any) return t.AUDIO;
+                return kind || '';
+              })()} 
+              readOnly 
+              icon={<Package size={12} />} 
+            />
+            <PropertyRow label={t.LAYER} value={activeLayout?.layers.find(l => l.id === instance.layerId)?.name || ''} readOnly icon={<LayersIcon size={12} />} />
             <div style={{ padding: '4px 10px 8px' }}>
               <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
-                <Plus size={12} /> Behaviors ({objectType?.behaviors?.length || 0})
+                <Plus size={12} /> {t.BEHAVIORS} ({objectType?.behaviors?.length || 0})
               </button>
             </div>
           </Category>
 
-          <Category label="Position">
-            <PropertyRow label="X" value={instance.x} onChange={v => updateInstance(activeLayoutId!, instanceId, { x: Number(v) })} type="number" icon={<Hash size={12} />} />
-            <PropertyRow label="Y" value={instance.y} onChange={v => updateInstance(activeLayoutId!, instanceId, { y: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <Category label={t.POSITION}>
+            <PropertyRow label={t.X} value={instance.x} onChange={v => updateInstance(activeLayoutId!, instanceId, { x: Number(v) })} type="number" icon={<Hash size={12} />} />
+            <PropertyRow label={t.Y} value={instance.y} onChange={v => updateInstance(activeLayoutId!, instanceId, { y: Number(v) })} type="number" icon={<Hash size={12} />} />
           </Category>
 
-          <Category label="Size">
-            <PropertyRow label="Width" value={instance.width} onChange={v => updateInstance(activeLayoutId!, instanceId, { width: Number(v) })} type="number" icon={<Hash size={12} />} />
-            <PropertyRow label="Height" value={instance.height} onChange={v => updateInstance(activeLayoutId!, instanceId, { height: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <Category label={t.SIZE}>
+            <PropertyRow label={t.WIDTH} value={instance.width} onChange={v => updateInstance(activeLayoutId!, instanceId, { width: Number(v) })} type="number" icon={<Hash size={12} />} />
+            <PropertyRow label={t.HEIGHT} value={instance.height} onChange={v => updateInstance(activeLayoutId!, instanceId, { height: Number(v) })} type="number" icon={<Hash size={12} />} />
           </Category>
 
-          <Category label="Appearance">
-            <PropertyRow label="Angle" value={instance.angle} onChange={v => updateInstance(activeLayoutId!, instanceId, { angle: Number(v) })} type="number" icon={<Hash size={12} />} />
-            <PropertyRow label="Opacity" value={instance.opacity} onChange={v => updateInstance(activeLayoutId!, instanceId, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
-            <PropertyRow label="Visible" value={instance.visible ? 'Yes' : 'No'} onChange={v => updateInstance(activeLayoutId!, instanceId, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12} />} />
+          <Category label={t.APPEARANCE}>
+            <PropertyRow label={t.ANGLE} value={instance.angle} onChange={v => updateInstance(activeLayoutId!, instanceId, { angle: Number(v) })} type="number" icon={<Hash size={12} />} />
+            <PropertyRow label={t.OPACITY} value={instance.opacity} onChange={v => updateInstance(activeLayoutId!, instanceId, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
+            <PropertyRow label={t.VISIBLE} value={instance.visible ? t.YES : t.NO} onChange={v => updateInstance(activeLayoutId!, instanceId, { visible: v === t.YES })} type="select" options={[t.YES, t.NO]} icon={<ToggleLeft size={12} />} />
             <div style={{ padding: '4px 10px 8px', display: 'flex', gap: '8px' }}>
               <button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instanceId })} style={actionButtonStyle}>
-                <Zap size={12} /> Effects ({instance.effects?.length || 0})
+                <Zap size={12} /> {t.EFFECTS} ({instance.effects?.length || 0})
               </button>
               {objectType.kind === 'tilemap' && (
                 <button onClick={() => openTilemapEditor(objectType.id)} style={actionButtonStyle}>
-                  <LayoutGrid size={12} /> Edit Tilemap
+                  <LayoutGrid size={12} /> {t.EDIT_TILEMAP}
                 </button>
               )}
             </div>
           </Category>
 
-          <Category label="Z Order">
+          <Category label={t.Z_ORDER}>
             <div style={{ padding: '0 10px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'front')} style={actionButtonStyle} title="Move to very top">
-                <ArrowUp size={12} color="#2ecc71" /> Top
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'front')} style={actionButtonStyle} title={t.TOP}>
+                <ArrowUp size={12} color="#2ecc71" /> {t.TOP}
               </button>
-              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'forward')} style={actionButtonStyle} title="Move forward one step">
-                <ArrowUp size={12} /> Forward
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'forward')} style={actionButtonStyle} title={t.FORWARD}>
+                <ArrowUp size={12} /> {t.FORWARD}
               </button>
-              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'back')} style={actionButtonStyle} title="Move to very bottom">
-                <ArrowDown size={12} color="#e74c3c" /> Bottom
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'back')} style={actionButtonStyle} title={t.BOTTOM}>
+                <ArrowDown size={12} color="#e74c3c" /> {t.BOTTOM}
               </button>
-              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'backward')} style={actionButtonStyle} title="Move backward one step">
-                <ArrowDown size={12} /> Backward
+              <button onClick={() => reorderInstance(activeLayoutId!, instanceId, 'backward')} style={actionButtonStyle} title={t.BACKWARD}>
+                <ArrowDown size={12} /> {t.BACKWARD}
               </button>
             </div>
           </Category>
 
           {editorState.runtimeState && (
-            <Category label="Runtime Debugger" icon={<Bug size={12} color="#f1c40f" />}>
+            <Category label={t.RUNTIME_DEBUGGER} icon={<Bug size={12} color="#f1c40f" />}>
               {(() => {
                 const rtInst = editorState.runtimeState.instances.find((i: any) => i.id === instance.id);
-                if (!rtInst) return <div style={infoTextStyle}>Instance not found in active runtime</div>;
+                if (!rtInst) return <div style={infoTextStyle}>{t.UNKNOWN}</div>;
                 return (
                   <>
                     <div style={{ fontSize: '10px', color: '#555', padding: '6px 10px', backgroundColor: '#1a1a1a', borderBottom: '1px solid #111' }}>
-                      LIVE VALUES FROM PREVIEW
+                      {t.LIVE_VALUES_FROM_PREVIEW}
                     </div>
-                    <PropertyRow label="RT Pos" value={`${rtInst.x.toFixed(1)}, ${rtInst.y.toFixed(1)}`} readOnly icon={<MousePointer2 size={12} />} />
-                    <PropertyRow label="RT Angle" value={`${rtInst.angle.toFixed(1)}°`} readOnly icon={<Zap size={12} />} />
+                    <PropertyRow label={t.RT_POS} value={`${rtInst.x.toFixed(1)}, ${rtInst.y.toFixed(1)}`} readOnly icon={<MousePointer2 size={12} />} />
+                    <PropertyRow label={t.RT_ANGLE} value={`${rtInst.angle.toFixed(1)}°`} readOnly icon={<Zap size={12} />} />
                     {objectType.kind === ObjectTypeKind.Sprite && (
                       <>
-                        <PropertyRow label="Anim" value={project.objectTypes.find(ot => ot.id === rtInst.objectTypeId)?.animations?.find(a => a.id === rtInst.properties._animId)?.name || 'default'} readOnly icon={<Sparkles size={12} />} />
-                        <PropertyRow label="Frame" value={rtInst.properties._frameIdx} readOnly icon={<Clock size={12} />} />
-                        <PropertyRow label="Playing" value={rtInst.properties._animPlaying !== false ? 'Yes' : 'No'} readOnly icon={<Activity size={12} />} />
+                        <PropertyRow label={t.ANIM} value={project.objectTypes.find(ot => ot.id === rtInst.objectTypeId)?.animations?.find(a => a.id === rtInst.properties._animId)?.name || t.DEFAULT} readOnly icon={<Sparkles size={12} />} />
+                        <PropertyRow label={t.FRAME} value={rtInst.properties._frameIdx} readOnly icon={<Clock size={12} />} />
+                        <PropertyRow label={t.PLAYING} value={rtInst.properties._animPlaying !== false ? t.YES : t.NO} readOnly icon={<Activity size={12} />} />
                       </>
                     )}
                     {Object.entries(rtInst.properties).filter(([k]) => !k.startsWith('_')).map(([k, v]) => (
@@ -284,7 +309,7 @@ export const Inspector: React.FC = () => {
             const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
             if (!pluginDef || pluginDef.propertyDefinitions.length === 0) return null;
             return (
-              <Category label={`${pluginDef.name} Properties`}>
+              <Category label={`${pluginDef.name} ${t.PROPERTIES_TITLE}`}>
                 {pluginDef.propertyDefinitions.map(pDef => {
                   const val = instance.properties[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
@@ -293,7 +318,7 @@ export const Inspector: React.FC = () => {
                   if (pDef.type === 'number') type = 'number';
                   else if (pDef.type === 'boolean') {
                     type = 'select';
-                    options = ['Yes', 'No'];
+                    options = [t.YES, t.NO];
                   } else if (pDef.type === 'enum') {
                     type = 'select';
                     options = pDef.options || [];
@@ -304,13 +329,13 @@ export const Inspector: React.FC = () => {
                   return (
                     <PropertyRow
                       key={pDef.name}
-                      label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                      label={pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name}
+                      value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                       type={type}
                       options={options}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateInstance(activeLayoutId!, instanceId, { properties: { ...instance.properties, [pDef.name]: finalVal } });
                       }}
@@ -324,43 +349,27 @@ export const Inspector: React.FC = () => {
           {objectType?.behaviors?.map(b => {
             const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
             return (
-              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#666', marginRight: '8px', fontWeight: 600 }}>OBJECT</span>}>
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#666', marginRight: '8px', fontWeight: 600 }}>{t.OBJECT_TYPE}</span>}>
                 {def?.propertyDefinitions.map(pDef => {
                   const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
                   let options: string[] = [];
                   let icon = null;
-
-                  if (pDef.type === 'number') {
-                    type = 'number';
-                    icon = <Hash size={12} />;
-                  } else if (pDef.type === 'boolean') {
-                    type = 'select';
-                    options = ['Yes', 'No'];
-                    icon = val ? <CheckSquare size={12} color="#4caf50" /> : <Square size={12} />;
-                  } else if (pDef.type === 'enum') {
-                    type = 'select';
-                    options = pDef.options || [];
-                  }
-
+                  if (pDef.type === 'number') { type = 'number'; icon = <Hash size={12} />; }
+                  else if (pDef.type === 'boolean') { type = 'select'; options = [t.YES, t.NO]; icon = val ? <CheckSquare size={12} color="#4caf50" /> : <Square size={12} />; }
+                  else if (pDef.type === 'enum') { type = 'select'; options = pDef.options || []; }
                   return (
-                    <PropertyRow
-                      key={pDef.name}
-                      label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
-                      type={type}
-                      options={options}
-                      icon={icon}
+                    <PropertyRow key={pDef.name} label={pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name} value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val} type={type} options={options} icon={icon}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
                       }}
                     />
                   );
                 })}
-                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateBehavior(objectType.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+                <PropertyRow label={t.ENABLED} value={!b.disabled ? t.YES : t.NO} onChange={v => updateBehavior(objectType.id, b.id, { disabled: v === t.NO })} type="select" options={[t.YES, t.NO]} />
               </Category>
             );
           })}
@@ -368,44 +377,32 @@ export const Inspector: React.FC = () => {
           {families.map(family => family.behaviors.map(b => {
             const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
             return (
-              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#007acc', marginRight: '8px', fontWeight: 600 }}>FAMILY: {family.name.toUpperCase()}</span>}>
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#007acc', marginRight: '8px', fontWeight: 600 }}>{t.FAMILY.toUpperCase()}: {family.name.toUpperCase()}</span>}>
                 {def?.propertyDefinitions.map(pDef => {
                   const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
                   let options: string[] = [];
-
                   if (pDef.type === 'number') type = 'number';
-                  else if (pDef.type === 'boolean') {
-                    type = 'select';
-                    options = ['Yes', 'No'];
-                  } else if (pDef.type === 'enum') {
-                    type = 'select';
-                    options = pDef.options || [];
-                  }
-
+                  else if (pDef.type === 'boolean') { type = 'select'; options = [t.YES, t.NO]; }
+                  else if (pDef.type === 'enum') { type = 'select'; options = pDef.options || []; }
                   return (
-                    <PropertyRow
-                      key={pDef.name}
-                      label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
-                      type={type}
-                      options={options}
+                    <PropertyRow key={pDef.name} label={pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name} value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val} type={type} options={options}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
                       }}
                     />
                   );
                 })}
-                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+                <PropertyRow label={t.ENABLED} value={!b.disabled ? t.YES : t.NO} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === t.NO })} type="select" options={[t.YES, t.NO]} />
               </Category>
             );
           }))}
 
           <Category
-            label="Instance Variables"
+            label={t.INSTANCE_VARIABLES}
             action={<button onClick={() => {
               if (objectType) {
                 setVariableEditor({ isOpen: true, objectTypeId: objectType.id });
@@ -413,7 +410,7 @@ export const Inspector: React.FC = () => {
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             <div style={{ padding: '6px 10px', backgroundColor: '#222' }}>
-              <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Object Variables</span>
+              <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t.OBJECT_VARIABLES_LABEL}</span>
             </div>
             {objectType?.instanceVariables?.map(v => {
               const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
@@ -422,40 +419,37 @@ export const Inspector: React.FC = () => {
               let rowType: any = 'text';
               let rowOptions: string[] = [];
               if (v.type === 'number') rowType = 'number';
-              else if (v.type === 'boolean') {
-                rowType = 'select';
-                rowOptions = ['Yes', 'No'];
-              }
+              else if (v.type === 'boolean') { rowType = 'select'; rowOptions = [t.YES, t.NO]; }
 
               return (
                 <div key={v.id} style={{ position: 'relative' }}>
                   <PropertyRow
                     label={v.name}
-                    value={v.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                    value={v.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                     type={rowType}
                     options={rowOptions}
                     onChange={newVal => {
                       let finalVal = newVal;
-                      if (v.type === 'boolean') finalVal = newVal === 'Yes';
+                      if (v.type === 'boolean') finalVal = newVal === t.YES;
                       if (v.type === 'number') finalVal = Number(newVal);
                       updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: finalVal } });
                     }}
                     icon={<Type size={12} color={isOverridden ? '#3498db' : '#666'} />}
                   />
                   <div style={{ position: 'absolute', right: '4px', top: '2px', display: 'flex', gap: '2px', opacity: 0.3 }} className="var-actions-hover">
-                    <button onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title="Edit definition"><Edit2 size={10} /></button>
+                    <button onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title={t.RENAME}><Edit2 size={10} /></button>
                   </div>
                 </div>
               );
             })}
             {(!objectType?.instanceVariables || objectType.instanceVariables.length === 0) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>No object variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>{t.NO_OBJECT_VARIABLES}</div>
             )}
 
             {families.map(family => (
               <React.Fragment key={family.id}>
                 <div style={{ padding: '6px 10px', backgroundColor: '#222', marginTop: '2px' }}>
-                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Family: {family.name}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t.FAMILY_VARIABLES_LABEL}: {family.name}</span>
                 </div>
                 {family.instanceVariables.map(v => {
                   const isOverridden = instance.properties?.[v.name] !== undefined && instance.properties?.[v.name] !== v.initialValue;
@@ -464,50 +458,47 @@ export const Inspector: React.FC = () => {
                   let rowType: any = 'text';
                   let rowOptions: string[] = [];
                   if (v.type === 'number') rowType = 'number';
-                  else if (v.type === 'boolean') {
-                    rowType = 'select';
-                    rowOptions = ['Yes', 'No'];
-                  }
+                  else if (v.type === 'boolean') { rowType = 'select'; rowOptions = [t.YES, t.NO]; }
 
                   return (
                     <div key={v.id} style={{ position: 'relative' }}>
                       <PropertyRow
                         label={v.name}
-                        value={v.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                        value={v.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                         type={rowType}
                         options={rowOptions}
                         onChange={newVal => {
                           let finalVal = newVal;
-                          if (v.type === 'boolean') finalVal = newVal === 'Yes';
+                          if (v.type === 'boolean') finalVal = newVal === t.YES;
                           if (v.type === 'number') finalVal = Number(newVal);
                           updateInstance(activeLayoutId!, instanceId, { properties: { ...(instance.properties || {}), [v.name]: finalVal } });
                         }}
                         icon={<Type size={12} color={isOverridden ? '#f1c40f' : '#666'} />}
                       />
                       <div style={{ position: 'absolute', right: '4px', top: '2px', display: 'flex', gap: '2px', opacity: 0.3 }} className="var-actions-hover">
-                        <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title="Edit definition"><Edit2 size={10} /></button>
+                        <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }} title={t.EDIT_DEFINITION}><Edit2 size={10} /></button>
                       </div>
                     </div>
                   );
                 })}
                 {family.instanceVariables.length === 0 && (
-                  <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>No family variables.</div>
+                  <div style={{ padding: '10px', fontSize: '11px', color: '#555', fontStyle: 'italic' }}>{t.NO_FAMILY_VARIABLES}</div>
                 )}
               </React.Fragment>
             ))}
           </Category>
 
-          <Category label="Effects" action={<button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instance.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+          <Category label={t.EFFECTS} action={<button onClick={() => setShowEffectsDialog({ targetType: 'instance', targetId: instance.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
             {instance.effects?.map(e => (
               <PropertyRow
                 key={e.id}
                 label={e.name}
-                value={e.disabled ? 'Disabled' : 'Active'}
+                value={e.disabled ? t.DISABLED : t.ENABLED}
                 readOnly
                 icon={<Zap size={12} color={e.disabled ? '#444' : '#f1c40f'} />}
               />
             ))}
-            {(!instance.effects || instance.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No effects</div>}
+            {(!instance.effects || instance.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>{t.NO} {t.EFFECTS}</div>}
           </Category>
 
           {showBehaviorsDialog && objectType && (
@@ -520,7 +511,7 @@ export const Inspector: React.FC = () => {
           )}
           {variableEditor?.isOpen && (
             <VariableDialog
-              title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
+              title={variableEditor.variable ? t.EDIT_INSTANCE_VARIABLE : t.NEW_INSTANCE_VARIABLE}
               variable={variableEditor.variable}
               existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId as any)?.instanceVariables.map(v => v.name) || []}
               onSave={(updates) => {
@@ -561,55 +552,55 @@ export const Inspector: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={panelHeaderStyle}>
           <Package size={14} style={{ color: '#007acc' }} />
-          Multiple Selection ({selectedInstanceIds.length})
+          {t.MULTIPLE_SELECTION} ({selectedInstanceIds.length})
         </div>
 
-        <Category label="Common Properties" icon={<ListIcon size={12} />}>
-          <PropertyRow label="X" value={getCommonValue('x')} onChange={v => updateAll({ x: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Y" value={getCommonValue('y')} onChange={v => updateAll({ y: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Width" value={getCommonValue('width')} onChange={v => updateAll({ width: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Height" value={getCommonValue('height')} onChange={v => updateAll({ height: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Angle" value={getCommonValue('angle')} onChange={v => updateAll({ angle: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Opacity" value={getCommonValue('opacity')} onChange={v => updateAll({ opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
+        <Category label={t.GENERAL} icon={<ListIcon size={12} />}>
+          <PropertyRow label={t.X} value={getCommonValue('x')} onChange={v => updateAll({ x: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.Y} value={getCommonValue('y')} onChange={v => updateAll({ y: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.WIDTH} value={getCommonValue('width')} onChange={v => updateAll({ width: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.HEIGHT} value={getCommonValue('height')} onChange={v => updateAll({ height: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.ANGLE} value={getCommonValue('angle')} onChange={v => updateAll({ angle: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.OPACITY} value={getCommonValue('opacity')} onChange={v => updateAll({ opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
           <PropertyRow
-            label="Visible"
-            value={getCommonValue('visible') === '' ? '' : (getCommonValue('visible') ? 'Yes' : 'No')}
-            onChange={v => updateAll({ visible: v === 'Yes' })}
+            label={t.VISIBLE}
+            value={getCommonValue('visible') === '' ? '' : (getCommonValue('visible') ? t.YES : t.NO)}
+            onChange={v => updateAll({ visible: v === t.YES })}
             type="select"
-            options={['', 'Yes', 'No']}
-            displayValues={['(Mixed)', 'Yes', 'No']}
+            options={['', t.YES, t.NO]}
+            displayValues={[t.MIXED, t.YES, t.NO]}
             icon={<ToggleLeft size={12} />}
           />
         </Category>
 
-        <Category label="Alignment Tools" icon={<AlignCenter size={12} />}>
+        <Category label={t.ALIGNMENT_TOOLS} icon={<AlignCenter size={12} />}>
           <div style={{ padding: '8px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
             <button onClick={() => {
               const minX = Math.min(...selectedInstances.map(i => i.x));
               updateAll({ x: minX });
-            }} style={actionButtonStyle} title="Align Left"><AlignLeft size={12} /></button>
+            }} style={actionButtonStyle} title={t.ALIGN_LEFT}><AlignLeft size={12} /></button>
             <button onClick={() => {
               const minX = Math.min(...selectedInstances.map(i => i.x));
               const maxX = Math.max(...selectedInstances.map(i => i.x + i.width));
               selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { x: Math.round(minX + (maxX - minX) / 2 - inst.width / 2) }));
-            }} style={actionButtonStyle} title="Align Center"><AlignCenter size={12} /></button>
+            }} style={actionButtonStyle} title={t.ALIGN_CENTER}><AlignCenter size={12} /></button>
             <button onClick={() => {
               const maxX = Math.max(...selectedInstances.map(i => i.x + i.width));
               selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { x: maxX - inst.width }));
-            }} style={actionButtonStyle} title="Align Right"><AlignRight size={12} /></button>
+            }} style={actionButtonStyle} title={t.ALIGN_RIGHT}><AlignRight size={12} /></button>
             <button onClick={() => {
               const minY = Math.min(...selectedInstances.map(i => i.y));
               updateAll({ y: minY });
-            }} style={actionButtonStyle} title="Align Top"><ArrowUp size={12} /></button>
+            }} style={actionButtonStyle} title={t.ALIGN_TOP}><ArrowUp size={12} /></button>
             <button onClick={() => {
               const minY = Math.min(...selectedInstances.map(i => i.y));
               const maxY = Math.max(...selectedInstances.map(i => i.y + i.height));
               selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { y: Math.round(minY + (maxY - minY) / 2 - inst.height / 2) }));
-            }} style={actionButtonStyle} title="Align Middle"><span style={{ fontWeight: 'bold' }}>—</span></button>
+            }} style={actionButtonStyle} title={t.ALIGN_MIDDLE}><span style={{ fontWeight: 'bold' }}>—</span></button>
             <button onClick={() => {
               const maxY = Math.max(...selectedInstances.map(i => i.y + i.height));
               selectedInstances.forEach(inst => updateInstance(activeLayoutId!, inst.id, { y: maxY - inst.height }));
-            }} style={actionButtonStyle} title="Align Bottom"><ArrowDown size={12} /></button>
+            }} style={actionButtonStyle} title={t.ALIGN_BOTTOM}><ArrowDown size={12} /></button>
           </div>
         </Category>
       </div>
@@ -625,33 +616,33 @@ export const Inspector: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Package size={14} style={{ color: '#007acc' }} />
-            Object Type: {objectType.name}
+            {t.OBJECT_TYPE}: {objectType.name}
           </div>
 
-          <Category label="General" icon={<ListIcon size={12} />}>
-            <PropertyRow label="Name" value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Type size={12} />} />
-            <PropertyRow label="Kind" value={objectType.kind} readOnly icon={<Package size={12} />} />
+          <Category label={t.GENERAL} icon={<ListIcon size={12} />}>
+            <PropertyRow label={t.NAME} value={objectType.name} onChange={v => updateObjectType(objectType.id, { name: String(v) })} icon={<Type size={12} />} />
+            <PropertyRow label={t.KIND} value={objectType.kind} readOnly icon={<Package size={12} />} />
             <PropertyRow
-              label="Folder"
+              label={t.FOLDER}
               value={objectType.folderId || ''}
               type="select"
               options={['', ...project.folders.filter(f => f.type === 'objectType').map(f => f.id)]}
-              displayValues={['(None)', ...project.folders.filter(f => f.type === 'objectType').map(f => f.name)]}
+              displayValues={[t.NONE, ...project.folders.filter(f => f.type === 'objectType').map(f => f.name)]}
               onChange={v => moveEntityToFolder('objectType', objectType.id, v === '' ? null : String(v))}
               icon={<Folder size={12} />}
             />
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
-                <Plus size={12} /> Behaviors ({objectType.behaviors?.length || 0})
+                <Plus size={12} /> {t.BEHAVIORS} ({objectType.behaviors?.length || 0})
               </button>
               {objectType.kind === 'sprite' && (
                 <button onClick={() => openSpriteEditor(objectType.id)} style={actionButtonStyle}>
-                  <Edit2 size={12} /> Edit Animations
+                  <Edit2 size={12} /> {t.EDIT_ANIMATIONS}
                 </button>
               )}
               {objectType.kind === 'tilemap' && (
                 <button onClick={() => openTilemapEditor(objectType.id)} style={actionButtonStyle}>
-                  <LayoutGrid size={12} /> Edit Tilemap
+                  <LayoutGrid size={12} /> {t.EDIT_TILEMAP}
                 </button>
               )}
             </div>
@@ -661,7 +652,7 @@ export const Inspector: React.FC = () => {
             const pluginDef = PLUGIN_DEFINITIONS.find(p => p.kind === objectType.kind);
             if (!pluginDef || pluginDef.propertyDefinitions.length === 0) return null;
             return (
-              <Category label={`${pluginDef.name} Defaults`}>
+              <Category label={`${pluginDef.name} ${t.DEFAULTS}`}>
                 {pluginDef.propertyDefinitions.map(pDef => {
                   const val = objectType.properties[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
@@ -670,7 +661,7 @@ export const Inspector: React.FC = () => {
                   if (pDef.type === 'number') type = 'number';
                   else if (pDef.type === 'boolean') {
                     type = 'select';
-                    options = ['Yes', 'No'];
+                    options = [t.YES, t.NO];
                   } else if (pDef.type === 'enum') {
                     type = 'select';
                     options = pDef.options || [];
@@ -681,13 +672,13 @@ export const Inspector: React.FC = () => {
                   return (
                     <PropertyRow
                       key={pDef.name}
-                      label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                      label={pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name}
+                      value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                       type={type}
                       options={options}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateObjectType(objectType.id, { properties: { ...objectType.properties, [pDef.name]: finalVal } });
                       }}
@@ -701,7 +692,7 @@ export const Inspector: React.FC = () => {
           {objectType.behaviors?.map(b => {
             const def = BEHAVIOR_DEFINITIONS.find(d => d.type === b.type);
             return (
-              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Object</span>}>
+              <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>{t.OBJECT}</span>}>
                 {def?.propertyDefinitions.map(pDef => {
                   const val = b.properties?.[pDef.name] ?? pDef.defaultValue;
                   let type: any = 'text';
@@ -710,7 +701,7 @@ export const Inspector: React.FC = () => {
                   if (pDef.type === 'number') type = 'number';
                   else if (pDef.type === 'boolean') {
                     type = 'select';
-                    options = ['Yes', 'No'];
+                    options = [t.YES, t.NO];
                   } else if (pDef.type === 'enum') {
                     type = 'select';
                     options = pDef.options || [];
@@ -719,13 +710,13 @@ export const Inspector: React.FC = () => {
                   return (
                     <PropertyRow
                       key={pDef.name}
-                      label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                      label={pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name}
+                      value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                       type={type}
                       options={options}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateBehavior(objectType.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
                       }}
@@ -737,7 +728,7 @@ export const Inspector: React.FC = () => {
           })}
 
           {families.map(family => family.behaviors.map(b => (
-            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>Family: {family.name}</span>}>
+            <Category key={b.id} label={b.name} action={<span style={{ fontSize: '9px', color: '#555', marginRight: '8px' }}>{t.FAMILY}: {family.name}</span>}>
               {Object.keys(b.properties || {}).map(prop => (
                 <PropertyRow
                   key={prop}
@@ -750,13 +741,13 @@ export const Inspector: React.FC = () => {
           )))}
 
           <Category
-            label="Instance Variables"
+            label={t.INSTANCE_VARIABLES}
             action={<button onClick={() => {
               setVariableEditor({ isOpen: true, objectTypeId: objectType.id });
             }} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             <div style={{ padding: '4px 0', borderBottom: '1px solid #222' }}>
-              <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Object Variables</span>
+              <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>{t.OBJECT_VARIABLES_LABEL}</span>
             </div>
             {objectType.instanceVariables?.map(v => (
               <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
@@ -794,41 +785,41 @@ export const Inspector: React.FC = () => {
                   }}
                   style={{ ...inputStyle, height: '22px' }}
                 />
-                <button
-                  onClick={() => updateInstanceVariable(objectType.id, v.id, { watcherEnabled: !v.watcherEnabled })}
-                  style={{ background: 'none', border: 'none', color: v.watcherEnabled ? '#007acc' : '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                  title="Toggle Live Watcher"
-                >
-                  {v.watcherEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
-                </button>
-                <button
-                  onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })}
-                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#007acc'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#444'}
-                  title="Edit variable properties"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button
-                  onClick={() => removeInstanceVariable(objectType.id, v.id)}
-                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#ff4444'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#444'}
-                  title="Delete variable"
-                >
-                  <Trash2 size={12} />
-                </button>
+                  <button
+                    onClick={() => updateInstanceVariable(objectType.id, v.id, { watcherEnabled: !v.watcherEnabled })}
+                    style={{ background: 'none', border: 'none', color: v.watcherEnabled ? '#007acc' : '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                    title={t.TOGGLE_WATCHER}
+                  >
+                    {v.watcherEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
+                  </button>
+                  <button
+                    onClick={() => setVariableEditor({ isOpen: true, variable: v, objectTypeId: objectType.id })}
+                    style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#007acc'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#444'}
+                    title={t.EDIT_VARIABLE_PROPS}
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                  <button
+                    onClick={() => removeInstanceVariable(objectType.id, v.id)}
+                    style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ff4444'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#444'}
+                    title={t.DELETE_VARIABLE}
+                  >
+                    <Trash2 size={12} />
+                  </button>
               </div>
             ))}
             {(objectType.instanceVariables?.length === 0 || !objectType.instanceVariables) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No object variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>{t.NO} {t.OBJECT_VARIABLES}.</div>
             )}
 
             {families.map(family => (
               <React.Fragment key={family.id}>
                 <div style={{ padding: '4px 0', borderBottom: '1px solid #222', marginTop: '8px' }}>
-                  <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>Family: {family.name}</span>
+                  <span style={{ padding: '0 10px', fontSize: '9px', fontWeight: 800, color: '#555', textTransform: 'uppercase' }}>{t.FAMILY}: {family.name}</span>
                 </div>
                 {family.instanceVariables.map(v => (
                   <div key={v.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', gap: '8px', minHeight: '30px', borderBottom: '1px solid #222' }}>
@@ -848,32 +839,32 @@ export const Inspector: React.FC = () => {
                     <button
                       onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })}
                       style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                      title="Edit family variable"
+                      title={t.EDIT_DEFINITION}
                     >
                       <Edit2 size={12} />
                     </button>
                     <button
                       onClick={() => removeFamilyInstanceVariable(family.id, v.id)}
                       style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                      title="Remove family variable"
+                      title={t.DELETE}
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
                 ))}
                 {family.instanceVariables.length === 0 && (
-                  <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+                  <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>{t.NO} {t.FAMILY_VARIABLES_LABEL}</div>
                 )}
               </React.Fragment>
             ))}
           </Category>
 
-          <Category label="State Machine" action={<button onClick={() => setShowStatesDialog({ objectTypeId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+          <Category label={t.STATE_MACHINE} action={<button onClick={() => setShowStatesDialog({ objectTypeId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
             <div style={{ padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', color: '#888' }}>Initial State:</span>
+                <span style={{ fontSize: '11px', color: '#888' }}>{t.INITIAL_STATE}:</span>
                 <span style={{ fontSize: '11px', color: '#ccc', fontWeight: 600 }}>
-                  {objectType.states?.find(s => s.id === objectType.initialStateId)?.name || '(None)'}
+                  {objectType.states?.find(s => s.id === objectType.initialStateId)?.name || t.NONE}
                 </span>
               </div>
               {objectType.states?.map(s => (
@@ -882,21 +873,21 @@ export const Inspector: React.FC = () => {
                   {s.name}
                 </div>
               ))}
-              {(!objectType.states || objectType.states.length === 0) && <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No states defined</div>}
+              {(!objectType.states || objectType.states.length === 0) && <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic' }}>{t.NO} {t.STATE_MACHINE}</div>}
             </div>
           </Category>
 
-          <Category label="Effects" action={<button onClick={() => setShowEffectsDialog({ targetType: 'objectType', targetId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
+          <Category label={t.EFFECTS} action={<button onClick={() => setShowEffectsDialog({ targetType: 'objectType', targetId: objectType.id })} style={miniButtonStyle}><Plus size={12} /></button>}>
             {objectType.effects?.map(e => (
               <PropertyRow
                 key={e.id}
                 label={e.name}
-                value={e.disabled ? 'Disabled' : 'Active'}
+                value={e.disabled ? t.DISABLED : t.ENABLED}
                 readOnly
                 icon={<Zap size={12} color={e.disabled ? '#444' : '#f1c40f'} />}
               />
             ))}
-            {(!objectType.effects || objectType.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>No effects</div>}
+            {(!objectType.effects || objectType.effects.length === 0) && <div style={{ padding: '8px 12px', fontSize: '10px', color: '#555', fontStyle: 'italic' }}>{t.NO} {t.EFFECTS}</div>}
           </Category>
 
           {showBehaviorsDialog && (
@@ -909,7 +900,7 @@ export const Inspector: React.FC = () => {
           )}
           {variableEditor?.isOpen && (
             <VariableDialog
-              title={variableEditor.variable ? "Edit Instance Variable" : "New Instance Variable"}
+              title={variableEditor.variable ? t.EDIT_INSTANCE_VARIABLE : t.NEW_INSTANCE_VARIABLE}
               variable={variableEditor.variable}
               existingNames={project.objectTypes.find(ot => ot.id === variableEditor.objectTypeId as any)?.instanceVariables.map(v => v.name) || []}
               onSave={(updates) => {
@@ -936,17 +927,17 @@ export const Inspector: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={panelHeaderStyle}>
             <Users size={14} style={{ color: '#007acc' }} />
-            Family: {family.name}
+            {t.FAMILY}: {family.name}
           </div>
 
-          <Category label="General" icon={<ListIcon size={12} />}>
-            <PropertyRow label="Name" value={family.name} onChange={v => updateFamily(family.id, { name: String(v) })} icon={<Users size={12} />} />
+          <Category label={t.GENERAL} icon={<ListIcon size={12} />}>
+            <PropertyRow label={t.NAME} value={family.name} onChange={v => updateFamily(family.id, { name: String(v) })} icon={<Users size={12} />} />
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => setShowFamilyMembersDialog(true)} style={actionButtonStyle}>
-                <Users size={12} /> Manage Members ({family.objectTypeIds.length})
+                <Users size={12} /> {t.MANAGE_MEMBERS} ({family.objectTypeIds.length})
               </button>
               <button onClick={() => setShowBehaviorsDialog(true)} style={actionButtonStyle}>
-                <Plus size={12} /> Behaviors ({family.behaviors?.length || 0})
+                <Plus size={12} /> {t.BEHAVIORS} ({family.behaviors?.length || 0})
               </button>
             </div>
           </Category>
@@ -963,7 +954,7 @@ export const Inspector: React.FC = () => {
                   if (pDef.type === 'number') type = 'number';
                   else if (pDef.type === 'boolean') {
                     type = 'select';
-                    options = ['Yes', 'No'];
+                    options = [t.YES, t.NO];
                   } else if (pDef.type === 'enum') {
                     type = 'select';
                     options = pDef.options || [];
@@ -973,25 +964,25 @@ export const Inspector: React.FC = () => {
                     <PropertyRow
                       key={pDef.name}
                       label={pDef.name}
-                      value={pDef.type === 'boolean' ? (val ? 'Yes' : 'No') : val}
+                      value={pDef.type === 'boolean' ? (val ? t.YES : t.NO) : val}
                       type={type}
                       options={options}
                       onChange={val => {
                         let finalVal = val;
-                        if (pDef.type === 'boolean') finalVal = val === 'Yes';
+                        if (pDef.type === 'boolean') finalVal = val === t.YES;
                         if (pDef.type === 'number') finalVal = Number(val);
                         updateFamilyBehavior(family.id, b.id, { properties: { ...(b.properties || {}), [pDef.name]: finalVal } });
                       }}
                     />
                   );
                 })}
-                <PropertyRow label="Enabled" value={!b.disabled ? 'Yes' : 'No'} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === 'No' })} type="select" options={['Yes', 'No']} />
+                <PropertyRow label={t.ENABLED} value={!b.disabled ? t.YES : t.NO} onChange={v => updateFamilyBehavior(family.id, b.id, { disabled: v === t.NO })} type="select" options={[t.YES, t.NO]} />
               </Category>
             );
           })}
 
           <Category
-            label="Family Variables"
+            label={t.FAMILY_VARIABLES}
             action={<button onClick={() => setVariableEditor({ isOpen: true, familyId: family.id })} style={miniButtonStyle}><Plus size={12} /></button>}
           >
             {family.instanceVariables?.map(v => (
@@ -1012,20 +1003,28 @@ export const Inspector: React.FC = () => {
                 <button
                   onClick={() => updateFamilyInstanceVariable(family.id, v.id, { watcherEnabled: !v.watcherEnabled })}
                   style={{ background: 'none', border: 'none', color: v.watcherEnabled ? '#007acc' : '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                  title="Toggle Live Watcher"
+                  title={t.TOGGLE_WATCHER}
                 >
                   {v.watcherEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
                 </button>
-                <button onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                <button 
+                  onClick={() => setVariableEditor({ isOpen: true, variable: v, familyId: family.id })} 
+                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  title={t.EDIT_VARIABLE_PROPS}
+                >
                   <Edit2 size={12} />
                 </button>
-                <button onClick={() => removeFamilyInstanceVariable(family.id, v.id)} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                <button 
+                  onClick={() => removeFamilyInstanceVariable(family.id, v.id)} 
+                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  title={t.DELETE_VARIABLE}
+                >
                   <Trash2 size={12} />
                 </button>
               </div>
             ))}
             {(family.instanceVariables?.length === 0 || !family.instanceVariables) && (
-              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>No family variables.</div>
+              <div style={{ padding: '10px', fontSize: '11px', color: '#666', fontStyle: 'italic' }}>{t.NO} {t.FAMILY_VARIABLES}.</div>
             )}
           </Category>
 
@@ -1042,7 +1041,7 @@ export const Inspector: React.FC = () => {
           )}
           {variableEditor?.isOpen && (
             <VariableDialog
-              title={variableEditor.variable ? "Edit Family Variable" : "New Family Variable"}
+              title={variableEditor.variable ? t.EDIT_FAMILY_VARIABLE : t.NEW_FAMILY_VARIABLE}
               variable={variableEditor.variable}
               existingNames={family.instanceVariables.map(v => v.name)}
               onSave={(updates) => {
@@ -1068,48 +1067,48 @@ export const Inspector: React.FC = () => {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
       <div style={panelHeaderStyle}>
         <Info size={14} style={{ color: '#007acc' }} />
-        Properties: {activeLayout?.name || 'Project'}
+        {t.PROPERTIES_TITLE}: {activeLayout?.name || t.CRE_ENGINE}
       </div>
 
       {layer && (
-        <Category label="Active Layer" icon={<LayersIcon size={12} />}>
-          <PropertyRow label="Name" value={layer.name} onChange={v => updateLayer(activeLayout!.id, layer.id, { name: String(v) })} icon={<Type size={12} />} />
-          <PropertyRow label="Opacity" value={layer.opacity} onChange={v => updateLayer(activeLayout!.id, layer.id, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
-          <PropertyRow label="Parallax X" value={layer.parallaxX} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxX: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
-          <PropertyRow label="Parallax Y" value={layer.parallaxY} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxY: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
-          <PropertyRow label="Visible" value={layer.visible ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { visible: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12} />} />
-          <PropertyRow label="Locked" value={layer.locked ? 'Yes' : 'No'} onChange={v => updateLayer(activeLayout!.id, layer.id, { locked: v === 'Yes' })} type="select" options={['Yes', 'No']} icon={<ToggleLeft size={12} />} />
+        <Category label={t.ACTIVE_LAYER} icon={<LayersIcon size={12} />}>
+          <PropertyRow label={t.NAME} value={layer.name} onChange={v => updateLayer(activeLayout!.id, layer.id, { name: String(v) })} icon={<Type size={12} />} />
+          <PropertyRow label={t.OPACITY} value={layer.opacity} onChange={v => updateLayer(activeLayout!.id, layer.id, { opacity: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
+          <PropertyRow label={t.PARALLAX_X} value={layer.parallaxX} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxX: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
+          <PropertyRow label={t.PARALLAX_Y} value={layer.parallaxY} onChange={v => updateLayer(activeLayout!.id, layer.id, { parallaxY: Number(v) })} type="number" step={0.1} icon={<Hash size={12} />} />
+          <PropertyRow label={t.VISIBLE} value={layer.visible ? t.YES : t.NO} onChange={v => updateLayer(activeLayout!.id, layer.id, { visible: v === t.YES })} type="select" options={[t.YES, t.NO]} icon={<ToggleLeft size={12} />} />
+          <PropertyRow label={t.LOCKED} value={layer.locked ? t.YES : t.NO} onChange={v => updateLayer(activeLayout!.id, layer.id, { locked: v === t.YES })} type="select" options={[t.YES, t.NO]} icon={<ToggleLeft size={12} />} />
           <div style={{ padding: '4px 10px' }}>
             <button onClick={() => setShowEffectsDialog({ targetType: 'layer', targetId: layer.id })} style={actionButtonStyle}>
-              <Plus size={12} /> Effects ({layer.effects?.length || 0})
+              <Plus size={12} /> {t.EFFECTS} ({layer.effects?.length || 0})
             </button>
           </div>
         </Category>
       )}
 
       {activeLayout && (
-        <Category label="Layout Settings">
-          <PropertyRow label="Name" value={activeLayout.name} onChange={v => updateLayout(activeLayout.id, { name: String(v) })} icon={<Type size={12} />} />
-          <PropertyRow label="Width" value={activeLayout.width} onChange={v => updateLayout(activeLayout.id, { width: Number(v) })} type="number" icon={<Hash size={12} />} />
-          <PropertyRow label="Height" value={activeLayout.height} onChange={v => updateLayout(activeLayout.id, { height: Number(v) })} type="number" icon={<Hash size={12} />} />
+        <Category label={t.LAYOUT_SETTINGS}>
+          <PropertyRow label={t.NAME} value={activeLayout.name} onChange={v => updateLayout(activeLayout.id, { name: String(v) })} icon={<Type size={12} />} />
+          <PropertyRow label={t.WIDTH} value={activeLayout.width} onChange={v => updateLayout(activeLayout.id, { width: Number(v) })} type="number" icon={<Hash size={12} />} />
+          <PropertyRow label={t.HEIGHT} value={activeLayout.height} onChange={v => updateLayout(activeLayout.id, { height: Number(v) })} type="number" icon={<Hash size={12} />} />
           <PropertyRow
-            label="Folder"
+            label={t.FOLDER}
             value={activeLayout.folderId || ''}
             type="select"
             options={['', ...project.folders.filter(f => f.type === 'layout').map(f => f.id)]}
-            displayValues={['(None)', ...project.folders.filter(f => f.type === 'layout').map(f => f.name)]}
+            displayValues={[t.NONE, ...project.folders.filter(f => f.type === 'layout').map(f => f.name)]}
             onChange={v => moveEntityToFolder('layout', activeLayout.id, v === '' ? null : String(v))}
             icon={<Folder size={12} />}
           />
-          <PropertyRow label="Event Sheet" value={project.eventSheets.find(es => es.id === activeLayout.eventSheetId)?.name || 'None'} readOnly icon={<FileText size={12} />} />
+          <PropertyRow label={t.EVENT_SHEET} value={project.eventSheets.find(es => es.id === activeLayout.eventSheetId)?.name || t.NONE} readOnly icon={<FileText size={12} />} />
         </Category>
       )}
 
-      <Category label="Project Settings">
-        <PropertyRow label="Name" value={project.settings.name} onChange={v => updateProjectSettings({ name: String(v) })} icon={<Type size={12} />} />
-        <PropertyRow label="Author" value={project.settings.author} onChange={v => updateProjectSettings({ author: String(v) })} icon={<Type size={12} />} />
-        <PropertyRow label="Viewport Width" value={project.settings.viewportWidth} onChange={v => updateProjectSettings({ viewportWidth: Number(v) })} type="number" icon={<Hash size={12} />} />
-        <PropertyRow label="Viewport Height" value={project.settings.viewportHeight} onChange={v => updateProjectSettings({ viewportHeight: Number(v) })} type="number" icon={<Hash size={12} />} />
+      <Category label={t.PROJECT_SETTINGS}>
+        <PropertyRow label={t.NAME} value={project.settings.name} onChange={v => updateProjectSettings({ name: String(v) })} icon={<Type size={12} />} />
+        <PropertyRow label={t.AUTHOR} value={project.settings.author} onChange={v => updateProjectSettings({ author: String(v) })} icon={<Type size={12} />} />
+        <PropertyRow label={t.VIEWPORT_WIDTH} value={project.settings.viewportWidth} onChange={v => updateProjectSettings({ viewportWidth: Number(v) })} type="number" icon={<Hash size={12} />} />
+        <PropertyRow label={t.VIEWPORT_HEIGHT} value={project.settings.viewportHeight} onChange={v => updateProjectSettings({ viewportHeight: Number(v) })} type="number" icon={<Hash size={12} />} />
       </Category>
 
       <div style={{ padding: '16px 20px', fontSize: '10px', color: '#444', textAlign: 'center', borderTop: '1px solid #111', marginTop: 'auto', backgroundColor: '#181818', letterSpacing: '1px' }}>

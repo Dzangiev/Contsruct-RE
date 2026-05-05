@@ -1,5 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface SimpleModalProps {
   title: string;
@@ -11,6 +13,8 @@ interface SimpleModalProps {
 }
 
 export const SimpleModal: React.FC<SimpleModalProps> = ({ title, message, type, defaultValue, onConfirm, onCancel }) => {
+  const { editorState } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const [value, setValue] = React.useState(defaultValue || '');
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -53,15 +57,15 @@ export const SimpleModal: React.FC<SimpleModalProps> = ({ title, message, type, 
                 onChange={e => setValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 style={inputStyle}
-                placeholder="Type here..."
+                placeholder={t.TYPE_HERE}
               />
             </div>
           )}
         </div>
         
         <div style={footerStyle}>
-          <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
-          <button onClick={handleConfirm} style={confirmButtonStyle}>OK</button>
+          <button onClick={onCancel} style={cancelButtonStyle}>{t.CANCEL}</button>
+          <button onClick={handleConfirm} style={confirmButtonStyle}>{t.OK}</button>
         </div>
       </div>
     </div>
@@ -74,12 +78,12 @@ const overlayStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  backgroundColor: 'rgba(0, 0, 0, 0.8)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 9999,
-  backdropFilter: 'blur(2px)'
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {

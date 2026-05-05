@@ -7,6 +7,7 @@ import { InsertObjectDialog } from './InsertObjectDialog';
 import { Trash2, Copy, Grid, Zap, Maximize, Settings, MousePointer2, Info, Layout as LayoutIcon, AlignLeft, AlignCenter, AlignRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { getEffectsFilter } from '../../utils/renderUtils';
 import { ViewportInstance } from './ViewportInstance';
+import { getTranslation } from '../../i18n';
 
 export const Viewport: React.FC = () => {
   const { 
@@ -32,6 +33,8 @@ export const Viewport: React.FC = () => {
     setGridSettingsDialogOpen,
     setRulerSettings
   } = useEditorStore();
+  
+  const t = getTranslation(editorState.language);
   
   const activeLayout = project.layouts?.find(l => l.id === editorState.activeLayoutId);
   const activeLayer = activeLayout?.layers?.find(layer => layer.id === editorState.activeLayerId);
@@ -85,10 +88,13 @@ export const Viewport: React.FC = () => {
   
   React.useEffect(() => {
     if (activeLayout && containerSize.width > 0 && activeLayout.id !== lastLayoutId) {
-      centerLayout();
+      // Only center if we don't have a saved view for this layout yet
+      if (!editorState.layoutViews[activeLayout.id]) {
+        centerLayout();
+      }
       setLastLayoutId(activeLayout.id);
     }
-  }, [activeLayout, containerSize, lastLayoutId, centerLayout]);
+  }, [activeLayout, containerSize, lastLayoutId, centerLayout, editorState.layoutViews]);
 
   // Global key handlers
   React.useEffect(() => {
@@ -819,7 +825,6 @@ export const Viewport: React.FC = () => {
         cursor: (tool === 'pan' || isSpaceDown) ? (panStart ? 'grabbing' : 'grab') : (tool === 'place') ? 'crosshair' : (dragStart || resizing) ? 'grabbing' : 'default', 
         outline: 'none', display: 'flex', flexDirection: 'column',
         opacity: lastLayoutId ? 1 : 0,
-        transition: 'opacity 0.2s ease-in-out',
         '--pan-x': `${panX}px`,
         '--pan-y': `${panY}px`,
         '--zoom': zoom,
@@ -1103,7 +1108,7 @@ export const Viewport: React.FC = () => {
             pointerEvents: 'none',
             zIndex: 1000
           }}>
-            Angle: {currentRotation}°
+            {t.ANGLE}: {currentRotation}°
           </div>
         )}
 
@@ -1121,49 +1126,49 @@ export const Viewport: React.FC = () => {
                 <>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { removeInstance(activeLayout.id, contextMenu.instanceId!); setSelectedInstances([]); setContextMenu(null); }}>
                     <Trash2 size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Delete</span> <span style={{ color: '#666', fontSize: '10px' }}>Del</span>
+                    <span style={{ flex: 1 }}>{t.DELETE}</span> <span style={{ color: '#666', fontSize: '10px' }}>Del</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { cloneInstance(activeLayout.id, contextMenu.instanceId!); setContextMenu(null); }}>
                     <Copy size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Clone</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
+                    <span style={{ flex: 1 }}>{t.CLONE}</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+D</span>
                   </div>
 
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>Z ORDER</div>
+                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>{t.Z_ORDER}</div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>
                     <ArrowUp size={12} style={{ marginRight: '8px', color: '#2ecc71' }} />
-                    <span style={{ flex: 1 }}>Send to Top</span>
+                    <span style={{ flex: 1 }}>{t.SEND_TO_TOP}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'back'); setContextMenu(null); }}>
                     <ArrowDown size={12} style={{ marginRight: '8px', color: '#e74c3c' }} />
-                    <span style={{ flex: 1 }}>Send to Bottom</span>
+                    <span style={{ flex: 1 }}>{t.SEND_TO_BOTTOM}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'forward'); setContextMenu(null); }}>
                     <ArrowUp size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Move Forward</span>
+                    <span style={{ flex: 1 }}>{t.MOVE_FORWARD}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'backward'); setContextMenu(null); }}>
                     <ArrowDown size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Move Backward</span>
+                    <span style={{ flex: 1 }}>{t.MOVE_BACKWARD}</span>
                   </div>
                   
                   {selectedInstanceIds.length > 1 && (
                     <>
                       <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                      <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ALIGN</div>
+                      <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>{t.ALIGN}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '0 8px', gap: '2px' }}>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('left')} title="Align Left"><AlignLeft size={14} /></div>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('center')} title="Align Center"><AlignCenter size={14} /></div>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('right')} title="Align Right"><AlignRight size={14} /></div>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('top')} title="Align Top"><ArrowUp size={14} /></div>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('middle')} title="Align Middle"><span style={{ fontWeight: 'bold' }}>—</span></div>
-                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('bottom')} title="Align Bottom"><ArrowDown size={14} /></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('left')} title={t.ALIGN_LEFT}><AlignLeft size={14} /></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('center')} title={t.ALIGN_CENTER}><AlignCenter size={14} /></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('right')} title={t.ALIGN_RIGHT}><AlignRight size={14} /></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('top')} title={t.ALIGN_TOP}><ArrowUp size={14} /></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('middle')} title={t.ALIGN_MIDDLE}><span style={{ fontWeight: 'bold' }}>—</span></div>
+                        <div className="context-menu-item" style={{ ...contextMenuItemStyle, padding: '6px', justifyContent: 'center', borderRadius: '4px' }} onClick={() => alignSelection('bottom')} title={t.ALIGN_BOTTOM}><ArrowDown size={14} /></div>
                       </div>
                     </>
                   )}
 
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>TRANSFORM</div>
+                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>{t.TRANSFORM}</div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { 
                     selectedInstanceIds.forEach(id => {
                       const inst = activeLayout.instances.find(i => i.id === id);
@@ -1176,7 +1181,7 @@ export const Viewport: React.FC = () => {
                     setContextMenu(null);
                   }}>
                     <Grid size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    Align to Grid
+                    {t.ALIGN_TO_GRID}
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { 
                     selectedInstanceIds.forEach(id => updateInstanceSilently(activeLayout.id, id, { angle: 0 }));
@@ -1184,43 +1189,43 @@ export const Viewport: React.FC = () => {
                     setContextMenu(null);
                   }}>
                     <Maximize size={12} style={{ marginRight: '8px', opacity: 0.7, transform: 'rotate(45deg)' }} />
-                    Reset Rotation
+                    {t.RESET_ROTATION}
                   </div>
                   
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDER</div>
+                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>{t.ORDER}</div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'front'); setContextMenu(null); }}>
                     <ArrowUp size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    Bring to Front
+                    {t.BRING_TO_FRONT}
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { reorderInstance(activeLayout.id, contextMenu.instanceId!, 'back'); setContextMenu(null); }}>
                     <ArrowDown size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    Send to Back
+                    {t.SEND_TO_BACK}
                   </div>
                 </>
               ) : (
                 <>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances(activeLayout.instances.map(i => i.id)); setContextMenu(null); }}>
                     <MousePointer2 size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Select All</span>
+                    <span style={{ flex: 1 }}>{t.SELECT_ALL}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { centerLayout(1); setContextMenu(null); }}>
                     <Maximize size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Center View</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+0</span>
+                    <span style={{ flex: 1 }}>{t.CENTER_VIEW}</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+0</span>
                   </div>
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
-                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>GRID</div>
+                  <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>{t.GRID}</div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, undefined, !showGrid); setContextMenu(null); }}>
                     <Grid size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Show Grid</span> <span style={{ color: showGrid ? '#4caf50' : '#666' }}>{showGrid ? 'ON' : 'OFF'}</span>
+                    <span style={{ flex: 1 }}>{t.SHOW_GRID}</span> <span style={{ color: showGrid ? '#4caf50' : '#666' }}>{showGrid ? t.ON : t.OFF}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setGridSettings(undefined, undefined, !snapToGrid, undefined); setContextMenu(null); }}>
                     <Zap size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Snap to Grid</span> <span style={{ color: snapToGrid ? '#4caf50' : '#666' }}>{snapToGrid ? 'ON' : 'OFF'}</span>
+                    <span style={{ flex: 1 }}>{t.SNAP_TO_GRID}</span> <span style={{ color: snapToGrid ? '#4caf50' : '#666' }}>{snapToGrid ? t.ON : t.OFF}</span>
                   </div>
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setRulerSettings(!showRulers); setContextMenu(null); }}>
                     <Maximize size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    <span style={{ flex: 1 }}>Show Rulers</span> <span style={{ color: showRulers ? '#4caf50' : '#666' }}>{showRulers ? 'ON' : 'OFF'}</span>
+                    <span style={{ flex: 1 }}>{t.SHOW_RULERS}</span> <span style={{ color: showRulers ? '#4caf50' : '#666' }}>{showRulers ? t.ON : t.OFF}</span>
                   </div>
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => {
@@ -1228,7 +1233,7 @@ export const Viewport: React.FC = () => {
                     setContextMenu(null);
                   }}>
                     <Settings size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                    Edit Grid...
+                    {t.EDIT_GRID}
                   </div>
                 </>
               )}

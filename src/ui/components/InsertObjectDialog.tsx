@@ -2,6 +2,8 @@ import React from 'react';
 import { PLUGIN_DEFINITIONS, PluginDefinition } from '../../model/definitions';
 import { Image, Grid, Type, Search, X } from 'lucide-react';
 import { ObjectTypeKind } from '../../model/project';
+import { getTranslation } from '../../i18n';
+import { useEditorStore } from '../../store/useEditorStore';
 
 interface InsertObjectDialogProps {
   onSelect: (kind: ObjectTypeKind, name: string) => void;
@@ -9,6 +11,8 @@ interface InsertObjectDialogProps {
 }
 
 export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect, onClose }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedPlugin, setSelectedPlugin] = React.useState<PluginDefinition | null>(null);
   const [objectName, setObjectName] = React.useState('');
@@ -37,7 +41,7 @@ export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h3 style={{ margin: 0, fontSize: '16px' }}>Create New Object Type</h3>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>{t.INSERT_OBJECT}</h3>
           <button onClick={onClose} style={closeButtonStyle}><X size={20} /></button>
         </div>
 
@@ -47,7 +51,7 @@ export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect
               <Search size={14} style={searchIconStyle} />
               <input 
                 autoFocus
-                placeholder="Search plugins..."
+                placeholder={t.SEARCH_PLUGINS}
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 style={searchInputStyle}
@@ -71,7 +75,9 @@ export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect
                   <div style={{ color: selectedPlugin?.kind === plugin.kind ? '#007acc' : '#888' }}>
                     {getIcon(plugin.icon)}
                   </div>
-                  <div style={{ fontWeight: 'bold', fontSize: '12px', marginTop: '8px' }}>{plugin.name}</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '12px', marginTop: '8px' }}>
+                    {plugin.nameKey ? (t as any)[plugin.nameKey] : plugin.name}
+                  </div>
                 </div>
               ))}
             </div>
@@ -81,18 +87,22 @@ export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect
             {selectedPlugin ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <div>
-                  <div style={labelStyle}>Plugin</div>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>{selectedPlugin.name}</div>
-                  <div style={{ fontSize: '12px', color: '#aaa', marginTop: '5px', lineHeight: '1.4' }}>{selectedPlugin.description}</div>
+                  <div style={labelStyle}>{t.PLUGIN}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>
+                    {selectedPlugin.nameKey ? (t as any)[selectedPlugin.nameKey] : selectedPlugin.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#aaa', marginTop: '5px', lineHeight: '1.4' }}>
+                    {selectedPlugin.descriptionKey ? (t as any)[selectedPlugin.descriptionKey] : selectedPlugin.description}
+                  </div>
                 </div>
 
                 <div>
-                  <div style={labelStyle}>Object Name</div>
+                  <div style={labelStyle}>{t.NAME}</div>
                   <input 
                     value={objectName}
                     onChange={e => setObjectName(e.target.value)}
                     style={nameInputStyle}
-                    placeholder="Enter name..."
+                    placeholder={`${t.NAME}...`}
                   />
                 </div>
 
@@ -106,14 +116,14 @@ export const InsertObjectDialog: React.FC<InsertObjectDialogProps> = ({ onSelect
                       cursor: objectName.trim() ? 'pointer' : 'not-allowed'
                     }}
                   >
-                    Insert
+                    {t.ADD_NEW}
                   </button>
                 </div>
               </div>
             ) : (
               <div style={emptyRightStyle}>
                 <Image size={48} style={{ opacity: 0.1, marginBottom: '10px' }} />
-                <div>Select an object type to see details</div>
+                <div>{t.SELECT_OBJECT_TYPE_DETAILS}</div>
               </div>
             )}
           </div>
@@ -130,7 +140,8 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 3000
+  zIndex: 3000,
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {

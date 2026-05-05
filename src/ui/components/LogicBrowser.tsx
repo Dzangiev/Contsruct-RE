@@ -2,6 +2,8 @@ import React from 'react';
 import { Project, ObjectType, Family } from '../../model/project';
 import { LogicDefinition, CONDITIONS, ACTIONS } from '../../model/definitions';
 import { Search, ChevronRight, Info, Settings, Box, Terminal, Code, Cpu, MousePointer2, Zap, Layout, Monitor, Users } from 'lucide-react';
+import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface LogicBrowserProps {
   project: Project;
@@ -23,12 +25,14 @@ const ObjectCard: React.FC<{ name: string, icon: React.ReactNode, onClick: () =>
 );
 
 export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSelect, onClose, initialObjectTypeId, initialLogicTypeId }) => {
+  const editorState = useEditorStore(state => state.editorState);
+  const t = getTranslation(editorState.language);
   const initialOT = initialObjectTypeId ? project.objectTypes.find(ot => ot.id === initialObjectTypeId) : undefined;
   
   const [step, setStep] = React.useState<'object' | 'logic'>((initialObjectTypeId !== undefined || initialLogicTypeId !== undefined) ? 'logic' : 'object');
   const [selectedObjectType, setSelectedObjectType] = React.useState<any | undefined>(initialOT);
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>('All');
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>(t.ALL);
 
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
@@ -84,25 +88,42 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
       matchesBehavior = false;
     }
 
+    const translatedName = (item.nameKey ? (t as any)[item.nameKey] : item.name) || '';
+    const translatedCategory = (item.categoryKey ? (t as any)[item.categoryKey] : item.category) || '';
+    
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
+                          item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          translatedName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          translatedCategory.toLowerCase().includes(searchTerm.toLowerCase());
                           
     return matchesTarget && matchesKind && matchesBehavior && matchesSearch;
   });
 
-  // 2. Generate categories list from ALL available items (not just the ones in the current category)
-  const categories = ['All', ...Array.from(new Set(availableItems.map(i => i.category)))];
+  const categoryKeys = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    availableItems.forEach(item => {
+      if (item.categoryKey && !map[item.category]) {
+        map[item.category] = item.categoryKey;
+      }
+    });
+    return map;
+  }, [availableItems]);
 
-  // 3. Finally, filter for display based on the selected category
+  const getTranslatedCategory = (catName: string) => (t as any)[categoryKeys[catName]] || catName;
+
+  // 2. Generate categories list from ALL available items
+  const categories = [t.ALL, ...Array.from(new Set(availableItems.map(i => i.category)))];
+
+  // 3. Finally, filter for display based on the selected raw category
   const filteredItems = availableItems.filter(item => 
-    selectedCategoryId === 'All' || item.category === selectedCategoryId
+    selectedCategoryId === t.ALL || item.category === selectedCategoryId
   );
 
   const handleObjectSelect = (ot: ObjectType | Family | undefined) => {
     setSelectedObjectType(ot);
     setStep('logic');
     setSearchTerm('');
-    setSelectedCategoryId('All');
+    setSelectedCategoryId(t.ALL);
   };
 
   const handleLogicSelect = (def: LogicDefinition) => {
@@ -148,10 +169,10 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
             </div>
             <div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
-                {step === 'object' ? `Add ${mode === 'condition' ? 'Condition' : 'Action'}` : `${selectedObjectType?.name || 'System'}`}
+                {step === 'object' ? (mode === 'condition' ? t.ADD_CONDITION : t.ADD_ACTION) : `${selectedObjectType?.name || t.SYSTEM}`}
               </div>
               <div style={{ fontSize: '11px', color: '#888' }}>
-                {step === 'object' ? 'Select target object first' : `Select ${mode === 'condition' ? 'a condition' : 'an action'}`}
+                {step === 'object' ? t.SELECT_TARGET_OBJECT_FIRST : (mode === 'condition' ? t.SELECT_A_CONDITION : t.SELECT_AN_ACTION)}
               </div>
             </div>
           </div>
@@ -166,7 +187,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={step === 'object' ? "Search objects..." : `Search ${mode}s...`}
+            placeholder={step === 'object' ? t.SEARCH_OBJECTS : (mode === 'condition' ? t.SEARCH_CONDITIONS : t.SEARCH_ACTIONS)}
             style={inputStyle}
           />
         </div>
@@ -175,7 +196,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
           {step === 'object' ? (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
               <ObjectCard 
-                name="System" 
+                name={t.SYSTEM} 
                 icon={<Monitor size={24} color="#3498db" />} 
                 onClick={() => handleObjectSelect(undefined)}
                 selected={!selectedObjectType}
@@ -213,7 +234,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
                       color: selectedCategoryId === cat ? '#fff' : '#aaa'
                     }}
                   >
-                    {cat}
+                    {cat === t.ALL ? t.ALL : getTranslatedCategory(cat)}
                   </div>
                 ))}
               </div>
@@ -239,15 +260,17 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
                     >
                       <ChevronRight size={14} style={{ opacity: hoveredItem?.type === def.type ? 1 : 0.2 }} />
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 600, fontSize: '13px' }}>{def.name}</span>
-                        <span style={{ fontSize: '11px', color: '#666' }}>{def.category}</span>
+                        <span style={{ fontWeight: 600, fontSize: '13px' }}>
+                          {def.nameKey ? (t as any)[def.nameKey] : def.name}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#666' }}>{getTranslatedCategory(def.category)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
                 {filteredItems.length === 0 && (
                   <div style={{ padding: '40px', textAlign: 'center', color: '#666', fontSize: '12px' }}>
-                    No matching {mode}s found.
+                    {mode === 'condition' ? t.NO_MATCHING_CONDITIONS_FOUND : t.NO_MATCHING_ACTIONS_FOUND}
                   </div>
                 )}
               </div>
@@ -261,17 +284,19 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
             {hoveredItem ? (
               <>
                 <Info size={14} color="#007acc" />
-                <span style={{ fontSize: '12px', color: '#aaa' }}>{hoveredItem.description || hoveredItem.name}</span>
+                <span style={{ fontSize: '12px', color: '#aaa' }}>
+                  {hoveredItem.descriptionKey ? (t as any)[hoveredItem.descriptionKey] : (hoveredItem.description || hoveredItem.name)}
+                </span>
               </>
             ) : (
-              <span style={{ fontSize: '11px', color: '#555' }}>Hover an item for description</span>
+              <span style={{ fontSize: '11px', color: '#555' }}>{t.HOVER_AN_ITEM_FOR_DESCRIPTION}</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {step === 'logic' && (
-              <button onClick={() => setStep('object')} style={secondaryButtonStyle}>Back to Objects</button>
+              <button onClick={() => setStep('object')} style={secondaryButtonStyle}>{t.BACK_TO_OBJECTS}</button>
             )}
-            <button onClick={onClose} style={secondaryButtonStyle}>Cancel</button>
+            <button onClick={onClose} style={secondaryButtonStyle}>{t.CANCEL}</button>
           </div>
         </div>
       </div>
@@ -284,7 +309,7 @@ export const LogicBrowser: React.FC<LogicBrowserProps> = ({ project, mode, onSel
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.85)',
+  backgroundColor: 'rgba(0,0,0,0.8)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

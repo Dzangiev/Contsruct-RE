@@ -12,6 +12,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { EventBlock } from '../../../model/project';
 import { ConditionItem, ActionItem } from './LogicItem';
 import { EventBlockItemProps } from './types';
+import { getTranslation } from '../../../i18n';
 
 const BASE_GUTTER_WIDTH = 50;
 const INDENT_STEP = 24;
@@ -22,6 +23,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
   const gutterWidth = BASE_GUTTER_WIDTH + (depth * INDENT_STEP);
 
   const { editorState, setSelectedEventBlocks, updateEventBlock, moveEventBlock, moveCondition, moveAction } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const isSelected = editorState.selectedEventBlockIds.includes(block.id);
   const isDisabled = block.disabled;
   const isDragged = draggedBlockId === block.id;
@@ -144,13 +146,13 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           {blockIndices.get(block.id)}
         </div>
         <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
-          <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? 'Local' : 'Global'}</div>
+          <div style={{ color: isLocal ? '#e67e22' : '#3498db', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', width: '40px', userSelect: 'none' }}>{isLocal ? t.LOCAL : t.GLOBAL}</div>
           <div style={{ flex: 1, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '12px' }}>
             <VariableIcon size={14} color={isLocal ? '#e67e22' : '#3498db'} />
             <span>{block.variable.name}</span>
             <span style={{ color: '#888' }}>=</span>
             <span style={{ color: block.variable.type === 'string' ? '#e67e22' : '#2ecc71' }}>{block.variable.type === 'string' ? `"${block.variable.initialValue}"` : String(block.variable.initialValue)}</span>
-            {block.variable.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#444', padding: '1px 4px', borderRadius: '2px', color: '#aaa' }}>CONST</span>}
+            {block.variable.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#444', padding: '1px 4px', borderRadius: '2px', color: '#aaa' }}>{t.CONST}</span>}
           </div>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
@@ -192,12 +194,12 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           </div>
           <div style={{ backgroundColor: '#2d2d2d', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderRight: '1px solid #333', borderRadius: '4px 0 0 0', gridColumn: '2 / 4' }}>
             <Zap size={14} color="#9b59b6" />
-            <div style={{ fontWeight: 'bold', color: '#9b59b6', fontSize: '12px' }}>Function: {block.functionName}</div>
+            <div style={{ fontWeight: 'bold', color: '#9b59b6', fontSize: '12px' }}>{t.FUNCTION}: {block.functionName}</div>
             <div style={{ color: '#888', fontSize: '10px' }}>({paramsSummary})</div>
             {block.functionReturnType && block.functionReturnType !== 'none' && (
-              <span style={{ fontSize: '10px', backgroundColor: '#333', padding: '1px 4px', borderRadius: '2px', color: '#8e44ad', border: '1px solid #8e44ad' }}>RETURNS {block.functionReturnType.toUpperCase()}</span>
+              <span style={{ fontSize: '10px', backgroundColor: '#333', padding: '1px 4px', borderRadius: '2px', color: '#8e44ad', border: '1px solid #8e44ad' }}>{t.RETURNS} {block.functionReturnType.toUpperCase()}</span>
             )}
-            <button onClick={(e) => { e.stopPropagation(); onOpenFunctionEditor(eventSheetId, block); }} style={{ ...iconButtonStyle, color: '#9b59b6', marginLeft: 'auto' }} title="Edit Function Properties">
+            <button onClick={(e) => { e.stopPropagation(); onOpenFunctionEditor(eventSheetId, block); }} style={{ ...iconButtonStyle, color: '#9b59b6', marginLeft: 'auto' }} title={t.FUNCTION_PROPERTIES}>
               <Edit2 size={14} />
             </button>
             {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
@@ -215,7 +217,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
             >
-              + Add condition
+              {t.ADD_CONDITION_LINK}
             </div>
           </div>
           <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #9b59b6' : '1px solid #333', borderTop: 'none', borderLeft: 'none', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
@@ -227,7 +229,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
             >
-              + Add action
+              {t.ADD_ACTION_LINK}
             </div>
           </div>
         </div>
@@ -254,7 +256,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
         </div>
         <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: isSelected ? '#004b7e' : '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderRadius: '2px' }}>
           <FilePlus size={14} color="#2ecc71" />
-          <div style={{ fontWeight: 'bold', flex: 1, fontSize: '12px' }}>Include sheet: <span style={{ color: '#2ecc71' }}>{includedSheet?.name || 'Unknown'}</span></div>
+          <div style={{ fontWeight: 'bold', flex: 1, fontSize: '12px' }}>{t.INCLUDE_SHEET}: <span style={{ color: '#2ecc71' }}>{includedSheet?.name || t.UNKNOWN}</span></div>
           {block.bookmarked && <Bookmark size={14} fill="#f1c40f" color="#f1c40f" />}
         </div>
       </div>
@@ -337,7 +339,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
           {isDisabled && <Ghost size={14} style={{ position: 'absolute', right: '24px', top: '4px', color: '#666' }} />}
           {block.conditions.map((c, i) => (
             <React.Fragment key={c.id}>
-              {block.isOrBlock && i > 0 && <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', margin: '3px 0', fontWeight: 'bold', backgroundColor: '#222' }}>— OR —</div>}
+              {block.isOrBlock && i > 0 && <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', margin: '3px 0', fontWeight: 'bold', backgroundColor: '#222' }}>{t.OR}</div>}
               <ConditionItem project={useEditorStore.getState().project} eventSheetId={eventSheetId} blockId={block.id} item={c} index={i + 1} onOpenBrowser={onOpenBrowser} onOpenParamEditor={onOpenParamEditor} onContextMenu={onContextMenu} searchTerm={searchTerm} setDraggedLogicItem={setDraggedLogicItem} draggedLogicItem={draggedLogicItem} type="condition" />
             </React.Fragment>
           ))}
@@ -346,7 +348,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
             onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
           >
-            + Add condition
+            {t.ADD_CONDITION_LINK}
           </div>
         </div>
         <div onClick={(e) => { e.stopPropagation(); onOpenBrowser('action', block.id); }} style={{ padding: '0', backgroundColor: '#252526', border: isSelected ? '1px solid #007acc' : '1px solid #333', borderLeft: 'none', borderRadius: '0 3px 3px 0', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
@@ -358,7 +360,7 @@ export const EventBlockItem: React.FC<EventBlockItemProps> = ({
             onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.opacity = '1'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.opacity = '0.8'; }}
           >
-            + Add action
+            {t.ADD_ACTION_LINK}
           </div>
         </div>
       </div>

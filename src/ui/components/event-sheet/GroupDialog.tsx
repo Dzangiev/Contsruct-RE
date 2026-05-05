@@ -1,6 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Folder } from 'lucide-react';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { getTranslation } from '../../../i18n';
 
 interface GroupDialogProps {
   isOpen: boolean;
@@ -13,15 +15,24 @@ interface GroupDialogProps {
 
 export const GroupDialog: React.FC<GroupDialogProps> = ({
   isOpen,
-  initialName = 'Group',
+  initialName,
   initialDescription = '',
   initialActiveOnStart = true,
   onSave,
   onCancel
 }) => {
-  const [name, setName] = React.useState(initialName);
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
+  
+  const [name, setName] = React.useState(initialName || t.GROUP);
   const [description, setDescription] = React.useState(initialDescription);
   const [activeOnStart, setActiveOnStart] = React.useState(initialActiveOnStart);
+
+  React.useEffect(() => {
+    if (isOpen && initialName === undefined) {
+      setName(t.GROUP);
+    }
+  }, [isOpen, initialName, t.GROUP]);
 
   if (!isOpen) return null;
 
@@ -38,14 +49,14 @@ export const GroupDialog: React.FC<GroupDialogProps> = ({
             <div style={{ backgroundColor: '#007acc', padding: '4px', borderRadius: '4px' }}>
               <Folder size={16} color="#fff" />
             </div>
-            <span style={{ fontWeight: 600 }}>Group properties</span>
+            <span style={{ fontWeight: 600 }}>{t.GROUP_PROPERTIES}</span>
           </div>
           <button onClick={onCancel} style={closeButtonStyle}><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} style={contentStyle}>
           <div style={rowStyle}>
-            <label style={labelStyle}>Name</label>
+            <label style={labelStyle}>{t.NAME}</label>
             <input 
               autoFocus
               value={name}
@@ -55,7 +66,7 @@ export const GroupDialog: React.FC<GroupDialogProps> = ({
           </div>
 
           <div style={rowStyle}>
-            <label style={labelStyle}>Description (optional)</label>
+            <label style={labelStyle}>{t.DESCRIPTION_OPTIONAL}</label>
             <textarea 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -65,7 +76,7 @@ export const GroupDialog: React.FC<GroupDialogProps> = ({
           </div>
 
           <div style={{ ...rowStyle, justifyContent: 'flex-start' }}>
-            <label style={labelStyle}>Active on start</label>
+            <label style={labelStyle}>{t.ACTIVE_ON_START}</label>
             <input 
               type="checkbox"
               checked={activeOnStart}
@@ -76,8 +87,8 @@ export const GroupDialog: React.FC<GroupDialogProps> = ({
         </form>
 
         <div style={footerStyle}>
-          <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
-          <button onClick={() => handleSubmit()} style={saveButtonStyle}>OK</button>
+          <button onClick={onCancel} style={cancelButtonStyle}>{t.CANCEL}</button>
+          <button onClick={() => handleSubmit()} style={saveButtonStyle}>{t.OK}</button>
         </div>
       </div>
     </div>
@@ -93,7 +104,8 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 9999
+  zIndex: 9999,
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {

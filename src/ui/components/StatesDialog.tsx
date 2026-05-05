@@ -1,6 +1,8 @@
 import React from 'react';
 import { State } from '../../model/project';
-import { Plus, Trash2, X, Activity, Edit2 } from 'lucide-react';
+import { Plus, Trash2, X, Activity } from 'lucide-react';
+import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface StatesDialogProps {
   states: State[];
@@ -23,7 +25,7 @@ const overlayStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 10000,
-  backdropFilter: 'blur(5px)'
+  backdropFilter: 'blur(4px)'
 };
 
 const dialogStyle: React.CSSProperties = {
@@ -55,6 +57,8 @@ const itemStyle: React.CSSProperties = {
 };
 
 export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialStateId, onAdd, onRemove, onUpdate, onSetInitial, onClose }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [newName, setNewName] = React.useState('');
 
   const handleAdd = () => {
@@ -70,7 +74,7 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Activity size={16} color="#3498db" />
-            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>State Machine</h2>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>{t.STATE_MACHINE}</h2>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}><X size={18} /></button>
         </div>
@@ -78,7 +82,7 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
         <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', gap: '8px' }}>
           <input 
             type="text" 
-            placeholder="New state name..." 
+            placeholder={t.NEW_STATE_NAME} 
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -89,7 +93,8 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
               borderRadius: '4px', 
               color: '#fff', 
               padding: '6px 10px',
-              fontSize: '12px'
+              fontSize: '12px',
+              outline: 'none'
             }}
           />
           <button 
@@ -101,14 +106,15 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
               borderRadius: '4px', 
               padding: '6px 12px',
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '12px',
+              fontWeight: 600
             }}
           >
-            Add
+            {t.ADD}
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: '200px' }}>
           {states.map(state => (
             <div key={state.id} style={itemStyle}>
               <div 
@@ -121,7 +127,7 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
                   backgroundColor: initialStateId === state.id ? '#3498db' : 'transparent',
                   cursor: 'pointer'
                 }} 
-                title={initialStateId === state.id ? "Initial State" : "Set as Initial State"}
+                title={initialStateId === state.id ? t.INITIAL_STATE : t.SET_AS_INITIAL_STATE}
               />
               <input 
                 type="text" 
@@ -147,8 +153,8 @@ export const StatesDialog: React.FC<StatesDialogProps> = ({ states, initialState
             </div>
           ))}
           {states.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#555', fontSize: '13px' }}>
-              No states defined. Add a state to start the state machine.
+            <div style={{ padding: '40px', textAlign: 'center', color: '#555', fontSize: '13px', fontStyle: 'italic' }}>
+              {t.NO_STATES_DEFINED}
             </div>
           )}
         </div>

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { Project, EventBlock } from '../../../model/project';
+import { getTranslation } from '../../../i18n';
 
 interface ContextMenuProps {
   project: Project;
@@ -23,7 +24,8 @@ interface ContextMenuProps {
 export const ContextMenu: React.FC<ContextMenuProps> = ({ 
   project, x, y, blockId, logicItemId, eventSheetId, onAddVariable, onAddGroup, onEditGroup, onClose, setBrowserState 
 }) => {
-  const { addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem } = useEditorStore();
+  const { editorState, addEventBlock, removeEventBlock, copySelected, cutSelected, pasteSelected, addCondition, updateEventBlock, toggleConditionInverted, toggleOrBlock, removeCondition, removeAction, pasteLogicItem } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
 
   const findBlock = (list: EventBlock[]): EventBlock | undefined => { for (const b of list) { if (b.id === blockId) return b; const f = findBlock(b.children); if (f) return f; } return undefined; };
@@ -44,58 +46,58 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               if (b.conditions.some(c => c.id === logicItemId)) useEditorStore.getState().toggleConditionDisabled(eventSheetId, blockId, logicItemId);
               else if (b.actions.some(a => a.id === logicItemId)) useEditorStore.getState().toggleActionDisabled(eventSheetId, blockId, logicItemId);
             }
-          } onClose(); }}><EyeOff size={14} /> Toggle disabled (D)</div>
+          } onClose(); }}><EyeOff size={14} /> {t.TOGGLE_DISABLED}</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> Copy Item</div>
-          <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> Cut Item</div>
+          <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> {t.COPY_ITEM}</div>
+          <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> {t.CUT_ITEM}</div>
           <div style={contextDividerStyle} />
           {blockId && logicItemId && (
-            <div style={contextItemStyle} onClick={() => { toggleConditionInverted(eventSheetId, blockId, logicItemId); onClose(); }}><Eye size={14} /> Invert (I)</div>
+            <div style={contextItemStyle} onClick={() => { toggleConditionInverted(eventSheetId, blockId, logicItemId); onClose(); }}><Eye size={14} /> {t.INVERT}</div>
           )}
           <div style={contextDividerStyle} />
-          <div onClick={() => { if (blockId && logicItemId) { removeCondition(eventSheetId, blockId, logicItemId); removeAction(eventSheetId, blockId, logicItemId); } onClose(); }} style={{ ...contextItemStyle, color: '#f44336' }}><Trash2 size={14} /> Delete Item</div>
+          <div onClick={() => { if (blockId && logicItemId) { removeCondition(eventSheetId, blockId, logicItemId); removeAction(eventSheetId, blockId, logicItemId); } onClose(); }} style={{ ...contextItemStyle, color: '#f44336' }}><Trash2 size={14} /> {t.DELETE_ITEM}</div>
         </>
       ) : blockId ? (
         <>
-          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> Add sub-event (S)</div>
-          <div style={contextItemStyle} onClick={() => { onAddVariable(blockId); onClose(); }}><Variable size={14} /> Add local variable (V)</div>
-          <div style={contextItemStyle} onClick={() => { onAddGroup(blockId); onClose(); }}><Folder size={14} /> Add sub-group (G)</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, blockId, 'event'); onClose(); }}><Plus size={14} /> {t.ADD_SUB_EVENT}</div>
+          <div style={contextItemStyle} onClick={() => { onAddVariable(blockId); onClose(); }}><Variable size={14} /> {t.ADD_LOCAL_VARIABLE}</div>
+          <div style={contextItemStyle} onClick={() => { onAddGroup(blockId); onClose(); }}><Folder size={14} /> {t.ADD_SUB_GROUP}</div>
           {currentBlock?.type === 'group' && (
-            <div style={contextItemStyle} onClick={() => { onEditGroup(eventSheetId, blockId, currentBlock); onClose(); }}><Folder size={14} /> Edit group properties</div>
+            <div style={contextItemStyle} onClick={() => { onEditGroup(eventSheetId, blockId, currentBlock); onClose(); }}><Folder size={14} /> {t.EDIT_GROUP_PROPERTIES}</div>
           )}
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'condition', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add condition (C)</div>
-          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'action', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> Add action (A)</div>
+          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'condition', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> {t.ADD_CONDITION} (C)</div>
+          <div style={contextItemStyle} onClick={() => { setBrowserState({ isOpen: true, mode: 'action', eventSheetId, blockId }); onClose(); }}><Plus size={14} /> {t.ADD_ACTION} (A)</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { updateEventBlock(eventSheetId, blockId, { disabled: !currentBlock?.disabled }); onClose(); }}><EyeOff size={14} /> {currentBlock?.disabled ? 'Enable' : 'Disable (D)'}</div>
-          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); addCondition(eventSheetId, 'LAST', 'else', []); onClose(); }}><GitBranch size={14} /> Add Else (X)</div>
+          <div style={contextItemStyle} onClick={() => { updateEventBlock(eventSheetId, blockId, { disabled: !currentBlock?.disabled }); onClose(); }}><EyeOff size={14} /> {currentBlock?.disabled ? t.ENABLE : t.DISABLE}</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); addCondition(eventSheetId, 'LAST', 'else', []); onClose(); }}><GitBranch size={14} /> {t.ADD_ELSE}</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { toggleOrBlock(eventSheetId, blockId); onClose(); }}> {currentBlock?.isOrBlock ? 'Make AND block' : 'Make OR block (Y)'}</div>
+          <div style={contextItemStyle} onClick={() => { toggleOrBlock(eventSheetId, blockId); onClose(); }}> {currentBlock?.isOrBlock ? t.MAKE_AND_BLOCK : t.MAKE_OR_BLOCK}</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, undefined, blockId); onClose(); }}>Add Above</div>
-          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, blockId, undefined); onClose(); }}>Add Below</div>
+          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, undefined, blockId); onClose(); }}>{t.ADD_ABOVE}</div>
+          <div style={contextItemStyle} onClick={() => { useEditorStore.getState().moveEventBlock(eventSheetId, blockId, null, 0, blockId, undefined); onClose(); }}>{t.ADD_BELOW}</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> Copy Block (Ctrl+C)</div>
-          <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> Cut Block (Ctrl+X)</div>
-          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, blockId); pasteLogicItem(eventSheetId, blockId, 0); onClose(); }}><Clipboard size={14} /> Paste (Ctrl+V)</div>
+          <div style={contextItemStyle} onClick={() => { copySelected(); onClose(); }}><Copy size={14} /> {t.COPY_BLOCK}</div>
+          <div style={contextItemStyle} onClick={() => { cutSelected(); onClose(); }}><Scissors size={14} /> {t.CUT_BLOCK}</div>
+          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, blockId); pasteLogicItem(eventSheetId, blockId, 0); onClose(); }}><Clipboard size={14} /> {t.PASTE}</div>
           <div style={contextDividerStyle} />
-          <div style={{ padding: '6px 12px', fontSize: '11px', color: '#666', fontWeight: 'bold' }}>SET COLOR</div>
+          <div style={{ padding: '6px 12px', fontSize: '11px', color: '#666', fontWeight: 'bold' }}>{t.SET_COLOR}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', padding: '4px 12px' }}>
             {colors.map(c => <div key={c} onClick={() => { updateEventBlock(eventSheetId, blockId, { color: c }); onClose(); }} style={{ width: '20px', height: '20px', backgroundColor: c, borderRadius: '2px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} />)}
           </div>
           <div style={contextDividerStyle} />
-          <div onClick={() => { removeEventBlock(eventSheetId, blockId); onClose(); }} style={{ ...contextItemStyle, color: '#f44336' }}><Trash2 size={14} /> Delete Block</div>
+          <div onClick={() => { removeEventBlock(eventSheetId, blockId); onClose(); }} style={{ ...contextItemStyle, color: '#f44336' }}><Trash2 size={14} /> {t.DELETE_BLOCK}</div>
         </>
       ) : (
         <>
-          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); onClose(); }}><Plus size={14} /> Add Event (E)</div>
-          <div style={contextItemStyle} onClick={() => { onAddVariable(null); onClose(); }}><Variable size={14} /> Add Variable (V)</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'event'); onClose(); }}><Plus size={14} /> {t.ADD_EVENT} (E)</div>
+          <div style={contextItemStyle} onClick={() => { onAddVariable(null); onClose(); }}><Variable size={14} /> {t.ADD_VARIABLE} (V)</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'function'); onClose(); }}><Zap size={14} /> Add Function (F)</div>
-          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'include'); onClose(); }}><FilePlus size={14} /> Add Include</div>
-          <div style={contextItemStyle} onClick={() => { onAddGroup(null); onClose(); }}><Folder size={14} /> Add Group (G)</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'function'); onClose(); }}><Zap size={14} /> {t.ADD_FUNCTION} (F)</div>
+          <div style={contextItemStyle} onClick={() => { addEventBlock(eventSheetId, null, 'include'); onClose(); }}><FilePlus size={14} /> {t.ADD_INCLUDE}</div>
+          <div style={contextItemStyle} onClick={() => { onAddGroup(null); onClose(); }}><Folder size={14} /> {t.ADD_GROUP} (G)</div>
           <div style={contextDividerStyle} />
-          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, null); onClose(); }}><Clipboard size={14} /> Paste (Ctrl+V)</div>
+          <div style={contextItemStyle} onClick={() => { pasteSelected(eventSheetId, null); onClose(); }}><Clipboard size={14} /> {t.PASTE}</div>
         </>
       )}
     </div>

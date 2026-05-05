@@ -11,17 +11,16 @@ import { ParamEditor } from './event-sheet/ParamEditor';
 import { FunctionEditor } from './event-sheet/FunctionEditor';
 import { ContextMenu } from './event-sheet/ContextMenu';
 import { GroupDialog } from './event-sheet/GroupDialog';
+import { getTranslation } from '../../i18n';
 
 export const EventSheetEditor: React.FC = () => {
   const { 
-    project, editorState, 
-    addEventBlock, updateEventBlock, removeEventBlock,
-    addCondition, updateCondition, removeCondition,
-    addAction, updateAction, removeAction,
-    setSelectedEventBlocks, setSelectedLogicItems,
-    setActiveLayout,
-    undo, redo, copySelected, cutSelected, pasteSelected, toggleOrBlock, pasteLogicItem
+    project, editorState, updateEventBlock, addEventBlock, removeEventBlock,
+    addCondition, removeCondition, addAction, removeAction,
+    undo, redo, copySelected, cutSelected, pasteSelected, toggleOrBlock, pasteLogicItem,
+    updateCondition, updateAction, setActiveLayout, setSelectedEventBlocks, setSelectedLogicItems
   } = useEditorStore();
+  const t = getTranslation(editorState.language);
   
   const [searchTerm, setSearchTerm] = React.useState('');
   const [replaceTerm, setReplaceTerm] = React.useState('');
@@ -286,9 +285,9 @@ export const EventSheetEditor: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorState, eventSheet, setSelectedEventBlocks, updateEventBlock, addEventBlock, removeEventBlock, addCondition, removeCondition, removeAction, copySelected, cutSelected, pasteSelected, pasteLogicItem, editorState.previewMode, toggleOrBlock]);
+  }, [editorState, eventSheet, setSelectedEventBlocks, updateEventBlock, addEventBlock, removeEventBlock, addCondition, removeCondition, removeAction, copySelected, cutSelected, pasteSelected, pasteLogicItem, editorState.previewMode, toggleOrBlock, t]);
 
-  if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>No event sheet found.</div>;
+  if (!eventSheet) return <div style={{ color: '#666', padding: '20px' }}>{t.NO_EVENT_SHEET_FOUND}</div>;
 
   const blockIndices = new Map<string, number>();
   let globalIndex = 1;
@@ -369,37 +368,37 @@ export const EventSheetEditor: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#252526', borderBottom: '1px solid #111', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', gap: '2px', marginRight: '10px', borderRight: '1px solid #444', paddingRight: '10px' }}>
-            <button onClick={(e) => { e.stopPropagation(); undo(); }} style={iconButtonStyle} title="Undo (Ctrl+Z)"><Undo size={14} /></button>
-            <button onClick={(e) => { e.stopPropagation(); redo(); }} style={iconButtonStyle} title="Redo (Ctrl+Y)"><Redo size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); undo(); }} style={iconButtonStyle} title={t.UNDO_TOOLTIP}><Undo size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); redo(); }} style={iconButtonStyle} title={t.REDO_TOOLTIP}><Redo size={14} /></button>
           </div>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Search size={14} style={{ position: 'absolute', left: '8px', color: '#666' }} />
-            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClick={(e) => e.stopPropagation()} placeholder="Search logic..." style={{ backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '150px', outline: 'none' }} />
-            <button onClick={() => setShowReplace(!showReplace)} style={{ ...iconButtonStyle, backgroundColor: showReplace ? '#007acc' : 'transparent' }} title="Replace Mode"><Replace size={14} /></button>
+            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClick={(e) => e.stopPropagation()} placeholder={t.SEARCH_LOGIC} style={{ backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '150px', outline: 'none' }} />
+            <button onClick={() => setShowReplace(!showReplace)} style={{ ...iconButtonStyle, backgroundColor: showReplace ? '#007acc' : 'transparent' }} title={t.REPLACE}><Replace size={14} /></button>
           </div>
           <div style={{ display: 'flex', gap: '2px', marginLeft: '10px' }}>
-            <button onClick={(e) => { e.stopPropagation(); expandAll(true); }} style={iconButtonStyle} title="Expand All"><Maximize2 size={14} /></button>
-            <button onClick={(e) => { e.stopPropagation(); expandAll(false); }} style={iconButtonStyle} title="Collapse All"><Minimize2 size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); expandAll(true); }} style={iconButtonStyle} title={t.EXPAND_ALL_TOOLTIP}><Maximize2 size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); expandAll(false); }} style={iconButtonStyle} title={t.COLLAPSE_ALL_TOOLTIP}><Minimize2 size={14} /></button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'event'); }} style={toolbarButtonStyle} title="Add Event (A)"><Plus size={14} /> Event</button>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'function'); }} style={toolbarButtonStyle} title="Add Function (F)"><Zap size={14} /> Function</button>
-          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'include'); }} style={toolbarButtonStyle} title="Include Sheet"><FilePlus size={14} /> Include</button>
-          <button onClick={(e) => { e.stopPropagation(); onAddGroup(); }} style={toolbarButtonStyle}><List size={14} /> Add Group (G)</button>
-          <button onClick={(e) => { e.stopPropagation(); onAddVariable(); }} style={toolbarButtonStyle} title="Add Variable (V)"> Var</button>
+          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'event'); }} style={toolbarButtonStyle} title={t.ADD_EVENT}><Plus size={14} /> {t.EVENT}</button>
+          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'function'); }} style={toolbarButtonStyle} title={t.ADD_FUNCTION}><Zap size={14} /> {t.FUNCTION}</button>
+          <button onClick={(e) => { e.stopPropagation(); addEventBlock(eventSheet.id, null, 'include'); }} style={toolbarButtonStyle} title={t.ADD_INCLUDE}><FilePlus size={14} /> {t.INCLUDE}</button>
+          <button onClick={(e) => { e.stopPropagation(); onAddGroup(); }} style={toolbarButtonStyle}><List size={14} /> {t.ADD_GROUP}</button>
+          <button onClick={(e) => { e.stopPropagation(); onAddVariable(); }} style={toolbarButtonStyle} title={t.ADD_VARIABLE}> {t.VAR}</button>
         </div>
       </div>
       
       {showReplace && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px', backgroundColor: '#2d2d2d', borderBottom: '1px solid #111' }}>
-          <div style={{ fontSize: '11px', color: '#888', fontWeight: 700, textTransform: 'uppercase', width: '60px' }}>Replace</div>
+          <div style={{ fontSize: '11px', color: '#888', fontWeight: 700, textTransform: 'uppercase', width: '60px' }}>{t.REPLACE}</div>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, maxWidth: '300px' }}>
             <Replace size={14} style={{ position: 'absolute', left: '8px', color: '#666' }} />
             <input 
               value={replaceTerm} 
               onChange={(e) => setReplaceTerm(e.target.value)} 
-              placeholder="Replace with..." 
+              placeholder={`${t.REPLACE_WITH}...`} 
               style={{ backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', padding: '4px 10px 4px 28px', fontSize: '12px', color: '#fff', width: '100%', outline: 'none' }} 
             />
           </div>
@@ -407,13 +406,13 @@ export const EventSheetEditor: React.FC = () => {
             onClick={handleReplaceAll}
             style={{ ...toolbarButtonStyle, backgroundColor: '#007acc', color: '#fff', border: 'none' }}
           >
-            Replace All
+            {t.REPLACE_ALL}
           </button>
           <button 
             onClick={() => setShowReplace(false)}
             style={{ ...iconButtonStyle }}
           >
-            Cancel
+            {t.CANCEL}
           </button>
         </div>
       )}
@@ -421,14 +420,14 @@ export const EventSheetEditor: React.FC = () => {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ width: '220px', backgroundColor: '#2d2d2d', borderRight: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '12px 15px', fontSize: '10px', fontWeight: 800, color: '#888', borderBottom: '1px solid #1a1a1a', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Box size={12} /> PROJECT OBJECTS
+            <Box size={12} /> {t.PROJECT_OBJECTS}
           </div>
           
           <div style={{ padding: '6px', borderBottom: '1px solid #1a1a1a', backgroundColor: '#252526' }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Search size={12} style={{ position: 'absolute', left: '8px', color: '#555' }} />
               <input 
-                placeholder="Filter objects..." 
+                placeholder={t.FILTER_OBJECTS}
                 style={{ 
                   width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #333', borderRadius: '4px', 
                   padding: '3px 8px 3px 24px', fontSize: '11px', color: '#ccc', outline: 'none' 
@@ -438,13 +437,13 @@ export const EventSheetEditor: React.FC = () => {
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
-            <div style={{ padding: '8px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase' }}>System</div>
+            <div style={{ padding: '8px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase' }}>{t.SYSTEM}</div>
             <div style={objectItemStyle} onClick={() => setBrowserState({ isOpen: true, mode: 'condition', eventSheetId: activeEventSheetId!, blockId: 'NEW', targetObjectTypeId: undefined })}>
               <Monitor size={14} color="#3498db" /> 
-              <span style={{ fontWeight: 500 }}>System</span>
+              <span style={{ fontWeight: 500 }}>{t.SYSTEM}</span>
             </div>
 
-            <div style={{ padding: '8px 12px 4px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase', marginTop: '8px' }}>Object Types</div>
+            <div style={{ padding: '8px 12px 4px 12px', fontSize: '10px', color: '#444', fontWeight: 700, textTransform: 'uppercase', marginTop: '8px' }}>{t.OBJECT_TYPES}</div>
             {project.objectTypes.map(ot => (
               <div 
                 key={ot.id} 
@@ -466,7 +465,7 @@ export const EventSheetEditor: React.FC = () => {
           {bookmarks.length > 0 && (
             <div style={{ borderTop: '1px solid #111', backgroundColor: '#1e1e1e' }}>
               <div style={{ padding: '8px 15px', fontSize: '10px', color: '#444', fontWeight: 800, textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
-                Bookmarks <Box size={10} />
+                {t.BOOKMARKS} <Box size={10} />
               </div>
               <div style={{ padding: '4px', maxHeight: '150px', overflowY: 'auto' }}>
                 {bookmarks.map((b: any) => (
@@ -624,7 +623,7 @@ export const EventSheetEditor: React.FC = () => {
       )}
       {variableEditorState?.isOpen && (
         <VariableDialog 
-          title={variableEditorState.variable.name ? "Edit Variable" : "New Global Variable"}
+          title={variableEditorState.variable.name ? t.EDIT_VARIABLE : t.NEW_GLOBAL_VARIABLE}
           variable={variableEditorState.variable}
           existingNames={getAllVariableNames(project)}
           showStaticConstant={true}

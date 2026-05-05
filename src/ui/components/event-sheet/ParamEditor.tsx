@@ -5,6 +5,8 @@ import { LogicDefinition } from '../../../model/definitions';
 
 import { ExpressionParser } from '../../../model/expressionParser';
 import { ExpressionBuilder } from './ExpressionBuilder';
+import { getTranslation } from '../../../i18n';
+import { useEditorStore } from '../../../store/useEditorStore';
 
 interface ParamEditorProps {
   project: Project;
@@ -76,6 +78,8 @@ function getInScopeVariables(project: Project, eventSheetId: string, blockId: st
 }
 
 export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSheetId, blockId, def, initialParams, targetObjectTypeId, onSave, onBack, onCancel }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [params, setParams] = React.useState([...initialParams]);
 
   React.useEffect(() => {
@@ -130,31 +134,31 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
     ...project.objectTypes.flatMap((ot: any) => ot.instanceVariables.map((v: any) => ({ name: `${ot.name}.${v.name}`, type: 'instance-variable', category: 'Instance Variables', icon: <Terminal size={12} color="#e67e22" /> }))), 
     ...project.families.map((f: any) => ({ name: f.name, type: 'family', category: 'Families', icon: <Users size={12} color="#f1c40f" /> })),
     ...project.families.flatMap((f: any) => f.instanceVariables.map((v: any) => ({ name: `${f.name}.${v.name}`, type: 'instance-variable', category: 'Family Variables', icon: <Terminal size={12} color="#f1c40f" /> }))),
-    ...project.layouts.map((l: any) => ({ name: `LayoutName("${l.name}")`, type: 'layout', category: 'Layouts', icon: <Layout size={12} color="#3498db" /> })),
-    { name: 'dt', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> }, 
-    { name: 'fps', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> },
-    { name: 'time', type: 'system', category: 'System', icon: <Settings size={12} color="#95a5a6" /> },
-    { name: 'random(max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'random(min, max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'abs(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'floor(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'ceil(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'round(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'sqrt(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'pow(x, y)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'sin(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'cos(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'tan(x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'min(a, b)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'max(a, b)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'clamp(x, min, max)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'lerp(a, b, t)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'unlerp(a, b, x)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'distance(x1, y1, x2, y2)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'angle(x1, y1, x2, y2)', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'pi', type: 'math', category: 'Math', icon: <Code size={12} color="#9b59b6" /> },
-    { name: 'Function.ReturnValue', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
-    { name: 'Function.Param(0)', type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> },
+    ...project.layouts.map((l: any) => ({ name: `LayoutName("${l.name}")`, type: 'layout', category: t.LAYOUTS, icon: <Layout size={12} color="#3498db" /> })),
+    { name: 'dt', type: 'system', category: t.SYSTEM, icon: <Settings size={12} color="#95a5a6" /> }, 
+    { name: 'fps', type: 'system', category: t.SYSTEM, icon: <Settings size={12} color="#95a5a6" /> },
+    { name: 'time', type: 'system', category: t.SYSTEM, icon: <Settings size={12} color="#95a5a6" /> },
+    { name: 'random(max)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'random(min, max)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'abs(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'floor(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'ceil(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'round(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'sqrt(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'pow(x, y)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'sin(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'cos(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'tan(x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'min(a, b)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'max(a, b)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'clamp(x, min, max)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'lerp(a, b, t)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'unlerp(a, b, x)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'distance(x1, y1, x2, y2)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'angle(x1, y1, x2, y2)', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'pi', type: 'math', category: t.CAT_MATH, icon: <Code size={12} color="#9b59b6" /> },
+    { name: 'Function.ReturnValue', type: 'function', category: t.CAT_FUNCTIONS, icon: <Zap size={12} color="#9b59b6" /> },
+    { name: 'Function.Param(0)', type: 'function', category: t.CAT_FUNCTIONS, icon: <Zap size={12} color="#9b59b6" /> },
     ...(() => {
       const names: string[] = [];
       project.eventSheets.forEach(es => {
@@ -166,7 +170,7 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
         };
         find(es.events);
       });
-      return names.map(n => ({ name: `Function.Call("${n}")`, type: 'function', category: 'Functions', icon: <Zap size={12} color="#9b59b6" /> }));
+      return names.map(n => ({ name: `Function.Call("${n}")`, type: 'function', category: t.CAT_FUNCTIONS, icon: <Zap size={12} color="#9b59b6" /> }));
     })()
   ].filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) || i.category.toLowerCase().includes(filter.toLowerCase()));
 
@@ -294,7 +298,7 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
   const handleOverlayMouseDown = (e: React.MouseEvent) => { if (e.target === e.currentTarget) setMouseDownOnOverlay(true); else setMouseDownOnOverlay(false); };
   const handleOverlayMouseUp = (e: React.MouseEvent) => { if (e.target === e.currentTarget && mouseDownOnOverlay) onCancel(); setMouseDownOnOverlay(false); };
 
-  const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 };
+  const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, backdropFilter: 'blur(4px)' };
   const modalStyle: React.CSSProperties = { backgroundColor: '#2d2d2d', borderRadius: '8px', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', border: '1px solid #444', color: '#d4d4d4', overflow: 'hidden' };
   const modalHeaderStyle: React.CSSProperties = { padding: '12px 16px', borderBottom: '1px solid #444' };
   const modalFooterStyle: React.CSSProperties = { padding: '12px 16px', borderTop: '1px solid #444', display: 'flex', justifyContent: 'flex-end', gap: '10px' };
@@ -313,8 +317,10 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
             </button>
             <div style={{ width: '32px', height: '32px', backgroundColor: '#007acc', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={18} color="#fff" /></div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Parameters: {def.name}</h3>
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{def.description}</div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{t.PARAMETERS}: {def.nameKey ? (t as any)[def.nameKey] : def.name}</h3>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                {def.descriptionKey ? (t as any)[def.descriptionKey] : (def.description || def.name)}
+              </div>
             </div>
           </div>
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto' }}>
@@ -330,7 +336,7 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
                   </select>
                 ) : pDef.type === 'functionName' ? (
                   <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}>
-                    <option value="">Select a function...</option>
+                    <option value="">{t.SELECT_FUNCTION}</option>
                     {project.eventSheets.flatMap(es => {
                       const findFuncs = (blocks: EventBlock[]): string[] => {
                         let names: string[] = [];
@@ -345,19 +351,19 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
                   </select>
                 ) : pDef.type === 'objectType' ? (
                   <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}>
-                    <optgroup label="Object Types">
+                    <optgroup label={t.OBJECT_TYPES}>
                       {project.objectTypes.map(ot => <option key={ot.id} value={ot.id}>{ot.name}</option>)}
                     </optgroup>
                     {project.families && project.families.length > 0 && (
-                      <optgroup label="Families">
+                      <optgroup label={t.FAMILIES}>
                         {project.families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                       </optgroup>
                     )}
                   </select>
-                ) : (pDef.type as any) === 'boolean' ? (
+                ) : pDef.type === 'boolean' ? (
                   <select value={params[i] === true || params[i] === 'true' ? 'true' : 'false'} onFocus={() => setActiveParamIndex(i)} onChange={(e) => { const n = [...params]; n[i] = e.target.value === 'true'; setParams(n); }} style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}>
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
+                    <option value="true">{t.YES}</option>
+                    <option value="false">{t.NO}</option>
                   </select>
                 ) : (pDef.type as any) === 'color' ? (
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -373,7 +379,7 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
                   </select>
                 ) : pDef.type === 'asset' ? (
                   <select value={params[i]} onFocus={() => setActiveParamIndex(i)} onChange={(e) => { const n = [...params]; n[i] = e.target.value; setParams(n); }} style={{ ...paramInputStyle, border: activeParamIndex === i ? '1px solid #007acc' : '1px solid #333' }}>
-                    <option value="">Select an asset...</option>
+                    <option value="">{t.SELECT_ASSET}</option>
                     {project.assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.type})</option>)}
                   </select>
                 ) : (pDef.type as any) === 'number' || (pDef.type as any) === 'string' ? (
@@ -424,10 +430,10 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({ project, mode, eventSh
             ))}
           </div>
           <div style={{ ...modalFooterStyle, backgroundColor: '#252526', borderTop: '1px solid #333', padding: '16px 24px' }}>
-            <div style={{ fontSize: '11px', color: '#666' }}>Tip: Ctrl+Enter to Save, Esc to Cancel</div>
+            <div style={{ fontSize: '11px', color: '#666' }}>{t.TIP_CTRL_ENTER}</div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => onSave(params)} style={{ ...saveButtonStyle, padding: '8px 24px' }}>Done</button>
-              <button onClick={onCancel} style={{ ...cancelButtonStyle, padding: '8px 24px' }}>Cancel</button>
+              <button onClick={() => onSave(params)} style={{ ...saveButtonStyle, padding: '8px 24px' }}>{t.DONE}</button>
+              <button onClick={onCancel} style={{ ...cancelButtonStyle, padding: '8px 24px' }}>{t.CANCEL}</button>
             </div>
           </div>
         </div>

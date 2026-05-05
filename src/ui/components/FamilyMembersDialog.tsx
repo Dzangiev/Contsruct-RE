@@ -2,6 +2,7 @@ import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { X, Check, Search, Package } from 'lucide-react';
 import { Family } from '../../model/project';
+import { getTranslation } from '../../i18n';
 
 interface FamilyMembersDialogProps {
   family: Family;
@@ -9,7 +10,8 @@ interface FamilyMembersDialogProps {
 }
 
 export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family, onClose }) => {
-  const { project, addFamilyObjectType, removeFamilyObjectType } = useEditorStore();
+  const { project, addFamilyObjectType, removeFamilyObjectType, editorState } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const members = project.objectTypes.filter(ot => family.objectTypeIds.includes(ot.id));
@@ -23,13 +25,13 @@ export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family
     <div style={overlayStyle}>
       <div style={dialogStyle}>
         <div style={headerStyle}>
-          <span style={{ fontWeight: 'bold' }}>Manage Family: {family.name}</span>
+          <span style={{ fontWeight: 'bold' }}>{t.MANAGE_FAMILY}: {family.name}</span>
           <button onClick={onClose} style={closeButtonStyle}><X size={18} /></button>
         </div>
 
         <div style={contentStyle}>
           <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>Family Members</div>
+            <div style={sectionHeaderStyle}>{t.FAMILY_MEMBERS}</div>
             <div style={listStyle}>
               {members.map(ot => (
                 <div key={ot.id} style={itemStyle}>
@@ -41,23 +43,23 @@ export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family
                     onClick={() => removeFamilyObjectType(family.id, ot.id)}
                     style={removeButtonStyle}
                   >
-                    Remove
+                    {t.REMOVE}
                   </button>
                 </div>
               ))}
-              {members.length === 0 && <div style={emptyStyle}>No members in this family.</div>}
+              {members.length === 0 && <div style={emptyStyle}>{t.NO_MEMBERS_IN_FAMILY}</div>}
             </div>
           </div>
 
           <div style={dividerStyle} />
 
           <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>Available Object Types</div>
+            <div style={sectionHeaderStyle}>{t.AVAILABLE_OBJECT_TYPES}</div>
             <div style={searchContainerStyle}>
               <Search size={14} color="#666" />
               <input 
                 type="text" 
-                placeholder="Search..." 
+                placeholder={`${t.SEARCH_LOGIC}...`} 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 style={searchInputStyle}
@@ -74,7 +76,7 @@ export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family
                     onClick={() => addFamilyObjectType(family.id, ot.id)}
                     style={addButtonStyle}
                   >
-                    Add
+                    {t.ADD}
                   </button>
                 </div>
               ))}
@@ -83,7 +85,7 @@ export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family
         </div>
 
         <div style={footerStyle}>
-          <button onClick={onClose} style={doneButtonStyle}>Done</button>
+          <button onClick={onClose} style={doneButtonStyle}>{t.DONE}</button>
         </div>
       </div>
     </div>
@@ -93,12 +95,12 @@ export const FamilyMembersDialog: React.FC<FamilyMembersDialogProps> = ({ family
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
+  backgroundColor: 'rgba(0,0,0,0.8)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 2000,
-  backdropFilter: 'blur(2px)'
+  backdropFilter: 'blur(4px)'
 };
 
 const dialogStyle: React.CSSProperties = {

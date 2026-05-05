@@ -8,6 +8,7 @@ import { PLUGIN_DEFINITIONS } from '../model/definitions';
 import { getEffectsFilter } from '../utils/renderUtils';
 import { BEHAVIORS } from './behaviors';
 import { BehaviorContext } from './behaviors/types';
+import { getTranslation } from '../i18n';
 
 interface RuntimeProps {
   project: Project;
@@ -102,6 +103,7 @@ function findPath(start: Point, end: Point, grid: boolean[][], cellSize: number)
 }
 export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) => {
   const { editorState } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const layout = project.layouts.find(l => l.id === layoutId) || project.layouts[0];
   const eventSheet = project.eventSheets.find(es => es.id === layout?.eventSheetId) || project.eventSheets[0];
 
@@ -1753,7 +1755,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 width: '8px', height: '8px', borderRadius: '50%', 
                 backgroundColor: isPaused ? '#f1c40f' : '#4caf50'
               }} />
-              <span style={{ fontSize: '13px', color: '#eee', fontWeight: 'bold' }}>{layout?.name || 'Preview'}</span>
+              <span style={{ fontSize: '13px', color: '#eee', fontWeight: 'bold' }}>{layout?.name || t.PREVIEW}</span>
             </div>
 
             {showStats && (
@@ -1773,23 +1775,23 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
               </div>
             )}
             
-            <ToolbarButton onClick={() => setIsPaused(!isPaused)} active={isPaused} title={isPaused ? "Resume" : "Pause"}>
+            <ToolbarButton onClick={() => setIsPaused(!isPaused)} active={isPaused} title={isPaused ? t.RESUME : t.PAUSE}>
               {isPaused ? <Play size={16} /> : <Pause size={16} />}
             </ToolbarButton>
-            <ToolbarButton onClick={restartGame} title="Restart"><RotateCcw size={16} /></ToolbarButton>
+            <ToolbarButton onClick={restartGame} title={t.RESTART}><RotateCcw size={16} /></ToolbarButton>
             <div style={{ width: '1px', height: '20px', backgroundColor: '#333' }} />
-            <ToolbarButton onClick={() => setShowStats(!showStats)} active={showStats} title="Performance Stats"><BarChart2 size={16} /></ToolbarButton>
-            <ToolbarButton onClick={() => setShowGrid(!showGrid)} active={showGrid} title="Toggle Grid"><Grid size={16} /></ToolbarButton>
-            <ToolbarButton onClick={() => setShowLogs(!showLogs)} active={showLogs} title="Console Logs"><Terminal size={16} /></ToolbarButton>
-            <ToolbarButton onClick={() => setDebugDraw(!debugDraw)} active={debugDraw} title="Debug Draw (Hitboxes)"><Bug size={16} /></ToolbarButton>
-            <ToolbarButton onClick={() => setShowSettings(!showSettings)} active={showSettings} title="Settings"><Settings size={16} /></ToolbarButton>
+            <ToolbarButton onClick={() => setShowStats(!showStats)} active={showStats} title={t.PERFORMANCE_STATS}><BarChart2 size={16} /></ToolbarButton>
+            <ToolbarButton onClick={() => setShowGrid(!showGrid)} active={showGrid} title={t.TOGGLE_GRID}><Grid size={16} /></ToolbarButton>
+            <ToolbarButton onClick={() => setShowLogs(!showLogs)} active={showLogs} title={t.CONSOLE_LOGS}><Terminal size={16} /></ToolbarButton>
+            <ToolbarButton onClick={() => setDebugDraw(!debugDraw)} active={debugDraw} title={t.DEBUG_DRAW}><Bug size={16} /></ToolbarButton>
+            <ToolbarButton onClick={() => setShowSettings(!showSettings)} active={showSettings} title={t.RUNTIME_SETTINGS}><Settings size={16} /></ToolbarButton>
           </div>
   
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginRight: '8px' }}>{vw} × {vh}</div>
-            <ToolbarButton onClick={toggleFullscreen} title="Fullscreen"><Maximize2 size={16} /></ToolbarButton>
+            <ToolbarButton onClick={toggleFullscreen} title={t.FULLSCREEN}><Maximize2 size={16} /></ToolbarButton>
             <button onClick={onStop} style={{ backgroundColor: '#e81123', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 'bold' }}>
-              <X size={14} /> Close
+              <X size={14} /> {t.CLOSE_PREVIEW}
             </button>
           </div>
         </div>
@@ -2035,8 +2037,8 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             zIndex: 100
           }}>
             <div style={{ padding: '8px 12px', backgroundColor: '#1a1a1a', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#888' }}>Console</span>
-              <button onClick={() => setLogs([])} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '10px' }}>Clear</button>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#888' }}>{t.CONSOLE}</span>
+              <button onClick={() => setLogs([])} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '10px' }}>{t.CLEAR}</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px', fontSize: '11px', fontFamily: 'JetBrains Mono, monospace' }}>
               {logs.map((log, i) => (
@@ -2045,7 +2047,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                   {log.msg}
                 </div>
               ))}
-              {logs.length === 0 && <div style={{ color: '#444', textAlign: 'center', marginTop: '40px' }}>No logs yet.</div>}
+              {logs.length === 0 && <div style={{ color: '#444', textAlign: 'center', marginTop: '40px' }}>{t.NO_LOGS}</div>}
             </div>
           </div>
         )}
@@ -2060,22 +2062,22 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
             animation: 'fadeIn 0.2s ease-out'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Runtime Settings</span>
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{t.RUNTIME_SETTINGS}</span>
               <X size={14} style={{ cursor: 'pointer' }} onClick={() => setShowSettings(false)} />
             </div>
 
             <div>
-              <Label>Scaling Mode</Label>
+              <Label>{t.SCALING_MODE}</Label>
               <Select value={scalingMode} onChange={(e) => setScalingMode(e.target.value as ScalingMode)}>
-                <option value="letterbox">Letterbox (Fit)</option>
-                <option value="stretch">Stretch to Fill</option>
-                <option value="integer">Integer Scale</option>
+                <option value="letterbox">{t.LETTERBOX}</option>
+                <option value="stretch">{t.STRETCH}</option>
+                <option value="integer">{t.INTEGER_SCALE}</option>
               </Select>
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <Label>Game Speed (Time Scale)</Label>
+                <Label>{t.GAME_SPEED}</Label>
                 <span style={{ fontSize: '11px', color: '#0af' }}>{timeScale.toFixed(2)}x</span>
               </div>
               <input 
@@ -2084,15 +2086,15 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 style={{ width: '100%', accentColor: '#0af', cursor: 'pointer' }}
               />
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                <button onClick={() => setTimeScale(1.0)} style={smallButtonStyle}>Reset (1.0x)</button>
-                <button onClick={() => setTimeScale(0.5)} style={smallButtonStyle}>Slow (0.5x)</button>
-                <button onClick={() => setTimeScale(0)} style={smallButtonStyle}>Freeze</button>
+                <button onClick={() => setTimeScale(1.0)} style={smallButtonStyle}>{t.RESET_SPEED}</button>
+                <button onClick={() => setTimeScale(0.5)} style={smallButtonStyle}>{t.SLOW_SPEED}</button>
+                <button onClick={() => setTimeScale(0)} style={smallButtonStyle}>{t.FREEZE_SPEED}</button>
               </div>
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <Label>Preview Zoom</Label>
+                <Label>{t.PREVIEW_ZOOM}</Label>
                 <span style={{ fontSize: '11px', color: '#0af' }}>{(previewZoom * 100).toFixed(0)}%</span>
               </div>
               <input 
@@ -2113,7 +2115,7 @@ export const Runtime: React.FC<RuntimeProps> = ({ project, layoutId, onStop }) =
                 onChange={(e) => setClipToViewport(e.target.checked)}
                 style={{ cursor: 'pointer' }}
               />
-              <label htmlFor="clip-toggle" style={{ fontSize: '12px', cursor: 'pointer', color: '#ccc' }}>Clip to Viewport</label>
+              <label htmlFor="clip-toggle" style={{ fontSize: '12px', cursor: 'pointer', color: '#ccc' }}>{t.CLIP_TO_VIEWPORT}</label>
             </div>
           </div>
         )}

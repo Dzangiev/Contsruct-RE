@@ -9,6 +9,7 @@ import {
   Copy, Clipboard, MousePointer, Sparkles, Maximize, ChevronUp
 } from 'lucide-react';
 import { generateId } from '../../utils/id';
+import { getTranslation } from '../../i18n';
 
 type DrawingTool = 'brush' | 'eraser' | 'fill' | 'point' | 'collision' | 'select';
 
@@ -16,6 +17,7 @@ export const SpriteEditor: React.FC = () => {
   const { 
     project, editorState, closeSpriteEditor, updateObjectType 
   } = useEditorStore();
+  const t = getTranslation(editorState.language);
 
   const spriteEditor = editorState.spriteEditor;
   if (!spriteEditor || !spriteEditor.isOpen) return null;
@@ -311,14 +313,14 @@ export const SpriteEditor: React.FC = () => {
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ backgroundColor: '#ff4b2b', padding: '6px', borderRadius: '4px' }}><ImageIcon size={20} color="#fff" /></div>
-            <span style={{ fontWeight: 800, fontSize: '16px', color: '#fff' }}>Sprite Editor: {objectType.name}</span>
+            <span style={{ fontWeight: 800, fontSize: '16px', color: '#fff' }}>{t.SPRITE_EDITOR}: {objectType.name}</span>
           </div>
           <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
             <div style={zoomContainerStyle}>
               <button onClick={() => setZoom(Math.max(1, zoom - 1))} style={zoomButtonStyle}><ZoomOut size={14}/></button>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#007acc', width: '50px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</div>
               <button onClick={() => setZoom(Math.min(100, zoom + 1))} style={zoomButtonStyle}><ZoomIn size={14}/></button>
-              <button onClick={autoFitZoom} style={{ ...zoomButtonStyle, borderLeft: '1px solid #222' }} title="Auto Fit Zoom"><Maximize size={14} /></button>
+              <button onClick={autoFitZoom} style={{ ...zoomButtonStyle, borderLeft: '1px solid #222' }} title={t.AUTO_FIT_ZOOM}><Maximize size={14} /></button>
             </div>
             <button onClick={closeSpriteEditor} style={closeButtonStyle}><X size={24} /></button>
           </div>
@@ -327,13 +329,13 @@ export const SpriteEditor: React.FC = () => {
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
           <div style={sidePanelStyle}>
             <div style={headerWithActionStyle}>
-              <span style={sectionHeaderStyle}>Animations</span>
-              <button 
+              <span style={sectionHeaderStyle}>{t.ANIMATIONS}</span>
+            <button 
                 onClick={() => {
                   const newId = generateId();
                   const newAnim = { 
                     id: newId, 
-                    name: `Animation ${objectType.animations.length + 1}`, 
+                    name: `${t.ANIMATION} ${objectType.animations.length + 1}`, 
                     speed: 5, 
                     loop: true, 
                     repeatCount: 0, 
@@ -375,44 +377,44 @@ export const SpriteEditor: React.FC = () => {
                 </div>
               ))}
             </div>
-            <div style={sectionHeaderStyle}>Tools & Points</div>
+            <div style={sectionHeaderStyle}>{t.TOOLS_AND_POINTS}</div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-              <ToolItem active={tool === 'select'} onClick={() => setTool('select')} icon={<MousePointer size={14}/>} label="Selection" shortcut="S" />
-              <ToolItem active={tool === 'brush'} onClick={() => setTool('brush')} icon={<Pencil size={14}/>} label="Brush" shortcut="B" />
-              <ToolItem active={tool === 'eraser'} onClick={() => setTool('eraser')} icon={<Eraser size={14}/>} label="Eraser" shortcut="E" />
-              <ToolItem active={tool === 'fill'} onClick={() => setTool('fill')} icon={<Droplet size={14}/>} label="Fill" shortcut="F" />
+              <ToolItem active={tool === 'select'} onClick={() => setTool('select')} icon={<MousePointer size={14}/>} label={t.SELECTION} shortcut="S" />
+              <ToolItem active={tool === 'brush'} onClick={() => setTool('brush')} icon={<Pencil size={14}/>} label={t.BRUSH} shortcut="B" />
+              <ToolItem active={tool === 'eraser'} onClick={() => setTool('eraser')} icon={<Eraser size={14}/>} label={t.ERASER} shortcut="E" />
+              <ToolItem active={tool === 'fill'} onClick={() => setTool('fill')} icon={<Droplet size={14}/>} label={t.FILL} shortcut="F" />
               <div style={dividerHStyle} />
-              <ToolItem active={tool === 'point' && selectedPointId === 'origin'} onClick={() => { setTool('point'); setSelectedPointId('origin'); }} icon={<Target size={14}/>} label="Origin" color="#3498db" shortcut="G" />
-              <ToolItem active={tool === 'collision'} onClick={() => setTool('collision')} icon={<Pentagon size={14}/>} label="Collision" color="#2ecc71" shortcut="C" />
+              <ToolItem active={tool === 'point' && selectedPointId === 'origin'} onClick={() => { setTool('point'); setSelectedPointId('origin'); }} icon={<Target size={14}/>} label={t.ORIGIN} color="#3498db" shortcut="G" />
+              <ToolItem active={tool === 'collision'} onClick={() => setTool('collision')} icon={<Pentagon size={14}/>} label={t.COLLISION} color="#2ecc71" shortcut="C" />
               <div style={dividerHStyle} />
               {selectedFrame?.imagePoints.map(p => (
                 <ToolItem key={p.id} active={tool === 'point' && selectedPointId === p.id} onClick={() => { setTool('point'); setSelectedPointId(p.id); }} icon={<Crosshair size={14}/>} label={p.name} />
               ))}
               <button style={addPointBtnStyle} onClick={() => {
                 if (!selectedFrame) return;
-                const newPoint = { id: generateId(), name: `Point ${selectedFrame.imagePoints.length + 1}`, x: 0.5, y: 0.5 };
+                const newPoint = { id: generateId(), name: `${t.POINT} ${selectedFrame.imagePoints.length + 1}`, x: 0.5, y: 0.5 };
                 onUpdateFrame(selectedFrame.id, { imagePoints: [...selectedFrame.imagePoints, newPoint] });
                 setSelectedPointId(newPoint.id); setTool('point');
-              }}><Plus size={14} /> Add Point</button>
+              }}><Plus size={14} /> {t.ADD_POINT}</button>
             </div>
           </div>
 
           <div style={mainAreaStyle}>
             <div style={toolbarStyle}>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <ToolBtn onClick={mirrorH} icon={<FlipHorizontal size={16}/>} title="Mirror H" />
-                <ToolBtn onClick={flipV} icon={<FlipVertical size={16}/>} title="Flip V" />
-                <ToolBtn onClick={rotate90} icon={<RotateCw size={16}/>} title="Rotate 90" />
-                <ToolBtn onClick={crop} icon={<Crop size={16}/>} title="Crop" />
+                <ToolBtn onClick={mirrorH} icon={<FlipHorizontal size={16}/>} title={t.MIRROR_H} />
+                <ToolBtn onClick={flipV} icon={<FlipVertical size={16}/>} title={t.FLIP_V} />
+                <ToolBtn onClick={rotate90} icon={<RotateCw size={16}/>} title={t.ROTATE_90} />
+                <ToolBtn onClick={crop} icon={<Crop size={16}/>} title={t.CROP} />
                 <div style={dividerStyle} />
-                <ToolBtn active={showOnionSkin} onClick={() => setShowOnionSkin(!showOnionSkin)} icon={showOnionSkin ? <Eye size={16}/> : <EyeOff size={16}/>} title="Onion Skinning" />
+                <ToolBtn active={showOnionSkin} onClick={() => setShowOnionSkin(!showOnionSkin)} icon={showOnionSkin ? <Eye size={16}/> : <EyeOff size={16}/>} title={t.ONION_SKINNING} />
                 <div style={dividerStyle} />
-                <ToolBtn onClick={() => setShowResizeDialog(true)} icon={<Maximize2 size={16}/>} title="Resize Canvas" />
+                <ToolBtn onClick={() => setShowResizeDialog(true)} icon={<Maximize2 size={16}/>} title={t.RESIZE_CANVAS} />
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <input type="color" value={color} onChange={e => setColor(e.target.value)} style={colorInputStyle} title="Select Color" />
-                <label style={uploadButtonStyle}><Upload size={14} /> IMPORT <input type="file" hidden onChange={handleFileUpload} accept="image/*" /></label>
+                <input type="color" value={color} onChange={e => setColor(e.target.value)} style={colorInputStyle} title={t.SELECT_COLOR} />
+                <label style={uploadButtonStyle}><Upload size={14} /> {t.IMPORT} <input type="file" hidden onChange={handleFileUpload} accept="image/*" /></label>
               </div>
             </div>
 
@@ -458,14 +460,14 @@ export const SpriteEditor: React.FC = () => {
                       )}
                    </div>
                 </div>
-              ) : <div style={{ color: '#444' }}>SELECT A FRAME</div>}
+              ) : <div style={{ color: '#444' }}>{t.SELECT_A_FRAME}</div>}
             </div>
 
             <div style={editorStatusBarStyle}>
                <div style={{ display: 'flex', gap: '20px' }}>
-                 <StatusItem label="SIZE" value={`${canvasSize.w} x ${canvasSize.h}`} />
-                 <StatusItem label="POS" value={mousePos ? `${mousePos.x}, ${mousePos.y}` : '-'} />
-                 <StatusItem label="ZOOM" value={`${Math.round(zoom * 100)}%`} />
+                 <StatusItem label={t.SIZE} value={`${canvasSize.w} x ${canvasSize.h}`} />
+                 <StatusItem label={t.POS} value={mousePos ? `${mousePos.x}, ${mousePos.y}` : '-'} />
+                 <StatusItem label={t.ZOOM} value={`${Math.round(zoom * 100)}%`} />
                </div>
             </div>
 
@@ -490,13 +492,13 @@ export const SpriteEditor: React.FC = () => {
                         const nextFrames = [...selectedAnim!.frames];
                         nextFrames.splice(idx + 1, 0, newFrame);
                         onUpdateAnim({ frames: nextFrames });
-                      }} style={iconButtonStyle} title="Duplicate"><Copy size={10} /></button>
+                      }} style={iconButtonStyle} title={t.DUPLICATE}><Copy size={10} /></button>
                       
                       {selectedAnim!.frames.length > 1 && (
                         <button onClick={(e) => { e.stopPropagation(); 
                           const nextFrames = selectedAnim!.frames.filter(f => f.id !== frame.id);
                           onUpdateAnim({ frames: nextFrames }); if (selectedFrameId === frame.id) setSelectedFrameId(nextFrames[Math.max(0, idx - 1)].id);
-                        }} style={iconButtonStyle} title="Delete"><Trash2 size={10} /></button>
+                        }} style={iconButtonStyle} title={t.DELETE}><Trash2 size={10} /></button>
                       )}
                     </div>
 
@@ -527,33 +529,33 @@ export const SpriteEditor: React.FC = () => {
           </div>
 
           <div style={sidePanelStyle}>
-            <div style={sectionHeaderStyle}>Properties</div>
+            <div style={sectionHeaderStyle}>{t.PROPERTIES}</div>
             <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {selectedAnim && (
                 <>
-                  <div><label style={labelStyle}>Animation Name</label>
+                  <div><label style={labelStyle}>{t.ANIMATION_NAME}</label>
                     <input value={selectedAnim.name} onChange={e => onUpdateAnim({ name: e.target.value })} style={propInputStyle} />
                   </div>
-                  <div><label style={labelStyle}>Speed (FPS)</label>
+                  <div><label style={labelStyle}>{t.SPEED_FPS}</label>
                     <input type="number" value={selectedAnim.speed} onChange={e => onUpdateAnim({ speed: Number(e.target.value) })} style={propInputStyle} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => onUpdateAnim({ loop: !selectedAnim.loop })}>
                     <div style={{ ...checkboxStyle, backgroundColor: selectedAnim.loop ? '#007acc' : '#000' }}>{selectedAnim.loop && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}</div>
-                    <span style={{ fontSize: '12px', color: '#aaa' }}>Loop</span>
+                    <span style={{ fontSize: '12px', color: '#aaa' }}>{t.LOOP}</span>
                   </div>
                   <button 
                     onClick={() => onUpdateAnim({ frames: [...selectedAnim.frames].reverse() })}
                     style={secondaryButtonStyle}
                   >
-                    Reverse Sequence
+                    {t.REVERSE_SEQUENCE}
                   </button>
                 </>
               )}
               {selectedFrame && (
                 <div style={propertyBlockStyle}>
-                  <div style={sectionHeaderStyle}>Frame Properties</div>
+                  <div style={sectionHeaderStyle}>{t.FRAME_PROPERTIES}</div>
                   <div style={{ padding: '10px' }}>
-                    <label style={labelStyle}>Frame Duration (Multiplier)</label>
+                    <label style={labelStyle}>{t.FRAME_DURATION}</label>
                     <input 
                       type="number" 
                       min={0.1} 
@@ -562,18 +564,18 @@ export const SpriteEditor: React.FC = () => {
                       onChange={e => onUpdateFrame(selectedFrame.id, { duration: Number(e.target.value) })} 
                       style={propInputStyle} 
                     />
-                    <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Higher = stays longer on screen</div>
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>{t.FRAME_DURATION_HINT}</div>
                   </div>
                 </div>
               )}
               {tool === 'collision' && (
                 <div style={propertyBlockStyle}>
-                  <div style={sectionHeaderStyle}>Collision Editor</div>
-                  <div style={infoTextStyle}>Drag the green dots to shape the hit mask.</div>
+                  <div style={sectionHeaderStyle}>{t.COLLISION_EDITOR}</div>
+                  <div style={infoTextStyle}>{t.COLLISION_HINT}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 10px' }}>
                     <button onClick={() => {
                       onUpdateFrame(selectedFrame!.id, { collisionPolygon: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] });
-                    }} style={secondaryButtonStyle}>Reset to Box</button>
+                    }} style={secondaryButtonStyle}>{t.RESET_TO_BOX}</button>
                     <button onClick={() => {
                       const canvas = canvasRef.current; if (!canvas) return;
                       const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -584,17 +586,17 @@ export const SpriteEditor: React.FC = () => {
                       if (hasPixels) {
                         onUpdateFrame(selectedFrame!.id, { collisionPolygon: [{ x: minX/canvas.width, y: minY/canvas.height }, { x: (maxX+1)/canvas.width, y: minY/canvas.height }, { x: (maxX+1)/canvas.width, y: (maxY+1)/canvas.height }, { x: minX/canvas.width, y: (maxY+1)/canvas.height }] });
                       }
-                    }} style={primaryButtonStyle}><Sparkles size={12}/> Guess Shape</button>
+                    }} style={primaryButtonStyle}><Sparkles size={12}/> {t.GUESS_SHAPE}</button>
                   </div>
                 </div>
               )}
             </div>
             <div style={miniPreviewStyle}>
-              <div style={sectionHeaderStyle}>Preview</div>
+              <div style={sectionHeaderStyle}>{t.PREVIEW}</div>
               <div style={miniPreviewContentStyle}>
                 {selectedAnim && selectedAnim.frames[previewFrameIdx]?.assetId ? (
                   <img src={selectedAnim.frames[previewFrameIdx].assetId} style={{ maxWidth: '80%', maxHeight: '80%', objectFit: 'contain', imageRendering: 'pixelated' }} alt="P" />
-                ) : <span style={{ color: '#222', fontSize: '10px' }}>IDLE</span>}
+                ) : <span style={{ color: '#222', fontSize: '10px' }}>{t.IDLE}</span>}
               </div>
             </div>
           </div>
@@ -603,13 +605,13 @@ export const SpriteEditor: React.FC = () => {
         {showResizeDialog && (
           <div style={dialogOverlayStyle}>
             <div style={dialogStyle}>
-              <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '20px' }}>RESIZE CANVAS</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '20px' }}>{t.RESIZE_CANVAS}</div>
               <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
-                <div style={{ flex: 1 }}><label style={labelStyle}>WIDTH</label><input id="resize-w" type="number" defaultValue={canvasSize.w} style={propInputStyle} /></div>
-                <div style={{ flex: 1 }}><label style={labelStyle}>HEIGHT</label><input id="resize-h" type="number" defaultValue={canvasSize.h} style={propInputStyle} /></div>
+                <div style={{ flex: 1 }}><label style={labelStyle}>{t.WIDTH}</label><input id="resize-w" type="number" defaultValue={canvasSize.w} style={propInputStyle} /></div>
+                <div style={{ flex: 1 }}><label style={labelStyle}>{t.HEIGHT}</label><input id="resize-h" type="number" defaultValue={canvasSize.h} style={propInputStyle} /></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button onClick={() => setShowResizeDialog(false)} style={secondaryButtonStyle}>CANCEL</button>
+                <button onClick={() => setShowResizeDialog(false)} style={secondaryButtonStyle}>{t.CANCEL}</button>
                 <button onClick={() => {
                   const w = Number((document.getElementById('resize-w') as HTMLInputElement).value);
                   const h = Number((document.getElementById('resize-h') as HTMLInputElement).value);
@@ -620,7 +622,7 @@ export const SpriteEditor: React.FC = () => {
                     setCanvasSize({ w, h });
                   });
                   setShowResizeDialog(false);
-                }} style={primaryButtonStyle}>APPLY</button>
+                }} style={primaryButtonStyle}>{t.APPLY}</button>
               </div>
             </div>
           </div>
@@ -664,7 +666,7 @@ const dividerStyle: React.CSSProperties = { width: '1px', height: '20px', backgr
 const dividerHStyle: React.CSSProperties = { height: '1px', backgroundColor: '#1a1a1a', margin: '8px 4px' };
 const colorInputStyle: React.CSSProperties = { width: '28px', height: '28px', padding: '0', border: '2px solid #333', borderRadius: '4px', background: 'none', cursor: 'pointer' };
 
-const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
+const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000, backdropFilter: 'blur(4px)' };
 const modalStyle: React.CSSProperties = { width: '98%', height: '98%', backgroundColor: '#0c0c0d', borderRadius: '4px', display: 'flex', flexDirection: 'column', border: '1px solid #222', color: '#d4d4d4' };
 const headerStyle: React.CSSProperties = { padding: '8px 20px', backgroundColor: '#1a1a1b', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
 const closeButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#444', cursor: 'pointer' };
@@ -691,7 +693,7 @@ const checkboxStyle: React.CSSProperties = { width: '18px', height: '18px', bord
 const miniPreviewStyle: React.CSSProperties = { marginTop: 'auto', borderTop: '1px solid #222' };
 const miniPreviewContentStyle: React.CSSProperties = { height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' };
 
-const dialogOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000 };
+const dialogOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, backdropFilter: 'blur(4px)' };
 const dialogStyle: React.CSSProperties = { backgroundColor: '#1a1a1b', padding: '32px', borderRadius: '8px', border: '1px solid #333', width: '320px' };
 const primaryButtonStyle: React.CSSProperties = { backgroundColor: '#007acc', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
 const secondaryButtonStyle: React.CSSProperties = { backgroundColor: 'transparent', color: '#666', border: '1px solid #333', padding: '8px 24px', borderRadius: '4px', fontWeight: 800, cursor: 'pointer' };

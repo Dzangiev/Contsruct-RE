@@ -14,6 +14,7 @@ import {
   Box,
   MousePointer2
 } from 'lucide-react';
+import { getTranslation } from '../../i18n';
 
 export const LayersPanel: React.FC = () => {
   const { 
@@ -26,18 +27,19 @@ export const LayersPanel: React.FC = () => {
     reorderInstance,
     setSelectedInstances
   } = useEditorStore();
+  const t = getTranslation(editorState.language);
 
   const activeLayout = project.layouts.find(l => l.id === editorState.activeLayoutId);
-  if (!activeLayout) return <div style={{ ...panelStyle, padding: '20px', color: '#666', fontSize: '11px', backgroundColor: '#1e1e1e' }}>No active layout</div>;
+  if (!activeLayout) return <div style={{ ...panelStyle, padding: '20px', color: '#666', fontSize: '11px', backgroundColor: '#1e1e1e' }}>{t.NO_ACTIVE_LAYOUT}</div>;
 
   return (
     <div style={panelStyle}>
       <div style={headerStyle}>
-        <span style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', color: '#aaa' }}>Layers</span>
+        <span style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', color: '#aaa' }}>{t.LAYERS}</span>
         <button 
-          onClick={() => addLayer(activeLayout.id, `Layer ${activeLayout.layers.length}`)}
+          onClick={() => addLayer(activeLayout.id, `${t.LAYER} ${activeLayout.layers.length}`)}
           style={actionButtonStyle}
-          title="Add Layer"
+          title={t.ADD_LAYER}
         >
           <Plus size={14} />
         </button>
@@ -77,14 +79,14 @@ export const LayersPanel: React.FC = () => {
                 <button 
                   onClick={(e) => { e.stopPropagation(); updateLayer(activeLayout.id, layer.id, { visible: !layer.visible }); }}
                   style={{ ...iconButtonStyle, opacity: layer.visible ? 1 : 0.4 }}
-                  title={layer.visible ? "Hide" : "Show"}
+                  title={layer.visible ? t.HIDE : t.SHOW}
                 >
                   {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
                 </button>
                 <button 
                   onClick={(e) => { e.stopPropagation(); updateLayer(activeLayout.id, layer.id, { locked: !layer.locked }); }}
                   style={{ ...iconButtonStyle, color: layer.locked ? '#e67e22' : '#888' }}
-                  title={layer.locked ? "Unlock" : "Lock"}
+                  title={layer.locked ? t.UNLOCK : t.LOCK}
                 >
                   {layer.locked ? <Lock size={12} /> : <Unlock size={12} />}
                 </button>
@@ -93,6 +95,7 @@ export const LayersPanel: React.FC = () => {
                   disabled={isLast}
                   onClick={(e) => { e.stopPropagation(); moveLayer(activeLayout.id, layer.id, 'up'); }}
                   style={{ ...iconButtonStyle, opacity: isLast ? 0.2 : 1 }}
+                  title={t.MOVE_UP}
                 >
                   <ChevronUp size={12} />
                 </button>
@@ -100,6 +103,7 @@ export const LayersPanel: React.FC = () => {
                   disabled={isFirst}
                   onClick={(e) => { e.stopPropagation(); moveLayer(activeLayout.id, layer.id, 'down'); }}
                   style={{ ...iconButtonStyle, opacity: isFirst ? 0.2 : 1 }}
+                  title={t.MOVE_DOWN}
                 >
                   <ChevronDown size={12} />
                 </button>
@@ -110,7 +114,7 @@ export const LayersPanel: React.FC = () => {
       </div>
 
       <div style={{ ...headerStyle, borderTop: '1px solid #333' }}>
-        <span style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', color: '#aaa' }}>Objects in Layer</span>
+        <span style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', color: '#aaa' }}>{t.OBJECTS_IN_LAYER}</span>
       </div>
 
       <div style={{ ...listStyle, flex: 1.5 }}>
@@ -143,7 +147,7 @@ export const LayersPanel: React.FC = () => {
                     color: isSelected ? '#fff' : '#aaa',
                     fontSize: '11px'
                   }}>
-                    {objectType?.name || 'Instance'}
+                    {objectType?.name || t.INSTANCE}
                   </span>
                 </div>
                 <div style={controlsStyle}>
@@ -151,6 +155,7 @@ export const LayersPanel: React.FC = () => {
                     disabled={isTop}
                     onClick={(e) => { e.stopPropagation(); reorderInstance(activeLayout.id, inst.id, 'forward'); }}
                     style={{ ...iconButtonStyle, opacity: isTop ? 0.2 : 0.8 }}
+                    title={t.FORWARD}
                   >
                     <ChevronUp size={12} />
                   </button>
@@ -158,6 +163,7 @@ export const LayersPanel: React.FC = () => {
                     disabled={isBottom}
                     onClick={(e) => { e.stopPropagation(); reorderInstance(activeLayout.id, inst.id, 'backward'); }}
                     style={{ ...iconButtonStyle, opacity: isBottom ? 0.2 : 0.8 }}
+                    title={t.BACKWARD}
                   >
                     <ChevronDown size={12} />
                   </button>
@@ -167,7 +173,7 @@ export const LayersPanel: React.FC = () => {
           })}
         {activeLayout.instances.filter(i => i.layerId === editorState.activeLayerId).length === 0 && (
           <div style={{ padding: '20px', textAlign: 'center', color: '#555', fontSize: '11px' }}>
-            No objects in this layer
+            {t.NO_OBJECTS_IN_LAYER}
           </div>
         )}
       </div>

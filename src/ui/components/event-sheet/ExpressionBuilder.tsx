@@ -15,6 +15,8 @@ import {
   Cpu
 } from 'lucide-react';
 import { Project, EventBlock } from '../../../model/project';
+import { getTranslation } from '../../../i18n';
+import { useEditorStore } from '../../../store/useEditorStore';
 
 interface ExpressionBuilderProps {
   project: Project;
@@ -33,6 +35,8 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
   onInsert,
   onClose 
 }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [viewMode, setViewMode] = React.useState<ViewMode>('main');
   const [selectedObjectId, setSelectedObjectId] = React.useState<string | null>(null);
   const [selectedFamilyId, setSelectedFamilyId] = React.useState<string | null>(null);
@@ -119,13 +123,13 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
 
   const renderMain = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      {renderItem(<Box size={14} color="#2ecc71" />, 'Objects', () => setViewMode('object'), true)}
-      {project.families.length > 0 && renderItem(<Users size={14} color="#f1c40f" />, 'Families', () => setViewMode('family'), true)}
-      {renderItem(<Variable size={14} color="#3498db" />, 'Global Variables', () => setViewMode('globals'), true)}
-      {locals.length > 0 && renderItem(<Variable size={14} color="#e67e22" />, 'Local Variables', () => setViewMode('locals'), true)}
-      {renderItem(<Calculator size={14} color="#9b59b6" />, 'Math', () => setViewMode('math'), true)}
-      {renderItem(<Settings size={14} color="#95a5a6" />, 'System', () => setViewMode('system'), true)}
-      {renderItem(<Zap size={14} color="#9b59b6" />, 'Functions', () => setViewMode('functions'), true)}
+      {renderItem(<Box size={14} color="#2ecc71" />, t.OBJECT_TYPES, () => setViewMode('object'), true)}
+      {project.families.length > 0 && renderItem(<Users size={14} color="#f1c40f" />, t.FAMILIES, () => setViewMode('family'), true)}
+      {renderItem(<Variable size={14} color="#3498db" />, t.GLOBAL_VARIABLES, () => setViewMode('globals'), true)}
+      {locals.length > 0 && renderItem(<Variable size={14} color="#e67e22" />, t.LOCAL_VARIABLES, () => setViewMode('locals'), true)}
+      {renderItem(<Calculator size={14} color="#9b59b6" />, t.CAT_MATH, () => setViewMode('math'), true)}
+      {renderItem(<Settings size={14} color="#95a5a6" />, t.SYSTEM, () => setViewMode('system'), true)}
+      {renderItem(<Zap size={14} color="#9b59b6" />, t.CAT_FUNCTIONS, () => setViewMode('functions'), true)}
     </div>
   );
 
@@ -143,11 +147,11 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     if (!ot) return null;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <div style={{ padding: '8px 12px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>Properties</div>
-        {['X', 'Y', 'Width', 'Height', 'Angle', 'Opacity'].map(p => renderItem(<Settings size={14} color="#3498db" />, p, () => onInsert(`${ot.name}.${p}`)))}
+        <div style={{ padding: '8px 12px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>{t.PROPERTIES_LABEL}</div>
+        {[{n: 'X', k: t.X}, {n: 'Y', k: t.Y}, {n: t.WIDTH, k: t.WIDTH}, {n: t.HEIGHT, k: t.HEIGHT}, {n: t.ANGLE, k: t.ANGLE}, {n: t.OPACITY, k: t.OPACITY}].map(p => renderItem(<Settings size={14} color="#3498db" />, p.k, () => onInsert(`${ot.name}.${p.n}`)))}
         {ot.instanceVariables.length > 0 && (
           <>
-            <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>Instance Variables</div>
+            <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>{t.INSTANCE_VARIABLES}</div>
             {ot.instanceVariables.map(v => renderItem(<Terminal size={14} color="#e67e22" />, v.name, () => onInsert(`${ot.name}.${v.name}`)))}
           </>
         )}
@@ -169,11 +173,11 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     if (!family) return null;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <div style={{ padding: '8px 12px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>Common Properties</div>
-        {['X', 'Y', 'Width', 'Height', 'Angle', 'Opacity'].map(p => renderItem(<Settings size={14} color="#3498db" />, p, () => onInsert(`${family.name}.${p}`)))}
+        <div style={{ padding: '8px 12px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>{t.COMMON_PROPERTIES}</div>
+        {[{n: 'X', k: t.X}, {n: 'Y', k: t.Y}, {n: t.WIDTH, k: t.WIDTH}, {n: t.HEIGHT, k: t.HEIGHT}, {n: t.ANGLE, k: t.ANGLE}, {n: t.OPACITY, k: t.OPACITY}].map(p => renderItem(<Settings size={14} color="#3498db" />, p.k, () => onInsert(`${family.name}.${p.n}`)))}
         {family.instanceVariables.length > 0 && (
           <>
-            <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>Instance Variables</div>
+            <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>{t.INSTANCE_VARIABLES}</div>
             {family.instanceVariables.map(v => renderItem(<Terminal size={14} color="#e67e22" />, v.name, () => onInsert(`${family.name}.${v.name}`)))}
           </>
         )}
@@ -186,17 +190,17 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     const items: { name: string, insert: string, icon: any, category: string }[] = [];
     
     // Add variables
-    globals.forEach(v => items.push({ name: v.name, insert: v.name, icon: <Variable size={14} color="#3498db" />, category: 'Global Variables' }));
-    locals.forEach(v => items.push({ name: v.name, insert: v.name, icon: <Variable size={14} color="#e67e22" />, category: 'Local Variables' }));
+    globals.forEach(v => items.push({ name: v.name, insert: v.name, icon: <Variable size={14} color="#3498db" />, category: t.GLOBAL_VARIABLES }));
+    locals.forEach(v => items.push({ name: v.name, insert: v.name, icon: <Variable size={14} color="#e67e22" />, category: t.LOCAL_VARIABLES }));
     
     // Add math
-    mathFuncs.forEach(m => items.push({ name: m.name, insert: m.insert, icon: <Calculator size={14} color="#9b59b6" />, category: 'Math' }));
+    mathFuncs.forEach(m => items.push({ name: m.name, insert: m.insert, icon: <Calculator size={14} color="#9b59b6" />, category: t.CAT_MATH }));
     
     // Add objects and their properties
     project.objectTypes.forEach(ot => {
-      items.push({ name: ot.name, insert: ot.name, icon: <Box size={14} color="#2ecc71" />, category: 'Objects' });
-      ['X', 'Y', 'Width', 'Height', 'Angle', 'Opacity'].forEach(p => items.push({ name: `${ot.name}.${p}`, insert: `${ot.name}.${p}`, icon: <Settings size={14} color="#3498db" />, category: `${ot.name} Properties` }));
-      ot.instanceVariables.forEach(v => items.push({ name: `${ot.name}.${v.name}`, insert: `${ot.name}.${v.name}`, icon: <Terminal size={14} color="#e67e22" />, category: `${ot.name} Variables` }));
+      items.push({ name: ot.name, insert: ot.name, icon: <Box size={14} color="#2ecc71" />, category: t.OBJECT_TYPES });
+      [{n: 'X', k: t.X}, {n: 'Y', k: t.Y}, {n: t.WIDTH, k: t.WIDTH}, {n: t.HEIGHT, k: t.HEIGHT}, {n: t.ANGLE, k: t.ANGLE}, {n: t.OPACITY, k: t.OPACITY}].forEach(p => items.push({ name: `${ot.name}.${p.n}`, insert: `${ot.name}.${p.n}`, icon: <Settings size={14} color="#3498db" />, category: `${ot.name} ${t.PROPERTIES_LABEL}` }));
+      ot.instanceVariables.forEach(v => items.push({ name: `${ot.name}.${v.name}`, insert: `${ot.name}.${v.name}`, icon: <Terminal size={14} color="#e67e22" />, category: `${ot.name} ${t.VARIABLES_LABEL}` }));
     });
 
     const filtered = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 50);
@@ -204,22 +208,22 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {filtered.map((i, idx) => renderItem(i.icon, i.name, () => onInsert(i.insert)))}
-        {filtered.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>No matches found.</div>}
+        {filtered.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>{t.NO_MATCHES_FOUND}</div>}
       </div>
     );
   };
 
   const getHeader = () => {
-    if (searchQuery) return 'Search Results';
+    if (searchQuery) return t.SEARCH_RESULTS;
     switch (viewMode) {
-      case 'object': return selectedObjectId ? project.objectTypes.find(o => o.id === selectedObjectId)?.name : 'Objects';
-      case 'family': return selectedFamilyId ? project.families.find(f => f.id === selectedFamilyId)?.name : 'Families';
-      case 'math': return 'Math Expressions';
-      case 'system': return 'System Expressions';
-      case 'functions': return 'Functions';
-      case 'globals': return 'Global Variables';
-      case 'locals': return 'Local Variables';
-      default: return 'Expression Builder';
+      case 'object': return selectedObjectId ? project.objectTypes.find(o => o.id === selectedObjectId)?.name : t.OBJECT_TYPES;
+      case 'family': return selectedFamilyId ? project.families.find(f => f.id === selectedFamilyId)?.name : t.FAMILIES;
+      case 'math': return t.MATH_EXPRESSIONS;
+      case 'system': return t.SYSTEM_EXPRESSIONS;
+      case 'functions': return t.CAT_FUNCTIONS;
+      case 'globals': return t.GLOBAL_VARIABLES;
+      case 'locals': return t.LOCAL_VARIABLES;
+      default: return t.EXPRESSION_BUILDER;
     }
   };
 
@@ -235,7 +239,7 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
           <input 
-            placeholder="Search variables, objects, functions..." 
+            placeholder={t.SEARCH_PLACEHOLDER_EXPR} 
             value={searchQuery} 
             onChange={e => setSearchQuery(e.target.value)}
             style={{ width: '100%', backgroundColor: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '11px', padding: '8px 12px 8px 32px', borderRadius: '4px', outline: 'none' }} 
@@ -250,7 +254,7 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,122,204,0.1)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <ChevronLeft size={14} /> BACK
+              <ChevronLeft size={14} /> {t.BACK}
             </button>
           )}
           <div style={{ fontSize: '10px', color: '#555', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{getHeader()}</div>
@@ -284,7 +288,7 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {renderItem(<Zap size={14} color="#9b59b6" />, 'Function.ReturnValue', () => onInsert('Function.ReturnValue'))}
                   {renderItem(<Zap size={14} color="#9b59b6" />, 'Function.Param', () => onInsert('Function.Param('))}
-                  <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>Custom Functions</div>
+                  <div style={{ padding: '16px 12px 8px', fontSize: '11px', color: '#666', fontWeight: 800, textTransform: 'uppercase' }}>{t.CUSTOM_FUNCTIONS}</div>
                   {names.map(n => renderItem(<Zap size={14} color="#9b59b6" />, n, () => onInsert(`Function.Call("${n}")`)))}
                 </div>
               );
@@ -295,7 +299,7 @@ export const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
       </div>
       
       <div style={{ padding: '12px', fontSize: '11px', color: '#666', borderTop: '1px solid #333', fontStyle: 'italic', backgroundColor: '#1e1e1e' }}>
-        Double-click an item to insert and close.
+        {t.TIP_DOUBLE_CLICK_INSERT}
       </div>
     </div>
   );

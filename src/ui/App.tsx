@@ -16,6 +16,8 @@ import { AssetPanel } from './components/AssetPanel';
 import { SimpleModal } from './components/SimpleModal';
 import { GridSettingsDialog } from './components/GridSettingsDialog';
 import { TilemapEditor } from './components/TilemapEditor';
+import { getTranslation } from '../i18n';
+import { Globe } from 'lucide-react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: string }, { hasError: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false }; }
@@ -23,8 +25,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: s
   componentDidCatch(error: any, errorInfo: any) { console.error(`Error in ${this.props.name}:`, error, errorInfo); }
   render() {
     if (this.state.hasError) {
+      const language = useEditorStore.getState().editorState.language;
+      const t = getTranslation(language);
       return <div style={{ padding: '20px', color: '#ff4444', backgroundColor: '#2a1a1a', fontSize: '12px', border: '1px solid #442222', flex: 1 }}>
-        <strong>Error in {this.props.name}</strong><br/>Check console for details.
+        <strong>{t.ERROR_IN} {this.props.name}</strong><br/>{t.CHECK_CONSOLE}
       </div>;
     }
     return this.props.children;
@@ -32,8 +36,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, name: s
 }
 
 const App: React.FC = () => {
-  const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog, setGridSettingsDialogOpen } = useEditorStore();
-  const { currentTab, previewMode, gridSettingsDialogOpen } = editorState;
+  const { project, editorState, dialogState, setTab, setPreviewMode, closeDialog, setGridSettingsDialogOpen, setLanguage } = useEditorStore();
+  const { currentTab, previewMode, gridSettingsDialogOpen, language } = editorState;
+  const t = getTranslation(language);
   const [rightPanelTab, setRightPanelTab] = React.useState<'properties' | 'variables'>('properties');
 
   return (
@@ -80,7 +85,7 @@ const App: React.FC = () => {
             userSelect: 'none'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div style={{ padding: '0 12px', fontWeight: 800, color: '#555', letterSpacing: '1px', fontSize: '10px' }}>CRE ENGINE</div>
+              <div style={{ padding: '0 12px', fontWeight: 800, color: '#555', letterSpacing: '1px', fontSize: '10px' }}>{t.CRE_ENGINE}</div>
               <div style={{ width: '1px', height: '16px', backgroundColor: '#3d3d3d', margin: '0 8px' }} />
               
               <nav style={{ display: 'flex', height: '35px' }}>
@@ -88,7 +93,7 @@ const App: React.FC = () => {
                   active={currentTab === 'layout'} 
                   onClick={() => setTab('layout')}
                   icon={<Monitor size={14} />}
-                  label={project.layouts?.find(l => l.id === editorState.activeLayoutId)?.name || 'Layout'} 
+                  label={project.layouts?.find(l => l.id === editorState.activeLayoutId)?.name || t.LAYOUT} 
                 />
                 {(() => {
                   const activeLayout = project.layouts?.find(l => l.id === editorState.activeLayoutId);
@@ -98,7 +103,7 @@ const App: React.FC = () => {
                       active={currentTab === 'eventSheet'} 
                       onClick={() => setTab('eventSheet')}
                       icon={<FileText size={14} />}
-                      label={eventSheet?.name || 'Event Sheet'} 
+                      label={eventSheet?.name || t.EVENT_SHEET} 
                     />
                   );
                 })()}
@@ -117,12 +122,12 @@ const App: React.FC = () => {
                   a.click();
                 }}
                 style={secondaryToolbarButtonStyle}
-                title="Export Project"
+                title={t.EXPORT}
               >
-                <Download size={14} /> EXPORT
+                <Download size={14} /> {t.EXPORT}
               </button>
-              <label style={secondaryToolbarButtonStyle} title="Import Project">
-                <Upload size={14} /> IMPORT
+              <label style={secondaryToolbarButtonStyle} title={t.IMPORT}>
+                <Upload size={14} /> {t.IMPORT}
                 <input 
                   type="file" 
                   hidden 
@@ -137,10 +142,10 @@ const App: React.FC = () => {
                         // Basic validation
                         if (imported.schemaVersion) {
                           useEditorStore.setState({ project: imported });
-                          alert('Project imported successfully!');
+                          alert(t.IMPORT_SUCCESS);
                         }
                       } catch (err) {
-                        alert('Failed to import project: Invalid JSON');
+                        alert(t.IMPORT_FAILURE);
                       }
                     };
                     reader.readAsText(file);
@@ -164,16 +169,48 @@ const App: React.FC = () => {
                   fontWeight: 700
                 }}
               >
-                <Play size={12} fill="currentColor" /> PREVIEW
+                <Play size={12} fill="currentColor" /> {t.PREVIEW}
               </button>
+              
+              <div style={{ width: '1px', height: '16px', backgroundColor: '#3d3d3d', margin: '0 4px' }} />
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+                <Globe size={14} style={{ color: '#888' }} />
+                <select 
+                  value={language} 
+                  onChange={(e) => setLanguage(e.target.value as any)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: '#ccc',
+                    border: 'none',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    appearance: 'none',
+                    paddingRight: '12px'
+                  }}
+                >
+                  <option value="en">EN</option>
+                  <option value="ru">RU</option>
+                </select>
+                <div style={{ position: 'absolute', right: 0, pointerEvents: 'none', color: '#888', fontSize: '8px' }}>▼</div>
+              </div>
             </div>
           </header>
           
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
-            <ErrorBoundary name="MainContent">
-              {currentTab === 'layout' ? <Viewport /> : <EventSheetEditor />}
-            </ErrorBoundary>
-          </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%', position: 'relative' }}>
+              <div style={{ display: currentTab === 'layout' ? 'flex' : 'none', flex: 1, flexDirection: 'column', height: '100%', width: '100%' }}>
+                <ErrorBoundary name="Viewport">
+                  <Viewport />
+                </ErrorBoundary>
+              </div>
+              <div style={{ display: currentTab === 'eventSheet' ? 'flex' : 'none', flex: 1, flexDirection: 'column', height: '100%', width: '100%' }}>
+                <ErrorBoundary name="EventSheetEditor">
+                  <EventSheetEditor />
+                </ErrorBoundary>
+              </div>
+            </div>
         </main>
 
         <div style={{ width: '300px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #1a1a1a', backgroundColor: '#1e1e1e' }}>
@@ -203,7 +240,7 @@ const App: React.FC = () => {
                 borderBottom: rightPanelTab === 'properties' ? '2px solid #007acc' : '2px solid transparent'
               }}
             >
-              <Info size={14} style={{ opacity: rightPanelTab === 'properties' ? 1 : 0.6 }} /> PROPERTIES
+              <Info size={14} style={{ opacity: rightPanelTab === 'properties' ? 1 : 0.6 }} /> {t.PROPERTIES}
             </button>
             <button 
               onClick={() => setRightPanelTab('variables')}
@@ -224,7 +261,7 @@ const App: React.FC = () => {
                 borderBottom: rightPanelTab === 'variables' ? '2px solid #007acc' : '2px solid transparent'
               }}
             >
-              <Variable size={14} style={{ opacity: rightPanelTab === 'variables' ? 1 : 0.6 }} /> VARIABLES
+              <Variable size={14} style={{ opacity: rightPanelTab === 'variables' ? 1 : 0.6 }} /> {t.VARIABLES}
             </button>
           </div>
           

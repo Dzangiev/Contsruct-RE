@@ -15,6 +15,9 @@ export const HighlightText: React.FC<{ text: string, highlight: string }> = ({ t
   );
 };
 
+import { getTranslation } from '../../../i18n';
+import { useEditorStore } from '../../../store/useEditorStore';
+
 export const LogicItemContent: React.FC<{
   item: any,
   def?: any,
@@ -23,6 +26,8 @@ export const LogicItemContent: React.FC<{
   searchTerm: string,
   isSelected?: boolean
 }> = ({ item, def, project, type, searchTerm, isSelected }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [isHovered, setIsHovered] = React.useState(false);
   const ot = project.objectTypes.find(o => o.id === item.targetObjectTypeId);
 
@@ -50,22 +55,22 @@ export const LogicItemContent: React.FC<{
 
     switch (item.type) {
       case 'always':
-        return <span style={{ color: txtColor, fontWeight: 500 }}>Every tick</span>;
+        return <span style={{ color: txtColor, fontWeight: 500 }}>{t.EVERY_TICK}</span>;
       case 'onStartOfLayout':
-        return <span style={{ color: txtColor, fontWeight: 500 }}>On start of layout</span>;
+        return <span style={{ color: txtColor, fontWeight: 500 }}>{t.ON_START_OF_LAYOUT}</span>;
       case 'else':
-        return <span style={{ color: txtColor, fontWeight: 700, fontStyle: 'italic' }}>Else</span>;
+        return <span style={{ color: txtColor, fontWeight: 700, fontStyle: 'italic' }}>{t.ELSE}</span>;
       
       case 'compareInstanceVariable':
       case 'compareVariable': {
-        const op = p[1] === '==' ? 'is equal to' : 
-                   p[1] === '!=' ? 'is not equal to' :
-                   p[1] === '<' ? 'is less than' :
-                   p[1] === '<=' ? 'is less or equal' :
-                   p[1] === '>' ? 'is greater than' :
-                   p[1] === '>=' ? 'is greater or equal' : p[1];
+        const op = p[1] === '==' ? t.IS_EQUAL_TO : 
+                   p[1] === '!=' ? t.IS_NOT_EQUAL_TO :
+                   p[1] === '<' ? t.IS_LESS_THAN :
+                   p[1] === '<=' ? t.IS_LESS_OR_EQUAL :
+                   p[1] === '>' ? t.IS_GREATER_THAN :
+                   p[1] === '>=' ? t.IS_GREATER_OR_EQUAL : p[1];
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: txtColor }}>Variable</span>
+          <span style={{ color: txtColor }}>{t.VARIABLE}</span>
           {formatParam(p[0])}
           <span style={{ color: subColor }}>{op}</span>
           {formatParam(p[2])}
@@ -74,25 +79,25 @@ export const LogicItemContent: React.FC<{
       case 'setInstanceVariable':
       case 'setVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: subColor }}>Set</span>
+          <span style={{ color: subColor }}>{t.SET}</span>
           {formatParam(p[0])}
-          <span style={{ color: subColor }}>to</span>
+          <span style={{ color: subColor }}>{t.TO}</span>
           {formatParam(p[1])}
         </div>;
       case 'addInstanceVariable':
       case 'addVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: subColor }}>Add</span>
+          <span style={{ color: subColor }}>{t.ADD}</span>
           {formatParam(p[1])}
-          <span style={{ color: subColor }}>to</span>
+          <span style={{ color: subColor }}>{t.TO}</span>
           {formatParam(p[0])}
         </div>;
       case 'subtractInstanceVariable':
       case 'subtractVariable':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: subColor }}>Subtract</span>
+          <span style={{ color: subColor }}>{t.SUBTRACT}</span>
           {formatParam(p[1])}
-          <span style={{ color: subColor }}>from</span>
+          <span style={{ color: subColor }}>{t.FROM}</span>
           {formatParam(p[0])}
         </div>;
       case 'callFunction': {
@@ -109,7 +114,7 @@ export const LogicItemContent: React.FC<{
         });
 
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: subColor }}>Call</span>
+          <span style={{ color: subColor }}>{t.CALL}</span>
           <span style={{ fontWeight: 700, color: paramColor }}>{funcName}</span>
           {foundParams.length > 0 && (
             <span style={{ color: subColor, fontSize: '11px' }}>
@@ -125,19 +130,19 @@ export const LogicItemContent: React.FC<{
         </div>;
       }
       case 'destroy':
-        return <span style={{ color: txtColor, fontWeight: 600 }}>Destroy</span>;
+        return <span style={{ color: txtColor, fontWeight: 600 }}>{t.DESTROY}</span>;
       case 'isVisible':
-        return <span style={{ color: txtColor }}>Is visible</span>;
+        return <span style={{ color: txtColor }}>{t.IS_VISIBLE}</span>;
       case 'setVisible':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ color: subColor }}>Set</span>
-          <span style={{ color: txtColor }}>visible</span>
-          <span style={{ color: subColor }}>to</span>
+          <span style={{ color: subColor }}>{t.SET}</span>
+          <span style={{ color: txtColor }}>{t.VISIBLE}</span>
+          <span style={{ color: subColor }}>{t.TO}</span>
           {formatParam(p[0])}
         </div>;
       case 'setPosition':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          <span style={{ color: subColor }}>Set position to</span>
+          <span style={{ color: subColor }}>{t.SET} {t.POS} {t.TO}</span>
           <span style={{ color: subColor }}>(</span>
           {formatParam(p[0])}
           <span style={{ color: subColor }}>,</span>
@@ -146,21 +151,23 @@ export const LogicItemContent: React.FC<{
         </div>;
       case 'createInstance':
         return <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: subColor }}>Create</span>
+          <span style={{ color: subColor }}>{t.ADD_NEW}</span>
           {formatParam(p[0])}
-          <span style={{ color: subColor }}>at (</span>
+          <span style={{ color: subColor }}>{t.AT} (</span>
           {formatParam(p[1])}
           <span style={{ color: subColor }}>,</span>
           {formatParam(p[2])}
-          <span style={{ color: subColor }}>) on layer</span>
+          <span style={{ color: subColor }}>) {t.ON_LAYER}</span>
           {formatParam(p[3])}
         </div>;
       case 'onPointerPressedOnObject':
-        return <span style={{ color: txtColor }}>On clicked</span>;
+        return <span style={{ color: txtColor }}>{t.ON_CLICKED}</span>;
       default:
         return (
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <span style={{ color: txtColor, fontWeight: 500 }}><HighlightText text={def.name} highlight={searchTerm} /></span>
+            <span style={{ color: txtColor, fontWeight: 500 }}>
+              <HighlightText text={def.nameKey ? (t as any)[def.nameKey] : def.name} highlight={searchTerm} />
+            </span>
             {p.length > 0 && (
               <span style={{ color: subColor, fontSize: '11px' }}>
                 ({p.map((val: any, idx: number) => (
@@ -227,7 +234,7 @@ export const LogicItemContent: React.FC<{
         ) : (
           <>
             <Settings size={12} color="#3498db" />
-            <span style={{ color: '#3498db', fontWeight: 600 }}>System</span>
+            <span style={{ color: '#3498db', fontWeight: 600 }}>{t.SYSTEM}</span>
           </>
         )}
       </div>

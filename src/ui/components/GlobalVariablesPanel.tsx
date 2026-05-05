@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { VariableDialog } from './VariableDialog';
 import { getVariableUsageCount, getVariableUsageLocations } from '../../model/eventUpdates';
+import { getTranslation } from '../../i18n';
 
 const panelStyle: React.CSSProperties = {
   display: 'flex',
@@ -81,8 +82,10 @@ export const GlobalVariablesPanel: React.FC = () => {
     updateFolder,
     removeFolder,
     moveEntityToFolder,
-    showDialog
+    showDialog,
+    editorState
   } = useEditorStore();
+  const t = getTranslation(editorState.language);
 
   const [filter, setFilter] = React.useState('');
   const [dialogState, setDialogState] = React.useState<{ variableId: string } | null>(null);
@@ -130,7 +133,7 @@ export const GlobalVariablesPanel: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontWeight: 600, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' }}>{v.name}</span>
-              {v.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#3498db33', padding: '1px 5px', borderRadius: '4px', color: '#3498db', fontWeight: 800 }}>CONST</span>}
+              {v.isConstant && <span style={{ fontSize: '9px', backgroundColor: '#3498db33', padding: '1px 5px', borderRadius: '4px', color: '#3498db', fontWeight: 800 }}>{t.CONST}</span>}
               {usageCount > 0 && (
                 <div 
                   style={{ 
@@ -166,18 +169,18 @@ export const GlobalVariablesPanel: React.FC = () => {
             <button 
               style={miniIconButtonStyle}
               onClick={() => setDialogState({ variableId: v.id })}
-              title="Configure Variable"
+              title={t.CONFIGURE_VARIABLE}
             >
               <Settings2 size={14} />
             </button>
             <button 
               style={{ ...miniIconButtonStyle, color: '#e74c3c' }}
               onClick={() => {
-                if (confirm(`Delete global variable "${v.name}"?`)) {
+                if (confirm(t.DELETE_VARIABLE_CONFIRM.replace('{name}', v.name))) {
                   removeGlobalVariable(v.id);
                 }
               }}
-              title="Delete"
+              title={t.DELETE}
             >
               <Trash2 size={14} />
             </button>
@@ -312,7 +315,7 @@ export const GlobalVariablesPanel: React.FC = () => {
               <button 
                 onClick={async (e) => {
                   e.stopPropagation();
-                  const name = await showDialog({ title: 'Rename Folder', message: 'Enter new folder name:', type: 'prompt', defaultValue: folder.name });
+                  const name = await showDialog({ title: t.RENAME_FOLDER, message: t.ENTER_NEW_FOLDER_NAME, type: 'prompt', defaultValue: folder.name });
                   if (name && typeof name === 'string') updateFolder(folder.id, { name });
                 }}
                 style={{ ...miniIconButtonStyle, padding: '2px' }}
@@ -320,7 +323,7 @@ export const GlobalVariablesPanel: React.FC = () => {
                 <Edit2 size={10} />
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); if (confirm(`Delete folder "${folder.name}"? Variables will move up.`)) removeFolder(folder.id); }}
+                onClick={(e) => { e.stopPropagation(); if (confirm(t.DELETE_FOLDER_CONFIRM.replace('{name}', folder.name))) removeFolder(folder.id); }}
                 style={{ ...miniIconButtonStyle, padding: '2px', color: '#e74c3c' }}
               >
                 <Trash2 size={10} />
@@ -343,13 +346,13 @@ export const GlobalVariablesPanel: React.FC = () => {
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Variable size={14} />
-          Global Variables
+          {t.GLOBAL_VARIABLES}
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
           <button 
-            onClick={() => addFolder('globalVariable', 'New Folder')}
+            onClick={() => addFolder('globalVariable', t.NEW_FOLDER)}
             style={miniIconButtonStyle}
-            title="New Folder"
+            title={t.NEW_FOLDER}
           >
             <Folder size={12} />
           </button>
@@ -361,7 +364,7 @@ export const GlobalVariablesPanel: React.FC = () => {
           <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#555' }} />
           <input 
             type="text" 
-            placeholder="Search variables..." 
+            placeholder={t.SEARCH_VARIABLES}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             style={{
@@ -410,7 +413,7 @@ export const GlobalVariablesPanel: React.FC = () => {
             <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
               <div style={{ color: '#444' }}><Variable size={48} /></div>
               <div style={{ color: '#555', fontStyle: 'italic', fontSize: '11px' }}>
-                No global variables defined
+                {t.NO_VARIABLES_DEFINED}
               </div>
             </div>
           )}
@@ -418,12 +421,12 @@ export const GlobalVariablesPanel: React.FC = () => {
       </div>
 
       <div style={{ padding: '8px 12px', borderTop: '1px solid #111', backgroundColor: '#181818', fontSize: '10px', color: '#444', letterSpacing: '0.5px' }}>
-        Total: {project.globalVariables.length} variables
+        {t.TOTAL}: {project.globalVariables.length} {t.VARIABLES_COUNT}
       </div>
 
       {dialogState && editingVar && (
         <VariableDialog 
-          title="Edit Global Variable"
+          title={t.EDIT_VARIABLE}
           variable={editingVar}
           existingNames={project.globalVariables.filter(v => v.id !== dialogState.variableId).map(v => v.name)}
           onSave={(updates) => {

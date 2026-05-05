@@ -1,4 +1,5 @@
 import { Project } from '../model/project';
+import { Language, detectLanguage } from '../i18n';
 
 export type ToolType = 'select' | 'place' | 'pan';
 
@@ -8,6 +9,7 @@ export interface ClipboardData {
 }
 
 export interface EditorState {
+  language: Language;
   activeLayoutId: string | null;
   activeLayerId: string | null;
   selectedInstanceIds: string[];
@@ -15,6 +17,7 @@ export interface EditorState {
   zoom: number;
   panX: number;
   panY: number;
+  layoutViews: Record<string, { zoom: number, panX: number, panY: number }>;
   placementObjectTypeId: string | null;
   selectedObjectTypeId: string | null;
   selectedFamilyId: string | null;
@@ -61,13 +64,14 @@ export function createInitialEditorState(project: Project): EditorState {
   
   // Heuristic to guess available viewport area before first render
   // Assuming sidebars are approx 600px total and header/footer approx 100px
-  const guessWidth = (typeof window !== 'undefined' ? window.innerWidth : 1600) - 650;
-  const guessHeight = (typeof window !== 'undefined' ? window.innerHeight : 900) - 150;
+  const guessWidth = (typeof window !== 'undefined' ? window.innerWidth : 1600) - 560;
+  const guessHeight = (typeof window !== 'undefined' ? window.innerHeight : 900) - 59;
   
   const initialPanX = Math.round(Math.max(40, (guessWidth - vWidth) / 2));
   const initialPanY = Math.round(Math.max(40, (guessHeight - vHeight) / 2));
 
   return {
+    language: detectLanguage(),
     activeLayoutId: firstLayout?.id || null,
     activeLayerId: firstLayer?.id || null,
     selectedInstanceIds: [],
@@ -75,6 +79,9 @@ export function createInitialEditorState(project: Project): EditorState {
     zoom: 1,
     panX: initialPanX,
     panY: initialPanY,
+    layoutViews: firstLayout ? {
+      [firstLayout.id]: { zoom: 1, panX: initialPanX, panY: initialPanY }
+    } : {},
     placementObjectTypeId: null,
     selectedObjectTypeId: null,
     selectedFamilyId: null,
@@ -127,6 +134,7 @@ export function setTab(state: EditorState, tab: 'layout' | 'eventSheet'): Editor
  * Clears selection when changing layouts.
  */
 export function setActiveLayout(state: EditorState, layoutId: string, layerId?: string): EditorState {
+  const savedView = state.layoutViews[layoutId];
   return {
     ...state,
     activeLayoutId: layoutId,
@@ -134,6 +142,9 @@ export function setActiveLayout(state: EditorState, layoutId: string, layerId?: 
     selectedInstanceIds: [],
     selectedObjectTypeId: null,
     selectedFamilyId: null,
+    zoom: savedView ? savedView.zoom : state.zoom,
+    panX: savedView ? savedView.panX : state.panX,
+    panY: savedView ? savedView.panY : state.panY,
   };
 }
 
@@ -202,11 +213,16 @@ export function setTool(
  * Updates viewport transformation.
  */
 export function setView(state: EditorState, zoom: number, panX: number, panY: number): EditorState {
+  const layoutViews = { ...state.layoutViews };
+  if (state.activeLayoutId) {
+    layoutViews[state.activeLayoutId] = { zoom, panX, panY };
+  }
   return {
     ...state,
     zoom,
     panX,
     panY,
+    layoutViews,
   };
 }
 

@@ -2,6 +2,8 @@ import React from 'react';
 import { Effect } from '../../model/project';
 import { EffectDefinition, EFFECT_DEFINITIONS } from '../../model/definitions';
 import { Plus, Trash2, X, Zap, ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import { getTranslation } from '../../i18n';
+import { useEditorStore } from '../../store/useEditorStore';
 
 interface EffectsDialogProps {
   effects: Effect[];
@@ -17,12 +19,12 @@ const overlayStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.85)',
+  backgroundColor: 'rgba(0,0,0,0.8)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 10000,
-  backdropFilter: 'blur(10px)',
+  backdropFilter: 'blur(4px)',
   animation: 'fadeIn 0.2s ease-out'
 };
 
@@ -71,6 +73,8 @@ const mainStyle: React.CSSProperties = {
 };
 
 export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, onRemove, onUpdate, onClose }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [selectedEffectId, setSelectedEffectId] = React.useState<string | null>(effects[0]?.id || null);
   const [showAddList, setShowAddList] = React.useState(false);
 
@@ -83,7 +87,7 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Zap size={18} color="#f1c40f" />
-            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#fff' }}>Effects Manager</h2>
+            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#fff' }}>{t.EFFECTS_TITLE}</h2>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}><X size={20} /></button>
         </div>
@@ -109,7 +113,7 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
                   fontSize: '12px'
                 }}
               >
-                <Plus size={14} /> Add Effect
+                <Plus size={14} /> {t.ADD_EFFECT}
               </button>
             </div>
 
@@ -126,7 +130,7 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = '#3e3e3e'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    {def.name}
+                    {def.nameKey ? (t as any)[def.nameKey] : def.name}
                   </div>
                 ))}
               </div>
@@ -148,7 +152,12 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
                 }}
               >
                 <Zap size={14} color={effect.disabled ? '#444' : '#f1c40f'} />
-                <span style={{ flex: 1, fontSize: '13px' }}>{effect.name}</span>
+                <span style={{ flex: 1, fontSize: '13px' }}>
+                  {(() => {
+                    const def = EFFECT_DEFINITIONS.find(d => d.type === effect.type);
+                    return def?.nameKey ? (t as any)[def.nameKey] : effect.name;
+                  })()}
+                </span>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onRemove(effect.id); if (selectedEffectId === effect.id) setSelectedEffectId(null); }}
                   style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 2 }}
@@ -165,9 +174,11 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
             {selectedEffect ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                   <h3 style={{ margin: 0, color: '#fff', fontSize: '18px' }}>{selectedEffect.name}</h3>
+                   <h3 style={{ margin: 0, color: '#fff', fontSize: '18px' }}>
+                     {selectedDef?.nameKey ? (t as any)[selectedDef.nameKey] : selectedEffect.name}
+                   </h3>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Enabled</span>
+                      <span style={{ fontSize: '12px', color: '#666' }}>{t.ENABLED}</span>
                       <input 
                         type="checkbox" 
                         checked={!selectedEffect.disabled} 
@@ -179,7 +190,9 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {selectedDef?.propertyDefinitions.map((pDef: any) => (
                     <div key={pDef.name} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <label style={{ width: '120px', color: '#888', fontSize: '12px' }}>{pDef.name}</label>
+                      <label style={{ width: '120px', color: '#888', fontSize: '12px' }}>
+                        {pDef.labelKey ? (t as any)[pDef.labelKey] : pDef.name}
+                      </label>
                       <input 
                         type={pDef.type === 'number' ? 'number' : 'text'}
                         value={selectedEffect.properties[pDef.name] ?? pDef.defaultValue}
@@ -206,7 +219,7 @@ export const EffectsDialog: React.FC<EffectsDialogProps> = ({ effects, onAdd, on
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
                 <Zap size={48} style={{ marginBottom: '16px', opacity: 0.2 }} />
-                <p>Select an effect to edit properties or add a new one.</p>
+                <p>{t.SELECT_EFFECT_DETAILS}</p>
               </div>
             )}
           </div>

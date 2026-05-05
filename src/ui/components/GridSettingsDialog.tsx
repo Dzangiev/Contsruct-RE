@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Grid, Zap, Eye, EyeOff, Palette, Move } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface GridSettingsDialogProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface GridSettingsDialogProps {
 
 export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, onClose }) => {
   const { editorState, setGridSettings } = useEditorStore();
+  const t = getTranslation(editorState.language);
   const { gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, snapToGrid, showGrid } = editorState;
 
   const [w, setW] = React.useState(gridSizeW);
@@ -50,7 +52,7 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
             <div style={{ backgroundColor: 'rgba(0, 122, 204, 0.1)', padding: '6px', borderRadius: '8px' }}>
               <Grid size={18} color="#007acc" />
             </div>
-            <span style={{ fontWeight: 700, fontSize: '15px', color: '#fff' }}>Grid Settings</span>
+            <span style={{ fontWeight: 700, fontSize: '15px', color: '#fff' }}>{t.GRID_SETTINGS}</span>
           </div>
           <button onClick={onClose} style={closeButtonStyle}><X size={18} /></button>
         </div>
@@ -60,46 +62,46 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
             {/* Left Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={sectionStyle}>
-                <div style={sectionHeaderStyle}><Grid size={14} /> <span>Grid Size</span></div>
+                <div style={sectionHeaderStyle}><Grid size={14} /> <span>{t.GRID} {t.SIZE}</span></div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={inputGroupStyle}>
                     <input type="number" value={w} onChange={e => setW(Number(e.target.value))} style={inputStyle} min={1} />
-                    <span style={inputLabelStyle}>Width</span>
+                    <span style={inputLabelStyle}>{t.WIDTH}</span>
                   </div>
                   <div style={inputGroupStyle}>
                     <input type="number" value={h} onChange={e => setH(Number(e.target.value))} style={inputStyle} min={1} />
-                    <span style={inputLabelStyle}>Height</span>
+                    <span style={inputLabelStyle}>{t.HEIGHT}</span>
                   </div>
                 </div>
               </div>
 
               <div style={sectionStyle}>
-                <div style={sectionHeaderStyle}><Move size={14} /> <span>Offset</span></div>
+                <div style={sectionHeaderStyle}><Move size={14} /> <span>{t.OFFSET}</span></div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={inputGroupStyle}>
                     <input type="number" value={ox} onChange={e => setOx(Number(e.target.value))} style={inputStyle} />
-                    <span style={inputLabelStyle}>X</span>
+                    <span style={inputLabelStyle}>{t.X}</span>
                   </div>
                   <div style={inputGroupStyle}>
                     <input type="number" value={oy} onChange={e => setOy(Number(e.target.value))} style={inputStyle} />
-                    <span style={inputLabelStyle}>Y</span>
+                    <span style={inputLabelStyle}>{t.Y}</span>
                   </div>
                 </div>
               </div>
 
               <div style={sectionStyle}>
-                <div style={sectionHeaderStyle}><Palette size={14} /> <span>Appearance</span></div>
+                <div style={sectionHeaderStyle}><Palette size={14} /> <span>{t.APPEARANCE}</span></div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <div style={{ ...inputGroupStyle, flex: '0 0 60px' }}>
                     <div style={{ position: 'relative', height: '32px' }}>
                       <input type="color" value={color} onChange={e => setColor(e.target.value)} style={colorInputStyle} />
                       <div style={{ ...colorPreviewStyle, backgroundColor: color }} />
                     </div>
-                    <span style={inputLabelStyle}>Color</span>
+                    <span style={inputLabelStyle}>{t.GRID_COLOR}</span>
                   </div>
                   <div style={inputGroupStyle}>
                     <input type="range" min="0" max="1" step="0.01" value={opacity} onChange={e => setOpacity(Number(e.target.value))} style={rangeInputStyle} />
-                    <span style={inputLabelStyle}>Opacity ({Math.round(opacity * 100)}%)</span>
+                    <span style={inputLabelStyle}>{t.GRID_OPACITY} ({Math.round(opacity * 100)}%)</span>
                   </div>
                 </div>
               </div>
@@ -108,7 +110,7 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
             {/* Right Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={sectionStyle}>
-                <label style={labelStyle}>Presets</label>
+                <label style={labelStyle}>{t.PRESETS}</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                   {presets.map(p => (
                     <button 
@@ -127,14 +129,14 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
               </div>
 
               <div style={{ ...sectionStyle, borderBottom: 'none' }}>
-                 <label style={labelStyle}>Options</label>
+                 <label style={labelStyle}>{t.OPTIONS}</label>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={toggleRowStyle} onClick={() => setGridSettings(undefined, undefined, !snapToGrid)}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ ...iconCircleStyle, backgroundColor: snapToGrid ? 'rgba(255, 204, 0, 0.1)' : 'transparent' }}>
                           <Zap size={14} color={snapToGrid ? '#ffcc00' : '#666'} />
                         </div>
-                        <span style={{ fontSize: '12px', color: snapToGrid ? '#fff' : '#888' }}>Snap to grid</span>
+                        <span style={{ fontSize: '12px', color: snapToGrid ? '#fff' : '#888' }}>{t.SNAP_TO_GRID}</span>
                       </div>
                       <div style={{ ...toggleStyle, backgroundColor: snapToGrid ? '#007acc' : '#333' }}>
                         <div style={{ ...toggleHandleStyle, transform: snapToGrid ? 'translateX(14px)' : 'translateX(0)' }} />
@@ -146,7 +148,7 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
                         <div style={{ ...iconCircleStyle, backgroundColor: showGrid ? 'rgba(76, 175, 80, 0.1)' : 'transparent' }}>
                           {showGrid ? <Eye size={14} color="#4caf50" /> : <EyeOff size={14} color="#666" />}
                         </div>
-                        <span style={{ fontSize: '12px', color: showGrid ? '#fff' : '#888' }}>Show grid</span>
+                        <span style={{ fontSize: '12px', color: showGrid ? '#fff' : '#888' }}>{t.SHOW_GRID}</span>
                       </div>
                       <div style={{ ...toggleStyle, backgroundColor: showGrid ? '#007acc' : '#333' }}>
                         <div style={{ ...toggleHandleStyle, transform: showGrid ? 'translateX(14px)' : 'translateX(0)' }} />
@@ -159,8 +161,8 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
         </div>
         
         <div style={footerStyle}>
-          <button onClick={onClose} style={cancelButtonStyle}>Cancel</button>
-          <button onClick={handleApply} style={confirmButtonStyle}>Apply Settings</button>
+          <button onClick={onClose} style={cancelButtonStyle}>{t.CANCEL}</button>
+          <button onClick={handleApply} style={confirmButtonStyle}>{t.APPLY}</button>
         </div>
       </div>
     </div>
@@ -169,8 +171,8 @@ export const GridSettingsDialog: React.FC<GridSettingsDialogProps> = ({ isOpen, 
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  zIndex: 10000, backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out'
+  backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 10000, backdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease-out'
 };
 
 const modalStyle: React.CSSProperties = {

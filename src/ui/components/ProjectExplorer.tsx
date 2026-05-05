@@ -46,6 +46,7 @@ import {
   MousePointer, 
   Monitor
 } from 'lucide-react';
+import { getTranslation } from '../../i18n';
 
 const explorerStyle: React.CSSProperties = {
   height: '100%',
@@ -120,6 +121,8 @@ export const ProjectExplorer: React.FC = () => {
     updateGlobalVariable,
     removeGlobalVariable
   } = useEditorStore();
+
+  const t = getTranslation(editorState.language);
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number, y: number, folderId?: string, itemId?: string, type: string } | null>(null);
   const [dragIndicator, setDragIndicator] = React.useState<string | null>(null);
@@ -217,7 +220,7 @@ export const ProjectExplorer: React.FC = () => {
               <button 
                 onClick={async (e) => {
                   e.stopPropagation();
-                  const name = await showDialog({ title: 'Rename Folder', message: 'Enter new folder name:', type: 'prompt', defaultValue: folder.name });
+                  const name = await showDialog({ title: t.RENAME, message: `${t.NAME}:`, type: 'prompt', defaultValue: folder.name });
                   if (name && typeof name === 'string') updateFolder(folder.id, { name });
                 }}
                 style={miniIconButtonStyle}
@@ -225,7 +228,7 @@ export const ProjectExplorer: React.FC = () => {
                 <Edit2 size={10} />
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); if (confirm(`Delete folder "${folder.name}"? Contents will move up.`)) removeFolder(folder.id); }}
+                onClick={(e) => { e.stopPropagation(); if (confirm(`${t.DELETE} ${t.FOLDER.toLowerCase()} "${folder.name}"? ${t.CONTENTS_WILL_MOVE_UP}`)) removeFolder(folder.id); }}
                 style={miniIconButtonStyle}
               >
                 <Trash2 size={10} />
@@ -298,7 +301,7 @@ export const ProjectExplorer: React.FC = () => {
                      fontWeight: 600
                    }}
                  >
-                   {editorState.placementObjectTypeId === item.id ? 'Placing...' : 'Place'}
+                   {editorState.placementObjectTypeId === item.id ? t.PLACING : t.PLACE}
                  </button>
                )}
                {type === 'family' && <span style={{ fontSize: '10px', color: '#555' }}>({item.objectTypeIds.length})</span>}
@@ -313,7 +316,7 @@ export const ProjectExplorer: React.FC = () => {
   return (
     <div className="project-explorer" style={explorerStyle}>
       <div style={{ padding: '12px 16px 8px 16px', fontWeight: 800, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        Project Explorer
+        {t.PROJECT_EXPLORER}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px 8px' }}>
@@ -343,14 +346,14 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-layout' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <LayoutIcon size={12} />
-              <span>Layouts</span>
+              <span>{t.LAYOUTS}</span>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => addFolder('layout', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
+              <button onClick={() => addFolder('layout', t.NEW_FOLDER)} style={miniIconButtonStyle} title={t.NEW_FOLDER}><Folder size={12} /></button>
               <button onClick={async () => {
-                  const name = await showDialog({ title: 'New Layout', message: 'Enter layout name:', type: 'prompt', defaultValue: `Layout ${(project.layouts?.length || 0) + 1}` });
+                  const name = await showDialog({ title: t.NEW_LAYOUT, message: `${t.NAME}:`, type: 'prompt', defaultValue: `${t.LAYOUT} ${(project.layouts?.length || 0) + 1}` });
                   if (name && typeof name === 'string') addLayout(name);
-              }} style={miniIconButtonStyle} title="Add Layout"><Plus size={12} /></button>
+              }} style={miniIconButtonStyle} title={t.ADD_LAYOUT}><Plus size={12} /></button>
             </div>
           </div>
           <div style={{ padding: '4px 0' }}>
@@ -384,17 +387,17 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-objectType' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Package size={12} />
-              <span>Object Types</span>
+              <span>{t.OBJECT_TYPES}</span>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => addFolder('objectType', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
+              <button onClick={() => addFolder('objectType', t.NEW_FOLDER)} style={miniIconButtonStyle} title={t.NEW_FOLDER}><Folder size={12} /></button>
               <button 
                 onClick={async () => {
-                  const name = await showDialog({ title: 'New Sprite', message: 'Enter sprite name:', type: 'prompt', defaultValue: `Sprite ${(project.objectTypes?.length || 0) + 1}` });
+                  const name = await showDialog({ title: t.NEW_SPRITE, message: `${t.NAME}:`, type: 'prompt', defaultValue: `${t.SPRITE} ${(project.objectTypes?.length || 0) + 1}` });
                   if (name && typeof name === 'string') addObjectType(name, ObjectTypeKind.Sprite);
                 }}
                 style={miniIconButtonStyle}
-                title="Add Object Type"
+                title={t.ADD_OBJECT_TYPE}
               >
                 <Plus size={12} />
               </button>
@@ -431,17 +434,17 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-family' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Users size={12} />
-              <span>Families</span>
+              <span>{t.FAMILIES}</span>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => addFolder('family', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
+              <button onClick={() => addFolder('family', t.NEW_FOLDER)} style={miniIconButtonStyle} title={t.NEW_FOLDER}><Folder size={12} /></button>
               <button 
                 onClick={async () => {
-                  const name = await showDialog({ title: 'New Family', message: 'Enter family name:', type: 'prompt', defaultValue: `Family ${(project.families?.length || 0) + 1}` });
+                  const name = await showDialog({ title: t.NEW_FAMILY, message: `${t.NAME}:`, type: 'prompt', defaultValue: `${t.FAMILY} ${(project.families?.length || 0) + 1}` });
                   if (name && typeof name === 'string') addFamily(name);
                 }}
                 style={miniIconButtonStyle}
-                title="Add Family"
+                title={t.ADD_FAMILY}
               >
                 <Plus size={12} />
               </button>
@@ -450,7 +453,7 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ padding: '4px 0' }}>
             {renderFolderContent('family', null)}
             {project.families?.length === 0 && (
-               <div style={{ padding: '8px 12px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>No families</div>
+               <div style={{ padding: '8px 12px', color: '#555', fontStyle: 'italic', fontSize: '11px' }}>{t.NO_FAMILIES}</div>
             )}
           </div>
         </section>
@@ -480,11 +483,11 @@ export const ProjectExplorer: React.FC = () => {
           <div style={{ ...sectionHeaderStyle, outline: dragIndicator === 'root-eventSheet' ? '1px solid #007acc' : 'none', outlineOffset: '-1px', backgroundColor: '#252526' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileText size={12} />
-              <span>Event Sheets</span>
+              <span>{t.EVENT_SHEETS}</span>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => addFolder('eventSheet', 'New Folder')} style={miniIconButtonStyle} title="New Folder"><Folder size={12} /></button>
-              <button style={miniIconButtonStyle} title="Add Event Sheet"><Plus size={12} /></button>
+              <button onClick={() => addFolder('eventSheet', t.NEW_FOLDER)} style={miniIconButtonStyle} title={t.NEW_FOLDER}><Folder size={12} /></button>
+              <button style={miniIconButtonStyle} title={t.ADD_EVENT_SHEET}><Plus size={12} /></button>
             </div>
           </div>
           <div style={{ padding: '4px 0' }}>
@@ -497,13 +500,13 @@ export const ProjectExplorer: React.FC = () => {
         <div style={{ ...contextMenuStyle, top: contextMenu.y, left: contextMenu.x }}>
           {contextMenu.folderId ? (
             <>
-              <div style={contextItemStyle} onClick={() => { addFolder(contextMenu.type as any, 'New Folder', contextMenu.folderId); }}><Folder size={12} /> New Sub-folder</div>
+              <div style={contextItemStyle} onClick={() => { addFolder(contextMenu.type as any, t.NEW_FOLDER, contextMenu.folderId); }}><Folder size={12} /> {t.NEW_SUB_FOLDER}</div>
               <div style={contextItemStyle} onClick={async () => { 
-                const name = await showDialog({ title: 'Rename Folder', message: 'New name:', type: 'prompt', defaultValue: project.folders.find(f => f.id === contextMenu.folderId)?.name });
+                const name = await showDialog({ title: t.RENAME_FOLDER, message: `${t.NAME}:`, type: 'prompt', defaultValue: project.folders.find(f => f.id === contextMenu.folderId)?.name });
                 if (name && typeof name === 'string') updateFolder(contextMenu.folderId!, { name });
-              }}><Edit2 size={12} /> Rename</div>
+              }}><Edit2 size={12} /> {t.RENAME}</div>
               <div style={contextDividerStyle} />
-              <div style={{ ...contextItemStyle, color: '#e74c3c' }} onClick={() => { if (confirm('Delete folder?')) removeFolder(contextMenu.folderId!); }}><Trash2 size={12} /> Delete</div>
+              <div style={{ ...contextItemStyle, color: '#e74c3c' }} onClick={() => { if (confirm(t.DELETE_CONFIRM)) removeFolder(contextMenu.folderId!); }}><Trash2 size={12} /> {t.DELETE}</div>
             </>
           ) : contextMenu.itemId ? (
             <>
@@ -511,17 +514,17 @@ export const ProjectExplorer: React.FC = () => {
                 const item = contextMenu.type === 'layout' ? project.layouts.find(l => l.id === contextMenu.itemId) :
                              contextMenu.type === 'objectType' ? project.objectTypes.find(ot => ot.id === contextMenu.itemId) :
                              project.families.find(f => f.id === contextMenu.itemId);
-                const name = await showDialog({ title: 'Rename', message: 'New name:', type: 'prompt', defaultValue: item?.name });
+                const name = await showDialog({ title: t.RENAME, message: `${t.NAME}:`, type: 'prompt', defaultValue: item?.name });
                 if (name && typeof name === 'string') {
                    if (contextMenu.type === 'layout') updateLayout(contextMenu.itemId!, { name });
                    else if (contextMenu.type === 'objectType') updateObjectType(contextMenu.itemId!, { name });
                    else if (contextMenu.type === 'family') updateFamily(contextMenu.itemId!, { name });
                 }
-              }}><Edit2 size={12} /> Rename</div>
+              }}><Edit2 size={12} /> {t.RENAME}</div>
               <div style={contextDividerStyle} />
               <div style={{ ...contextItemStyle, color: '#e74c3c' }} onClick={() => { 
                 // Delete item logic
-              }}><Trash2 size={12} /> Delete</div>
+              }}><Trash2 size={12} /> {t.DELETE}</div>
             </>
           ) : null}
         </div>

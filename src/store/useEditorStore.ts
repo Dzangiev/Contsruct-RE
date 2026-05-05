@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Project, createEmptyProject, ObjectTypeKind, EventBlock, Condition, Action } from '../model/project';
 import { EditorState, createInitialEditorState, ToolType, ClipboardData } from '../editor/editorState';
+import { Language } from '../i18n/types';
 import * as projectUpdates from '../model/projectUpdates';
 import * as eventUpdates from '../model/eventUpdates';
 import * as editorUpdates from '../editor/editorState';
@@ -90,6 +91,7 @@ interface EditorStore {
   setRulerSettings: (showRulers: boolean) => void;
   setMousePosition: (x: number, y: number) => void;
   setShowWatchers: (show: boolean) => void;
+  setLanguage: (lang: Language) => void;
   
   // Sprite Editor
   openSpriteEditor: (objectTypeId: string) => void;
@@ -581,6 +583,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setShowWatchers: (show) => set((state) => ({
     editorState: { ...state.editorState, showWatchers: show }
   })),
+  setLanguage: (lang) => {
+    localStorage.setItem('editor-language', lang);
+    set((state) => ({
+      editorState: { ...state.editorState, language: lang }
+    }));
+  },
 
   // Clipboard
   copySelected: () => {

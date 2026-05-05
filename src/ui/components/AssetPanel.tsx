@@ -2,10 +2,12 @@ import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Image, Music, FileText, Plus, Trash2, Upload, Search, Film } from 'lucide-react';
 import { generateId } from '../../utils/id';
+import { getTranslation } from '../../i18n';
 
 export const AssetPanel: React.FC = () => {
-  const { project, addAsset, removeAsset } = useEditorStore();
+  const { project, editorState, addAsset, removeAsset } = useEditorStore();
   const [filter, setFilter] = React.useState('');
+  const t = getTranslation(editorState.language);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,7 +44,7 @@ export const AssetPanel: React.FC = () => {
         borderBottom: '1px solid #111'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ccc', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          <Image size={12} /> Asset Library
+          <Image size={12} /> {t.ASSET_LIBRARY}
         </div>
         <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           <Plus size={14} color="#ccc" />
@@ -55,7 +57,7 @@ export const AssetPanel: React.FC = () => {
           <Search size={10} color="#666" style={{ position: 'absolute', left: '6px' }} />
           <input 
             type="text" 
-            placeholder="Search assets..." 
+            placeholder={t.SEARCH_ASSETS}
             value={filter}
             onChange={e => setFilter(e.target.value)}
             style={{ 
@@ -75,7 +77,7 @@ export const AssetPanel: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
         {filteredAssets.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#555', fontSize: '10px' }}>
-            No assets found.<br/>Click + to upload.
+            {t.NO_ASSETS_FOUND}<br/>{t.CLICK_TO_UPLOAD}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', gap: '4px' }}>

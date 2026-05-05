@@ -2,6 +2,8 @@ import React from 'react';
 import { Variable, X } from 'lucide-react';
 import { InstanceVariable, GlobalVariable } from '../../model/project';
 import { sanitizeName, isValidName } from '../../utils/naming';
+import { useEditorStore } from '../../store/useEditorStore';
+import { getTranslation } from '../../i18n';
 
 interface VariableDialogProps {
   title: string;
@@ -15,10 +17,13 @@ interface VariableDialogProps {
 export const VariableDialog: React.FC<VariableDialogProps> = ({ 
   title, variable, existingNames, onSave, onCancel, showStaticConstant = false
 }) => {
+  const { editorState } = useEditorStore();
+  const t = getTranslation(editorState.language);
+
   const getDefaultName = () => {
     let i = 1;
-    while (existingNames.includes(`Variable${i}`)) i++;
-    return `Variable${i}`;
+    while (existingNames.includes(`${t.VARIABLE}${i}`)) i++;
+    return `${t.VARIABLE}${i}`;
   };
 
   const [name, setName] = React.useState(variable?.name || getDefaultName());
@@ -40,12 +45,12 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!name.trim()) return setError('Name cannot be empty');
-    if (!isValidName(name)) return setError('Invalid name (must start with a letter and contain only letters, numbers, and underscores)');
+    if (!name.trim()) return setError(t.NAME_CANNOT_EMPTY);
+    if (!isValidName(name)) return setError(t.INVALID_NAME_FORMAT);
     
     // Check for uniqueness (excluding current name if editing)
     if (name !== variable?.name && existingNames.includes(name)) {
-      return setError('A variable with this name already exists');
+      return setError(t.VARIABLE_ALREADY_EXISTS);
     }
 
     onSave({ name, type, initialValue, description, isStatic, isConstant });
@@ -62,7 +67,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
           <div style={{ backgroundColor: '#3498db', padding: '6px', borderRadius: '6px' }}><Variable size={18} color="#fff" /></div>
           <div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>{title}</div>
-            <div style={{ fontSize: '11px', color: '#666' }}>Configure variable properties</div>
+            <div style={{ fontSize: '11px', color: '#666' }}>{t.CONFIGURE_VARIABLE}</div>
           </div>
           <button onClick={onCancel} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}><X size={20} /></button>
         </div>
@@ -70,7 +75,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
         <div style={{ padding: '32px 40px 24px' }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={rowStyle}>
-              <label style={labelStyle}>Name</label>
+              <label style={labelStyle}>{t.NAME}</label>
               <input 
                 ref={inputRef}
                 autoFocus 
@@ -81,20 +86,20 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
             </div>
 
             <div style={rowStyle}>
-              <label style={labelStyle}>Type</label>
+              <label style={labelStyle}>{t.TYPE}</label>
               <select value={type} onChange={e => setType(e.target.value as any)} style={inputBaseStyle}>
-                <option value="number">Number</option>
-                <option value="string">String</option>
-                <option value="boolean">Boolean</option>
+                <option value="number">{t.TYPE_NUMBER || 'Number'}</option>
+                <option value="string">{t.TYPE_STRING || 'String'}</option>
+                <option value="boolean">{t.TYPE_BOOLEAN || 'Boolean'}</option>
               </select>
             </div>
 
             <div style={rowStyle}>
-              <label style={labelStyle}>Initial value</label>
+              <label style={labelStyle}>{t.INITIAL_VALUE}</label>
               {type === 'boolean' ? (
                 <select value={String(initialValue)} onChange={e => setInitialValue(e.target.value === 'true')} style={inputBaseStyle}>
-                  <option value="true">True</option>
-                  <option value="false">False</option>
+                  <option value="true">{t.TRUE}</option>
+                  <option value="false">{t.FALSE}</option>
                 </select>
               ) : (
                 <input 
@@ -107,8 +112,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
             </div>
 
             <div style={rowStyle}>
-              <label style={labelStyle}>Description</label>
-              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description..." style={inputBaseStyle} />
+              <label style={labelStyle}>{t.DESCRIPTION}</label>
+              <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t.OPTIONAL_DESCRIPTION} style={inputBaseStyle} />
             </div>
 
             {showStaticConstant && (
@@ -117,14 +122,14 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
                   <div style={{ width: '16px', height: '16px', backgroundColor: isStatic ? '#007acc' : '#1e1e1e', border: '1px solid #444', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {isStatic && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}
                   </div>
-                  <span style={{ fontSize: '13px', color: isStatic ? '#fff' : '#888', fontWeight: isStatic ? 600 : 400 }}>Static</span>
+                  <span style={{ fontSize: '13px', color: isStatic ? '#fff' : '#888', fontWeight: isStatic ? 600 : 400 }}>{t.STATIC}</span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsConstant(!isConstant)}>
                   <div style={{ width: '16px', height: '16px', backgroundColor: isConstant ? '#007acc' : '#1e1e1e', border: '1px solid #444', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {isConstant && <div style={{ width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '1px' }} />}
                   </div>
-                  <span style={{ fontSize: '13px', color: isConstant ? '#fff' : '#888', fontWeight: isConstant ? 600 : 400 }}>Constant</span>
+                  <span style={{ fontSize: '13px', color: isConstant ? '#fff' : '#888', fontWeight: isConstant ? 600 : 400 }}>{t.CONSTANT}</span>
                 </div>
               </div>
             )}
@@ -134,8 +139,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
         </div>
 
         <div style={{ padding: '16px 24px', backgroundColor: '#2d2d2d', borderTop: '1px solid #1a1a1a', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button onClick={onCancel} style={cancelButtonStyle}>Cancel</button>
-          <button onClick={() => handleSubmit()} style={saveButtonStyle}>OK</button>
+          <button onClick={onCancel} style={cancelButtonStyle}>{t.CANCEL}</button>
+          <button onClick={() => handleSubmit()} style={saveButtonStyle}>{t.OK}</button>
         </div>
       </div>
     </div>
@@ -145,11 +150,12 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.85)',
+  backgroundColor: 'rgba(0,0,0,0.8)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 5000
+  zIndex: 5000,
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {

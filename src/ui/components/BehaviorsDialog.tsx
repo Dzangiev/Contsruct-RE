@@ -2,6 +2,8 @@ import React from 'react';
 import { BEHAVIOR_DEFINITIONS, BehaviorDefinition } from '../../model/definitions';
 import { X, Plus, Search, Settings, Shield } from 'lucide-react';
 import { ObjectType, Behavior } from '../../model/project';
+import { getTranslation } from '../../i18n';
+import { useEditorStore } from '../../store/useEditorStore';
 
 interface BehaviorsDialogProps {
   objectType: ObjectType;
@@ -11,6 +13,8 @@ interface BehaviorsDialogProps {
 }
 
 export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, onAdd, onRemove, onClose }) => {
+  const language = useEditorStore(s => s.editorState.language);
+  const t = getTranslation(language);
   const [showAddList, setShowAddList] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
 
@@ -25,7 +29,7 @@ export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, on
         <div style={headerStyle}>
           <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Shield size={18} color="#007acc" />
-            Behaviors: {objectType.name}
+            {t.BEHAVIORS_TITLE}: {objectType.name}
           </h3>
           <button onClick={onClose} style={closeButtonStyle}><X size={20} /></button>
         </div>
@@ -37,12 +41,12 @@ export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, on
                 <Search size={14} color="#666" />
                 <input 
                   autoFocus
-                  placeholder="Search behaviors..."
+                  placeholder={t.SEARCH_BEHAVIORS}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   style={searchInputStyle}
                 />
-                <button onClick={() => setShowAddList(false)} style={textButtonStyle}>Back</button>
+                <button onClick={() => setShowAddList(false)} style={textButtonStyle}>{t.BACK}</button>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
                 {filteredBehaviors.map(b => (
@@ -56,8 +60,12 @@ export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, on
                     }}
                     style={behaviorCardStyle}
                   >
-                    <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>{b.name}</div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{b.description}</div>
+                    <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>
+                      {b.nameKey ? (t as any)[b.nameKey] : b.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                      {b.descriptionKey ? (t as any)[b.descriptionKey] : b.description}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -73,20 +81,20 @@ export const BehaviorsDialog: React.FC<BehaviorsDialogProps> = ({ objectType, on
                           <div style={{ fontWeight: 'bold', color: '#fff' }}>{b.name}</div>
                           <div style={{ fontSize: '11px', color: '#666' }}>{b.type}</div>
                         </div>
-                        <button onClick={() => onRemove(b.id)} style={removeButtonStyle}>Remove</button>
+                        <button onClick={() => onRemove(b.id)} style={removeButtonStyle}>{t.DELETE}</button>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div style={emptyStateStyle}>
                     <Shield size={48} style={{ opacity: 0.1, marginBottom: '15px' }} />
-                    <div style={{ color: '#666' }}>No behaviors added to this object type.</div>
+                    <div style={{ color: '#666' }}>{t.NO_BEHAVIORS_ADDED}</div>
                   </div>
                 )}
               </div>
               <div style={footerStyle}>
                 <button onClick={() => setShowAddList(true)} style={addButtonStyle}>
-                  <Plus size={14} /> Add new behavior
+                  <Plus size={14} /> {t.ADD_BEHAVIOR}
                 </button>
               </div>
             </div>
@@ -104,7 +112,8 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 4000
+  zIndex: 4000,
+  backdropFilter: 'blur(4px)'
 };
 
 const modalStyle: React.CSSProperties = {

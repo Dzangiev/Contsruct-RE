@@ -2,10 +2,12 @@ import React from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { MousePointer2, Layers, Search, Cpu, FileJson, List, Zap, Terminal } from 'lucide-react';
 import { EventBlock } from '../../model/project';
+import { getTranslation } from '../../i18n';
 
 export const StatusBar: React.FC = () => {
   const { project, editorState } = useEditorStore();
-  const { mousePosition, activeLayerId, activeLayoutId, zoom, currentTab } = editorState;
+  const { mousePosition, activeLayerId, activeLayoutId, zoom, currentTab, language } = editorState;
+  const t = getTranslation(language);
   
   const activeLayout = project.layouts.find(l => l.id === activeLayoutId);
   const activeLayer = activeLayout?.layers.find(l => l.id === activeLayerId);
@@ -42,7 +44,7 @@ export const StatusBar: React.FC = () => {
 
           <div style={sectionStyle}>
             <Layers size={14} />
-            <span>{activeLayer?.name || 'No Layer'}</span>
+            <span>{activeLayer?.name || t.NO_LAYER}</span>
           </div>
 
           <div style={dividerStyle} />
@@ -56,28 +58,28 @@ export const StatusBar: React.FC = () => {
 
           <div style={sectionStyle}>
             <List size={14} style={{ opacity: 0.7 }} />
-            <span>Grid: {editorState.gridSizeW}x{editorState.gridSizeH}</span>
+            <span>{t.GRID}: {editorState.gridSizeW}x{editorState.gridSizeH}</span>
           </div>
         </>
       ) : (
         <>
           <div style={sectionStyle}>
             <Terminal size={14} />
-            <span>{project.globalVariables.length} Global Variables</span>
+            <span>{project.globalVariables.length} {t.GLOBAL_VARIABLES_COUNT}</span>
           </div>
 
           <div style={dividerStyle} />
 
           <div style={sectionStyle}>
             <List size={14} />
-            <span>{eventSheet ? countTotalEvents(eventSheet.events) : 0} Event Blocks</span>
+            <span>{eventSheet ? countTotalEvents(eventSheet.events) : 0} {t.EVENT_BLOCKS_COUNT}</span>
           </div>
 
           <div style={dividerStyle} />
 
           <div style={sectionStyle}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2ecc71' }}></div>
-            <span style={{ fontWeight: 600, letterSpacing: '0.5px' }}>C3 ELITE MODE ACTIVE</span>
+            <span style={{ fontWeight: 600, letterSpacing: '0.5px' }}>{t.ENGINE_MODE_ACTIVE}</span>
           </div>
         </>
       )}
@@ -86,7 +88,7 @@ export const StatusBar: React.FC = () => {
 
       <div style={sectionStyle}>
         <Cpu size={14} style={{ color: '#2ecc71' }} />
-        <span>Ready</span>
+        <span>{t.STATUS_READY}</span>
       </div>
     </div>
   );
