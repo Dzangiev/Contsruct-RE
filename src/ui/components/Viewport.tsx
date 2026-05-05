@@ -50,6 +50,45 @@ export const Viewport: React.FC = () => {
   
   
 
+  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
+
+  React.useEffect(() => {
+    if (!viewportRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    observer.observe(viewportRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const centerLayout = React.useCallback((targetZoom?: number) => {
+    if (!activeLayout || !viewportRef.current) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    const rulerOffset = showRulers ? 22 : 0;
+    const availableWidth = rect.width - rulerOffset;
+    const availableHeight = rect.height - rulerOffset;
+    
+    const useZoom = targetZoom || zoom;
+    const vWidth = project.settings.viewportWidth;
+    const vHeight = project.settings.viewportHeight;
+    const newPanX = (availableWidth - vWidth * useZoom) / 2;
+    const newPanY = (availableHeight - vHeight * useZoom) / 2;
+    
+    setView(useZoom, newPanX, newPanY);
+  }, [activeLayout, zoom, showRulers, setView, project.settings]);
+
+  // Auto-center on first load or when layout changes if not yet centered
+  const [lastLayoutId, setLastLayoutId] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    if (activeLayout && containerSize.width > 0 && activeLayout.id !== lastLayoutId) {
+      centerLayout();
+      setLastLayoutId(activeLayout.id);
+    }
+  }, [activeLayout, containerSize, lastLayoutId, centerLayout]);
+
   // Global key handlers
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -131,7 +170,7 @@ export const Viewport: React.FC = () => {
         }
         if (e.key === '0') {
           e.preventDefault();
-          setView(1, 50, 50);
+          centerLayout();
         }
       }
       if (e.key.toLowerCase() === 'g') {
@@ -153,7 +192,7 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode, setGridSettingsDialogOpen, setGridSettings, showGrid]);
+  }, [setTool, activeLayout, selectedInstanceIds, removeInstance, setSelectedInstances, gridSizeW, gridSizeH, gridOffsetX, gridOffsetY, gridColor, gridOpacity, undo, redo, copySelected, pasteInstances, cutSelected, cloneInstance, editorState.previewMode, setGridSettingsDialogOpen, setGridSettings, showGrid, centerLayout]);
 
   // Zooming Fix: Non-passive wheel listener to prevent browser zoom
   React.useEffect(() => {
@@ -472,18 +511,6 @@ export const Viewport: React.FC = () => {
     };
   }, [resizing, zoom, activeLayout, updateInstanceSilently, commitProject, panX, panY]);
 
-  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
-
-  React.useEffect(() => {
-    if (!viewportRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
-      }
-    });
-    observer.observe(viewportRef.current);
-    return () => observer.disconnect();
-  }, []);
 
   if (!activeLayout) return <div style={{ flex: 1, backgroundColor: '#333' }} />;
 
@@ -1214,6 +1241,10 @@ export const Viewport: React.FC = () => {
                   <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { setSelectedInstances(activeLayout.instances.map(i => i.id)); setContextMenu(null); }}>
                     <MousePointer2 size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
                     <span style={{ flex: 1 }}>Select All</span>
+                  </div>
+                  <div className="context-menu-item" style={contextMenuItemStyle} onClick={() => { centerLayout(1); setContextMenu(null); }}>
+                    <Maximize size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
+                    <span style={{ flex: 1 }}>Center View</span> <span style={{ color: '#666', fontSize: '10px' }}>Ctrl+0</span>
                   </div>
                   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.05)', margin: '4px 8px' }} />
                   <div style={{ padding: '4px 12px', fontSize: '10px', color: '#555', fontWeight: 'bold', letterSpacing: '0.05em' }}>GRID</div>
