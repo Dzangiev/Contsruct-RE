@@ -6,6 +6,7 @@ import { Rulers } from './Rulers';
 import { InsertObjectDialog } from './InsertObjectDialog';
 import { Trash2, Copy, Grid, Zap, Maximize, Settings, MousePointer2, Info, Layout as LayoutIcon, AlignLeft, AlignCenter, AlignRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { getEffectsFilter } from '../../utils/renderUtils';
+import { ViewportInstance } from './ViewportInstance';
 
 export const Viewport: React.FC = () => {
   const { 
@@ -209,100 +210,154 @@ export const Viewport: React.FC = () => {
         const my = e.clientY - rect.top - (showRulers ? 22 : 0);
         const newPanX = mx - (mx - panX) * (newZoom / zoom);
         const newPanY = my - (my - panY) * (newZoom / zoom);
+        
+        // Update CSS variables immediately for smoothness
+        el.style.setProperty('--pan-x', `${newPanX}px`);
+        el.style.setProperty('--pan-y', `${newPanY}px`);
+        
         setView(newZoom, newPanX, newPanY);
       } else if (e.shiftKey) {
         e.preventDefault();
-        setView(zoom, panX - e.deltaY, panY); // Shift + Wheel = Horizontal scroll
+        const newPanX = panX - e.deltaY;
+        el.style.setProperty('--pan-x', `${newPanX}px`);
+        setView(zoom, newPanX, panY); 
       } else {
-        setView(zoom, panX - e.deltaX, panY - e.deltaY);
+        const newPanX = panX - e.deltaX;
+        const newPanY = panY - e.deltaY;
+        el.style.setProperty('--pan-x', `${newPanX}px`);
+        el.style.setProperty('--pan-y', `${newPanY}px`);
+        setView(zoom, newPanX, newPanY);
       }
     };
     el.addEventListener('wheel', handleWheelGlobal, { passive: false });
     return () => el.removeEventListener('wheel', handleWheelGlobal);
-  }, [zoom, panX, panY, setView]);
+  }, [zoom, panX, panY, setView, showRulers]);
 
   const [snapLines, setSnapLines] = React.useState<{ x?: number, y?: number }[]>([]);
 
   // Instance Dragging
+  const dragRaf = React.useRef<number | null>(null);
+  const scrollInterval = React.useRef<number | null>(null);
+  
   React.useEffect(() => {
-    if (!dragStart) return;
+    if (!dragStart) {
+      if (scrollInterval.current) { clearInterval(scrollInterval.current); scrollInterval.current = null; }
+      return;
+    }
     const handleMouseMove = (e: MouseEvent) => {
-      const dx = (e.clientX - dragStart.x) / zoom;
-      const dy = (e.clientY - dragStart.y) / zoom;
+      // Auto-scrolling logic
+      if (!viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const margin = 50;
+      let scrollX = 0;
+      let scrollY = 0;
       
-      const activeSnaps: { x?: number, y?: number }[] = [];
+      if (e.clientX < rect.left + margin) scrollX = 10;
+      else if (e.clientX > rect.right - margin) scrollX = -10;
       
-      // Use the first selected instance as a reference for snapping to avoid clumping
-      const refId = Array.from(initialPositions.keys())[0];
-      const refPos = initialPositions.get(refId);
-      
-      if (activeLayout && refId && refPos) {
-        let targetX = refPos.x + dx;
-        let targetY = refPos.y + dy;
-        
-        if (e.shiftKey) {
-          if (Math.abs(dx) > Math.abs(dy)) targetY = refPos.y;
-          else targetX = refPos.x;
+      if (e.clientY < rect.top + margin) scrollY = 10;
+      else if (e.clientY > rect.bottom - margin) scrollY = -10;
+
+      if (scrollX !== 0 || scrollY !== 0) {
+        if (!scrollInterval.current) {
+          scrollInterval.current = window.setInterval(() => {
+            const el = viewportRef.current;
+            if (el) {
+              const currentPanX = parseFloat(el.style.getPropertyValue('--pan-x')) || 0;
+              const currentPanY = parseFloat(el.style.getPropertyValue('--pan-y')) || 0;
+              const newPanX = currentPanX + scrollX;
+              const newPanY = currentPanY + scrollY;
+              el.style.setProperty('--pan-x', `${newPanX}px`);
+              el.style.setProperty('--pan-y', `${newPanY}px`);
+              setView(zoom, newPanX, newPanY);
+            }
+          }, 16);
         }
-
-        if (snapToGrid) {
-          targetX = Math.round((targetX - gridOffsetX) / gridSizeW) * gridSizeW + gridOffsetX;
-          targetY = Math.round((targetY - gridOffsetY) / gridSizeH) * gridSizeH + gridOffsetY;
-        }
-
-        // Smart Guides (Object Snapping) - only apply if not already snapped to grid or as refinement
-        const snapThreshold = 10 / zoom;
-        const refInst = activeLayout.instances.find(i => i.id === refId);
-        
-        if (refInst) {
-          const others = [
-            ...activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id)),
-            { x: 0, y: 0, width: activeLayout.width, height: activeLayout.height, isLayout: true },
-            { x: 0, y: 0, width: project.settings.viewportWidth, height: project.settings.viewportHeight, isViewport: true }
-          ];
-
-          others.forEach(other => {
-            const otherEdgesX = [other.x, other.x + other.width / 2, other.x + other.width];
-            const myEdgesX = [targetX, targetX + refInst.width / 2, targetX + refInst.width];
-            
-            myEdgesX.forEach((myX) => {
-              otherEdgesX.forEach((othX) => {
-                if (Math.abs(myX - othX) < snapThreshold) {
-                  targetX += (othX - myX);
-                  activeSnaps.push({ x: othX });
-                }
-              });
-            });
-
-            const otherEdgesY = [other.y, other.y + other.height / 2, other.y + other.height];
-            const myEdgesY = [targetY, targetY + refInst.height / 2, targetY + refInst.height];
-            
-            myEdgesY.forEach((myY) => {
-              otherEdgesY.forEach((othY) => {
-                if (Math.abs(myY - othY) < snapThreshold) {
-                  targetY += (othY - myY);
-                  activeSnaps.push({ y: othY });
-                }
-              });
-            });
-          });
-        }
-
-        const snappedDeltaX = targetX - refPos.x;
-        const snappedDeltaY = targetY - refPos.y;
-
-        const updates: Record<string, any> = {};
-        initialPositions.forEach((pos, id) => {
-          updates[id] = { 
-            x: Math.round(pos.x + snappedDeltaX), 
-            y: Math.round(pos.y + snappedDeltaY) 
-          };
-        });
-        updateInstancesSilently(activeLayout.id, updates);
+      } else {
+        if (scrollInterval.current) { clearInterval(scrollInterval.current); scrollInterval.current = null; }
       }
-      setSnapLines(activeSnaps);
+
+      if (dragRaf.current) cancelAnimationFrame(dragRaf.current);
+      dragRaf.current = requestAnimationFrame(() => {
+        const dx = (e.clientX - dragStart.x) / zoom;
+        const dy = (e.clientY - dragStart.y) / zoom;
+        
+        const activeSnaps: { x?: number, y?: number }[] = [];
+        
+        // Use the first selected instance as a reference for snapping to avoid clumping
+        const refId = Array.from(initialPositions.keys())[0];
+        const refPos = initialPositions.get(refId);
+        
+        if (activeLayout && refId && refPos) {
+          let targetX = refPos.x + dx;
+          let targetY = refPos.y + dy;
+          
+          if (e.shiftKey) {
+            if (Math.abs(dx) > Math.abs(dy)) targetY = refPos.y;
+            else targetX = refPos.x;
+          }
+
+          if (snapToGrid) {
+            targetX = Math.round((targetX - gridOffsetX) / gridSizeW) * gridSizeW + gridOffsetX;
+            targetY = Math.round((targetY - gridOffsetY) / gridSizeH) * gridSizeH + gridOffsetY;
+          }
+
+          // Smart Guides (Object Snapping)
+          const snapThreshold = 10 / zoom;
+          const refInst = activeLayout.instances.find(i => i.id === refId);
+          
+          if (refInst) {
+            const others = [
+              ...activeLayout.instances.filter(i => !selectedInstanceIds.includes(i.id)),
+              { x: 0, y: 0, width: activeLayout.width, height: activeLayout.height, isLayout: true },
+              { x: 0, y: 0, width: project.settings.viewportWidth, height: project.settings.viewportHeight, isViewport: true }
+            ];
+
+            others.forEach(other => {
+              const otherEdgesX = [other.x, other.x + (other as any).width / 2, other.x + (other as any).width];
+              const myEdgesX = [targetX, targetX + refInst.width / 2, targetX + refInst.width];
+              
+              myEdgesX.forEach((myX) => {
+                otherEdgesX.forEach((othX) => {
+                  if (Math.abs(myX - othX) < snapThreshold) {
+                    targetX += (othX - myX);
+                    activeSnaps.push({ x: othX });
+                  }
+                });
+              });
+
+              const otherEdgesY = [other.y, other.y + (other as any).height / 2, other.y + (other as any).height];
+              const myEdgesY = [targetY, targetY + refInst.height / 2, targetY + refInst.height];
+              
+              myEdgesY.forEach((myY) => {
+                otherEdgesY.forEach((othY) => {
+                  if (Math.abs(myY - othY) < snapThreshold) {
+                    targetY += (othY - myY);
+                    activeSnaps.push({ y: othY });
+                  }
+                });
+              });
+            });
+          }
+
+          const snappedDeltaX = targetX - refPos.x;
+          const snappedDeltaY = targetY - refPos.y;
+
+          const updates: Record<string, any> = {};
+          initialPositions.forEach((pos, id) => {
+            updates[id] = { 
+              x: Math.round(pos.x + snappedDeltaX), 
+              y: Math.round(pos.y + snappedDeltaY) 
+            };
+          });
+          updateInstancesSilently(activeLayout.id, updates);
+        }
+        setSnapLines(activeSnaps);
+      });
     };
     const handleMouseUp = () => {
+      if (dragRaf.current) cancelAnimationFrame(dragRaf.current);
+      if (scrollInterval.current) { clearInterval(scrollInterval.current); scrollInterval.current = null; }
       setDragStart(null);
       setInitialPositions(new Map());
       setSnapLines([]);
@@ -314,17 +369,32 @@ export const Viewport: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragStart, initialPositions, zoom, activeLayout, updateInstanceSilently, commitProject, gridSizeW, gridSizeH, snapToGrid, selectedInstanceIds, project.settings.viewportWidth, project.settings.viewportHeight]);
+  }, [dragStart, initialPositions, zoom, activeLayout, updateInstancesSilently, commitProject, gridSizeW, gridSizeH, snapToGrid, selectedInstanceIds, project.settings.viewportWidth, project.settings.viewportHeight, gridOffsetX, gridOffsetY]);
 
   // Panning
+  const panRaf = React.useRef<number | null>(null);
   React.useEffect(() => {
     if (!panStart) return;
+    const el = viewportRef.current;
+    if (!el) return;
+
     const handleMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      setView(zoom, panStart.panX + dx, panStart.panY + dy);
+      if (panRaf.current) cancelAnimationFrame(panRaf.current);
+      panRaf.current = requestAnimationFrame(() => {
+        const dx = e.clientX - panStart.x;
+        const dy = e.clientY - panStart.y;
+        const newX = panStart.panX + dx;
+        const newY = panStart.panY + dy;
+        
+        el.style.setProperty('--pan-x', `${newX}px`);
+        el.style.setProperty('--pan-y', `${newY}px`);
+        setView(zoom, newX, newY);
+      });
     };
-    const handleMouseUp = () => setPanStart(null);
+    const handleMouseUp = () => {
+      if (panRaf.current) cancelAnimationFrame(panRaf.current);
+      setPanStart(null);
+    };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
@@ -749,8 +819,12 @@ export const Viewport: React.FC = () => {
         cursor: (tool === 'pan' || isSpaceDown) ? (panStart ? 'grabbing' : 'grab') : (tool === 'place') ? 'crosshair' : (dragStart || resizing) ? 'grabbing' : 'default', 
         outline: 'none', display: 'flex', flexDirection: 'column',
         opacity: lastLayoutId ? 1 : 0,
-        transition: 'opacity 0.2s ease-in-out'
-      }}
+        transition: 'opacity 0.2s ease-in-out',
+        '--pan-x': `${panX}px`,
+        '--pan-y': `${panY}px`,
+        '--zoom': zoom,
+        '--ruler-offset': `${showRulers ? 22 : 0}px`
+      } as React.CSSProperties}
       tabIndex={0} onMouseDown={handleMouseDown} onContextMenu={handleContextMenu} onClick={handleViewportClick} onMouseMove={handleMouseMoveGlobal}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDrop={handleDrop}
@@ -830,12 +904,12 @@ export const Viewport: React.FC = () => {
                   {/* Minor lines */}
                   <path 
                     d={`M ${gridSizeW} 0 L ${gridSizeW} ${gridSizeH * 4} M ${gridSizeW * 2} 0 L ${gridSizeW * 2} ${gridSizeH * 4} M ${gridSizeW * 3} 0 L ${gridSizeW * 3} ${gridSizeH * 4} M 0 ${gridSizeH} L ${gridSizeW * 4} ${gridSizeH} M 0 ${gridSizeH * 2} L ${gridSizeW * 4} ${gridSizeH * 2} M 0 ${gridSizeH * 3} L ${gridSizeW * 4} ${gridSizeH * 3}`} 
-                    fill="none" stroke={gridColor} strokeWidth={0.5 / zoom} opacity={gridOpacity * 0.3} style={{ vectorEffect: 'non-scaling-stroke' }} 
+                    fill="none" stroke={gridColor} strokeWidth={0.5 / zoom} opacity={gridOpacity * (zoom < 0.4 ? 0.1 : 0.3)} style={{ vectorEffect: 'non-scaling-stroke' }} 
                   />
                   {/* Major lines */}
                   <path 
                     d={`M ${gridSizeW * 4} 0 L 0 0 0 ${gridSizeH * 4}`} 
-                    fill="none" stroke={gridColor} strokeWidth={1 / zoom} opacity={gridOpacity * 0.8} style={{ vectorEffect: 'non-scaling-stroke' }} 
+                    fill="none" stroke={gridColor} strokeWidth={1 / zoom} opacity={gridOpacity * (zoom < 0.2 ? 0.2 : 0.8)} style={{ vectorEffect: 'non-scaling-stroke' }} 
                   />
                 </pattern>
                 <rect x={-50000} y={-50000} width={100000} height={100000} fill="none" pointerEvents="none" />
@@ -843,11 +917,27 @@ export const Viewport: React.FC = () => {
             )}
           </defs>
 
-          <g transform={`translate(${(showRulers ? 22 : 0) + panX}, ${(showRulers ? 22 : 0) + panY}) scale(${zoom})`}>
+          <g style={{ transform: 'translate3d(calc(var(--ruler-offset) + var(--pan-x)), calc(var(--ruler-offset) + var(--pan-y)), 0) scale(var(--zoom))', willChange: 'transform' }}>
             {/* Workspace Background (Infinite) */}
             <rect x={-20000} y={-20000} width={40000} height={40000} fill="#161617" />
             <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#workspace-dots)" />
             {showGrid && <rect x={-20000} y={-20000} width={40000} height={40000} fill="url(#grid-major)" opacity={0.3} pointerEvents="none" />}
+            
+            {/* Orientation Guides */}
+            <g pointerEvents="none">
+              {/* Layout Center Crosshair */}
+              <line x1={width / 2} y1={height / 2 - 20 / zoom} x2={width / 2} y2={height / 2 + 20 / zoom} stroke="rgba(255,255,255,0.4)" strokeWidth={2 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+              <line x1={width / 2 - 20 / zoom} y1={height / 2} x2={width / 2 + 20 / zoom} y2={height / 2} stroke="rgba(255,255,255,0.4)" strokeWidth={2 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+              <circle cx={width / 2} cy={height / 2} r={4 / zoom} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
+
+              {/* Viewport Boundary Extended Guides (Infinite Lines) */}
+              <g opacity={0.15}>
+                <line x1={0} y1={-20000} x2={0} y2={20000} stroke="#007acc" strokeWidth={1 / zoom} strokeDasharray={`${8/zoom} ${8/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                <line x1={project.settings.viewportWidth} y1={-20000} x2={project.settings.viewportWidth} y2={20000} stroke="#007acc" strokeWidth={1 / zoom} strokeDasharray={`${8/zoom} ${8/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                <line x1={-20000} y1={0} x2={20000} y2={0} stroke="#007acc" strokeWidth={1 / zoom} strokeDasharray={`${8/zoom} ${8/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />
+                <line x1={-20000} y1={project.settings.viewportHeight} x2={20000} y2={project.settings.viewportHeight} stroke="#007acc" strokeWidth={1 / zoom} strokeDasharray={`${8/zoom} ${8/zoom}`} style={{ vectorEffect: 'non-scaling-stroke' }} />
+              </g>
+            </g>
             
             {/* Layout Canvas with shadow/distinct border */}
             <rect 
@@ -881,150 +971,20 @@ export const Viewport: React.FC = () => {
                     filter: getEffectsFilter(layer.effects)
                   }}
                 >
-                  {instances.filter(inst => inst.layerId === layer.id).map(inst => {
-                    const isSelected = selectedInstanceIds.includes(inst.id);
-                    const objectType = project.objectTypes?.find(ot => ot.id === inst.objectTypeId);
-                    const kind = objectType?.kind || ObjectTypeKind.Sprite;
-
-                    const renderContent = () => {
-                      switch (kind) {
-                        case ObjectTypeKind.Text: {
-                          const textValue = inst.properties.text || objectType?.properties.text || 'Text';
-                          const color = inst.properties.color || objectType?.properties.color || '#ffffff';
-                          const fontSize = (inst.properties.fontSize || objectType?.properties.fontSize || 12);
-                          const fontFace = inst.properties.fontFace || objectType?.properties.fontFace || 'Arial';
-                          const hAlign = inst.properties.horizontalAlign || objectType?.properties.horizontalAlign || 'left';
-                          const vAlign = inst.properties.verticalAlign || objectType?.properties.verticalAlign || 'top';
-
-                          let textAnchor: any = 'start';
-                          let tx = 2;
-                          if (hAlign === 'center') { textAnchor = 'middle'; tx = inst.width / 2; }
-                          else if (hAlign === 'right') { textAnchor = 'end'; tx = inst.width - 2; }
-
-                          let domBaseline: any = 'hanging';
-                          let ty = 2;
-                          if (vAlign === 'center') { domBaseline = 'central'; ty = inst.height / 2; }
-                          else if (vAlign === 'bottom') { domBaseline = 'auto'; ty = inst.height - 2; }
-
-                          return (
-                            <g>
-                              <rect width={inst.width} height={inst.height} fill="transparent" stroke={isSelected ? "#0099ff" : "rgba(255,255,255,0.1)"} strokeWidth={1/zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
-                              <text 
-                                x={tx} y={ty} 
-                                fontSize={fontSize} 
-                                fill={color} 
-                                fontFamily={fontFace}
-                                textAnchor={textAnchor}
-                                dominantBaseline={domBaseline}
-                                pointerEvents="none"
-                                style={{ userSelect: 'none' }}
-                              >
-                                {textValue}
-                              </text>
-                            </g>
-                          );
-                        }
-                        case ObjectTypeKind.TiledBackground: {
-                          const tileW = inst.properties.tileWidth || 32;
-                          const tileH = inst.properties.tileHeight || 32;
-                          const bgColor = inst.properties.color || '#2d2d2d';
-                          return (
-                            <g>
-                              <defs>
-                                <pattern id={`tiled-${inst.id}`} width={tileW} height={tileH} patternUnits="userSpaceOnUse">
-                                  <rect width={tileW} height={tileH} fill={bgColor} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-                                  <path d={`M 0 ${tileH/2} L ${tileW} ${tileH/2} M ${tileW/2} 0 L ${tileW/2} ${tileH}`} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" opacity="0.3" />
-                                </pattern>
-                              </defs>
-                              <rect width={inst.width} height={inst.height} fill={`url(#tiled-${inst.id})`} stroke={isSelected ? "#0099ff" : "#444"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke' }} />
-                              <text x={inst.width/2} y={inst.height/2} fontSize={Math.max(10 / zoom, 2)} fill="rgba(255,255,255,0.2)" textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>Tiled</text>
-                            </g>
-                          );
-                        }
-                        case ObjectTypeKind.Sprite:
-                        default: {
-                          const defaultFrame = objectType?.animations?.[0]?.frames?.[0];
-                          const assetId = defaultFrame?.assetId;
-                          
-                          if (assetId) {
-                            return (
-                              <image 
-                                width={inst.width} height={inst.height} 
-                                href={assetId} 
-                                preserveAspectRatio="none"
-                                style={{ imageRendering: 'pixelated', opacity: inst.visible ? 1 : 0.3 }}
-                              />
-                            );
-                          }
-
-                          const spriteColor = inst.properties.color || '#4a4a4a';
-                          return (
-                            <g>
-                              <rect width={inst.width} height={inst.height} fill={spriteColor} stroke={isSelected ? "#0099ff" : "#555"} strokeWidth={isSelected ? 2 / zoom : 1 / zoom} style={{ vectorEffect: 'non-scaling-stroke', opacity: inst.visible ? 1 : 0.3 }} />
-                              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
-                                transform={`translate(${inst.width/2 - 12}, ${inst.height/2 - 12}) scale(${Math.min(inst.width, inst.height)/48})`}
-                                fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}
-                              />
-                              <text x={inst.width/2} y={inst.height - (isSelected ? 10/zoom : 5/zoom)} fontSize={Math.max(8 / zoom, 2)} fill="#888" textAnchor="middle" pointerEvents="none" style={{ userSelect: 'none' }}>{objectType?.name || 'Sprite'}</text>
-                            </g>
-                          );
-                        }
-                      }
-                    };
-
-                    return (
-                      <g 
-                        key={inst.id} 
-                        transform={`translate(${inst.x}, ${inst.y}) rotate(${inst.angle})`} 
-                        onMouseDown={(e) => handleInstanceMouseDown(e, inst.id)} 
-                        opacity={inst.opacity}
-                        style={{ filter: getEffectsFilter([...(objectType?.effects || []), ...(inst.effects || [])]) }}
-                      >
-                        {renderContent()}
-                        {highlightedInstanceIds.includes(inst.id) && !isSelected && (
-                          <rect 
-                            width={inst.width} height={inst.height} 
-                            fill="none" 
-                            stroke="#f1c40f" 
-                            strokeWidth={2 / zoom} 
-                            strokeDasharray={`${6/zoom} ${4/zoom}`}
-                            style={{ vectorEffect: 'non-scaling-stroke', animation: 'pulse 1s infinite' }}
-                          />
-                        )}
-                        {isSelected && (
-                          <g>
-                            <rect width={inst.width} height={inst.height} fill="rgba(0, 153, 255, 0.1)" pointerEvents="none" />
-                            {selectedInstanceIds.length === 1 && (
-                              <g>
-                                {[
-                                  { h: 'tl', x: 0, y: 0 }, { h: 't', x: inst.width / 2, y: 0 }, { h: 'tr', x: inst.width, y: 0 },
-                                  { h: 'r', x: inst.width, y: inst.height / 2 }, { h: 'br', x: inst.width, y: inst.height },
-                                  { h: 'b', x: inst.width / 2, y: inst.height }, { h: 'bl', x: 0, y: inst.height }, { h: 'l', x: 0, y: inst.height / 2 },
-                                ].map(handle => (
-                                  <rect 
-                                    key={handle.h} x={handle.x - 5 / zoom} y={handle.y - 5 / zoom} 
-                                    width={10 / zoom} height={10 / zoom} fill="white" stroke="#0099ff" 
-                                    strokeWidth={1.5 / zoom} rx={1 / zoom} ry={1 / zoom}
-                                    filter="url(#handleShadow)"
-                                    style={{ cursor: getHandleCursor(handle.h, inst.angle), vectorEffect: 'non-scaling-stroke' }} 
-                                    onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], handle.h)} 
-                                  />
-                                ))}
-                                <line x1={inst.width / 2} y1={0} x2={inst.width / 2} y2={-25 / zoom} stroke="#0099ff" strokeWidth={2 / zoom} strokeLinecap="round" />
-                                <circle 
-                                  cx={inst.width / 2} cy={-25 / zoom} r={6 / zoom} 
-                                  fill="white" stroke="#0099ff" strokeWidth={1.5 / zoom} 
-                                  filter="url(#handleShadow)"
-                                  style={{ cursor: 'alias', vectorEffect: 'non-scaling-stroke' }} 
-                                  onMouseDown={(e) => handleHandleMouseDown(e, [inst.id], 'rotate')} 
-                                />
-                              </g>
-                            )}
-                          </g>
-                        )}
-                      </g>
-                    );
-                  })}
+                  {instances.filter(inst => inst.layerId === layer.id).map(inst => (
+                    <ViewportInstance
+                      key={inst.id}
+                      inst={inst}
+                      isSelected={selectedInstanceIds.includes(inst.id)}
+                      isHighlighted={highlightedInstanceIds.includes(inst.id)}
+                      project={project}
+                      zoom={zoom}
+                      onMouseDown={handleInstanceMouseDown}
+                      onHandleMouseDown={handleHandleMouseDown}
+                      getHandleCursor={getHandleCursor}
+                      selectedInstanceIdsCount={selectedInstanceIds.length}
+                    />
+                  ))}
                 </g>
               );
             })}
