@@ -56,14 +56,25 @@ export function createInitialEditorState(project: Project): EditorState {
   const firstLayout = project.layouts[0] || null;
   const firstLayer = firstLayout?.layers[0] || null;
 
+  const vWidth = project.settings.viewportWidth || 854;
+  const vHeight = project.settings.viewportHeight || 480;
+  
+  // Heuristic to guess available viewport area before first render
+  // Assuming sidebars are approx 600px total and header/footer approx 100px
+  const guessWidth = (typeof window !== 'undefined' ? window.innerWidth : 1600) - 650;
+  const guessHeight = (typeof window !== 'undefined' ? window.innerHeight : 900) - 150;
+  
+  const initialPanX = Math.round(Math.max(40, (guessWidth - vWidth) / 2));
+  const initialPanY = Math.round(Math.max(40, (guessHeight - vHeight) / 2));
+
   return {
     activeLayoutId: firstLayout?.id || null,
     activeLayerId: firstLayer?.id || null,
     selectedInstanceIds: [],
     tool: 'select',
     zoom: 1,
-    panX: 0,
-    panY: 0,
+    panX: initialPanX,
+    panY: initialPanY,
     placementObjectTypeId: null,
     selectedObjectTypeId: null,
     selectedFamilyId: null,

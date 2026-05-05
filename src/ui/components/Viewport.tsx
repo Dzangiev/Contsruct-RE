@@ -747,7 +747,9 @@ export const Viewport: React.FC = () => {
       style={{ 
         flex: 1, height: '100%', width: '100%', backgroundColor: '#2b2b2b', position: 'relative', overflow: 'hidden', 
         cursor: (tool === 'pan' || isSpaceDown) ? (panStart ? 'grabbing' : 'grab') : (tool === 'place') ? 'crosshair' : (dragStart || resizing) ? 'grabbing' : 'default', 
-        outline: 'none', display: 'flex', flexDirection: 'column'
+        outline: 'none', display: 'flex', flexDirection: 'column',
+        opacity: lastLayoutId ? 1 : 0,
+        transition: 'opacity 0.2s ease-in-out'
       }}
       tabIndex={0} onMouseDown={handleMouseDown} onContextMenu={handleContextMenu} onClick={handleViewportClick} onMouseMove={handleMouseMoveGlobal}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
