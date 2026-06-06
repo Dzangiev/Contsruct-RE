@@ -62,9 +62,9 @@ export function getUniqueVariableName(project: Project, baseName: string): strin
  * Adds a new event block to an event sheet.
  */
 export function addEventBlock(
-  project: Project, 
-  eventSheetId: string, 
-  parentBlockId: string | null, 
+  project: Project,
+  eventSheetId: string,
+  parentBlockId: string | null,
   type: 'event' | 'group' | 'comment' | 'variable' | 'function' | 'include',
   id?: string
 ): Project {
@@ -143,7 +143,7 @@ export function updateEventBlock(
   if (updates.variable && updates.variable.name) {
     const newName = updates.variable.name;
     const existing = getAllVariableNames(project);
-    
+
     // Find the original block to get its variable ID
     const es = project.eventSheets.find(s => s.id === eventSheetId);
     const findB = (list: EventBlock[]): EventBlock | undefined => {
@@ -154,7 +154,7 @@ export function updateEventBlock(
       }
     };
     const originalBlock = es ? findB(es.events) : undefined;
-    
+
     if (originalBlock?.variable) {
       const varId = originalBlock.variable.id;
       const oldName = originalBlock.variable.name;
@@ -221,7 +221,7 @@ export function removeEventBlock(
 
   const eventSheet = project.eventSheets.find(es => es.id === eventSheetId);
   const blockToRemove = eventSheet ? findBlock(eventSheet.events) : undefined;
-  
+
   let updatedProject = project;
   if (blockToRemove?.type === 'variable' && blockToRemove.variable) {
     // Only remove from globalVariables if it was actually there (root-level)
@@ -806,19 +806,19 @@ export function toggleActionDisabled(
 function updateVariableReferencesInTree(blocks: EventBlock[], oldName: string, newName: string): EventBlock[] {
   return blocks.map(block => {
     const updatedBlock = { ...block };
-    
+
     // Update conditions
     updatedBlock.conditions = block.conditions.map(cond => {
       let newParams = [...cond.params];
-      
+
       // 1. Handle explicit variable parameters
       if (['compareVariable', 'compareGlobalVariable'].includes(cond.type) && newParams[0] === oldName) {
         newParams[0] = newName;
       }
-      
+
       // 2. Handle expressions in all parameters
       newParams = newParams.map(p => replaceVariableNameInExpression(p, oldName, newName));
-      
+
       return { ...cond, params: newParams };
     });
 
@@ -860,7 +860,7 @@ function updateVariableReferencesInTree(blocks: EventBlock[], oldName: string, n
 export function updateObjectTypeReferencesInTree(blocks: EventBlock[], oldName: string, newName: string): EventBlock[] {
   return blocks.map(block => {
     const updatedBlock = { ...block };
-    
+
     // Update conditions
     updatedBlock.conditions = block.conditions.map(cond => {
       const newParams = cond.params.map(p => replaceVariableNameInExpression(p, oldName, newName));
@@ -916,16 +916,16 @@ export function syncObjectTypeRenaming(project: Project, oldName: string, newNam
  * Handles the prefix format: ObjectName.VariableName
  */
 export function syncInstanceVariableRenaming(
-  project: Project, 
+  project: Project,
   targetName: string, // Object Type or Family name
-  oldVarName: string, 
+  oldVarName: string,
   newVarName: string
 ): Project {
   if (oldVarName === newVarName) return project;
 
   const replaceInstanceVarInExpression = (expression: any) => {
     if (typeof expression !== 'string') return expression;
-    
+
     // Replace "ObjectName.OldVarName" with "ObjectName.NewVarName"
     const escapedTarget = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedVar = oldVarName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -936,17 +936,17 @@ export function syncInstanceVariableRenaming(
   const updateTree = (blocks: EventBlock[]): EventBlock[] => {
     return blocks.map(block => {
       const updatedBlock = { ...block };
-      
+
       // Update conditions
       updatedBlock.conditions = block.conditions.map(cond => {
         let newParams = [...cond.params];
-        
+
         // Handle explicit instance variable parameter
         // This usually applies if the condition is targetted at the specific object
         if (cond.type === 'compareInstanceVariable' && newParams[0] === oldVarName) {
-           // We only update if this condition belongs to the object being renamed
-           // (or if we can't be sure, we update and assume the user knows what they're doing)
-           newParams[0] = newVarName;
+          // We only update if this condition belongs to the object being renamed
+          // (or if we can't be sure, we update and assume the user knows what they're doing)
+          newParams[0] = newVarName;
         }
 
         newParams = newParams.map(p => replaceInstanceVarInExpression(p));
@@ -1000,10 +1000,10 @@ export function syncInstanceVariableRenaming(
  */
 function replaceVariableNameInExpression(expression: any, oldName: string, newName: string): any {
   if (typeof expression !== 'string') return expression;
-  
+
   // Note: we escape the oldName just in case it contains regex-special characters
   const escapedName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   // Use regex with word boundaries (\b) to replace only the exact variable name.
   // This prevents replacing "v" inside "variable" if we rename "v" to "x".
   const regex = new RegExp(`\\b${escapedName}\\b`, 'g');
@@ -1037,7 +1037,7 @@ export function updateGlobalVariable(project: Project, variableId: string, updat
   const oldVar = project.globalVariables.find(v => v.id === variableId);
   if (!oldVar) return project;
   const oldName = oldVar.name;
-  
+
   let newName = updates.name;
   if (newName && newName !== oldName) {
     const allNames = getAllUsedNames(project);
@@ -1045,7 +1045,7 @@ export function updateGlobalVariable(project: Project, variableId: string, updat
   } else {
     newName = oldName;
   }
-  
+
   const finalUpdates = { ...updates, name: newName };
 
   // 1. Sync in globalVariables pool
@@ -1076,7 +1076,7 @@ export function updateGlobalVariable(project: Project, variableId: string, updat
 function syncVariableInTree(blocks: EventBlock[], variableId: string, oldName: string, newName: string, updates: Partial<GlobalVariable>): EventBlock[] {
   return blocks.map(b => {
     let nextB = b;
-    
+
     // If this is the definition block for the variable, update its properties
     if (b.type === 'variable' && b.variable?.id === variableId) {
       nextB = { ...b, variable: { ...b.variable, ...updates } };
@@ -1128,9 +1128,9 @@ export function getVariableUsageCount(project: Project, variableName: string): n
         });
         // Check local variables or other definitions
         if (b.variable && b.variable.name !== variableName) {
-           if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) count++;
+          if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) count++;
         }
-        
+
         scanBlocks(b.children);
       });
     };
@@ -1193,9 +1193,9 @@ export function getVariableUsageLocations(project: Project, variableName: string
           });
         });
         if (b.variable && b.variable.name !== variableName) {
-           if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) {
-             locations.push({ type: 'Local Variable', sheetName: es.name, sheetId: es.id, blockId: b.id, index: currentIndex, detail: `Initial value of "${b.variable.name}"` });
-           }
+          if (typeof b.variable.initialValue === 'string' && isVariableInExpression(b.variable.initialValue, variableName)) {
+            locations.push({ type: 'Local Variable', sheetName: es.name, sheetId: es.id, blockId: b.id, index: currentIndex, detail: `Initial value of "${b.variable.name}"` });
+          }
         }
         scanBlocks(b.children, currentIndex);
       });

@@ -10,7 +10,7 @@ import { generateId } from '../utils/id';
 interface EditorStore {
   project: Project;
   editorState: EditorState;
-  
+
   // History
   history: Project[];
   historyIndex: number;
@@ -92,11 +92,11 @@ interface EditorStore {
   setMousePosition: (x: number, y: number) => void;
   setShowWatchers: (show: boolean) => void;
   setLanguage: (lang: Language) => void;
-  
+
   // Sprite Editor
   openSpriteEditor: (objectTypeId: string) => void;
   closeSpriteEditor: () => void;
-  
+
   // Clipboard
   copySelected: () => void;
   cutSelected: () => void;
@@ -104,13 +104,13 @@ interface EditorStore {
   pasteLogicItem: (eventSheetId: string, targetBlockId: string, targetIndex: number) => void;
   pasteInstances: () => void;
   jumpToLogic: (sheetId: string, blockId: string) => void;
-  
+
   // Folder Actions
   addFolder: (type: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', name: string, parentId?: string | null) => void;
   updateFolder: (folderId: string, updates: any) => void;
   removeFolder: (folderId: string) => void;
   moveEntityToFolder: (entityType: 'objectType' | 'layout' | 'eventSheet' | 'family' | 'globalVariable', entityId: string, folderId: string | null) => void;
-  
+
   // History
   commitProject: () => void;
 
@@ -134,7 +134,7 @@ interface EditorStore {
   removeState: (objectTypeId: string, stateId: string) => void;
   updateState: (objectTypeId: string, stateId: string, updates: any) => void;
   setHighlightedInstances: (instanceIds: string[]) => void;
-  
+
   // Tilemap Editor
   openTilemapEditor: (objectTypeId: string) => void;
   closeTilemapEditor: () => void;
@@ -155,13 +155,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     ...createInitialEditorState(initialProject),
     spriteEditor: null
   },
-  
+
   history: [initialProject],
   historyIndex: 0,
 
   pushHistory: (newProject) => {
     const { history, historyIndex, project: currentProject } = get();
-    
+
     // Quick check if anything actually changed to avoid redundant history entries
     if (history.length > 0) {
       const last = history[historyIndex];
@@ -171,8 +171,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
 
     const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(newProject))); 
-    if (newHistory.length > 50) newHistory.shift(); 
+    newHistory.push(JSON.parse(JSON.stringify(newProject)));
+    if (newHistory.length > 50) newHistory.shift();
     set({ history: newHistory, historyIndex: newHistory.length - 1 });
   },
 
@@ -525,12 +525,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedLogicItems: (itemIds) => set((state) => {
     const nextEditorState = editorUpdates.setSelectedLogicItems(state.editorState, itemIds);
     let highlightedInstanceIds: string[] = [];
-    
+
     if (itemIds.length === 1) {
       const [blockId, itemId] = itemIds[0].split(':');
       const { project } = state;
       const activeLayout = project.layouts.find(l => l.id === nextEditorState.activeLayoutId);
-      
+
       let foundItem: any = null;
       project.eventSheets.forEach(es => {
         const find = (blocks: EventBlock[]) => {
@@ -556,18 +556,18 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         });
       }
     }
-    
+
     return { editorState: { ...nextEditorState, highlightedInstanceIds } };
   }),
-    setHighlightedInstances: (ids: string[]) => set(state => ({ editorState: { ...state.editorState, highlightedInstanceIds: ids } })),
-    
-    // Debugger actions
-    setRuntimeState: (runtimeState: any) => set(state => ({ editorState: { ...state.editorState, runtimeState } })),
+  setHighlightedInstances: (ids: string[]) => set(state => ({ editorState: { ...state.editorState, highlightedInstanceIds: ids } })),
 
-    // Asset actions
-    addAsset: (asset: any) => set(state => ({ project: { ...state.project, assets: [...state.project.assets, asset] } })),
-    removeAsset: (id: string) => set(state => ({ project: { ...state.project, assets: state.project.assets.filter(a => a.id !== id) } })),
-    updateAsset: (id: string, updates: any) => set(state => ({ project: { ...state.project, assets: state.project.assets.map(a => a.id === id ? { ...a, ...updates } : a) } })),
+  // Debugger actions
+  setRuntimeState: (runtimeState: any) => set(state => ({ editorState: { ...state.editorState, runtimeState } })),
+
+  // Asset actions
+  addAsset: (asset: any) => set(state => ({ project: { ...state.project, assets: [...state.project.assets, asset] } })),
+  removeAsset: (id: string) => set(state => ({ project: { ...state.project, assets: state.project.assets.filter(a => a.id !== id) } })),
+  updateAsset: (id: string, updates: any) => set(state => ({ project: { ...state.project, assets: state.project.assets.map(a => a.id === id ? { ...a, ...updates } : a) } })),
   setGridSettings: (gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) => {
     set(state => ({ editorState: editorUpdates.setGridSettings(state.editorState, gridSizeW, gridSizeH, snapToGrid, showGrid, gridOffsetX, gridOffsetY, gridColor, gridOpacity) }));
   },
@@ -594,7 +594,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   copySelected: () => {
     const { editorState, project } = get();
     const { selectedInstanceIds, activeLayoutId, selectedEventBlockIds: blockIds, selectedLogicItemIds: logicIds } = editorState;
-    
+
     if (selectedInstanceIds.length > 0 && activeLayoutId) {
       const layout = project.layouts.find(l => l.id === activeLayoutId);
       if (layout) {
@@ -640,7 +640,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { editorState, project } = get();
     const { selectedInstanceIds, activeLayoutId, selectedEventBlockIds: blockIds, selectedLogicItemIds: logicIds } = editorState;
     let nextProject = project;
-    
+
     if (selectedInstanceIds.length > 0 && activeLayoutId) {
       selectedInstanceIds.forEach(id => {
         nextProject = projectUpdates.removeInstance(nextProject, activeLayoutId, id);
@@ -702,8 +702,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { project } = get();
     const layout = project.layouts.find(l => l.eventSheetId === sheetId);
     set(state => {
-      let nextEditorState = { 
-        ...state.editorState, 
+      let nextEditorState = {
+        ...state.editorState,
         currentTab: 'eventSheet' as const,
         selectedEventBlockIds: [blockId]
       };
@@ -742,7 +742,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ project: next });
     get().pushHistory(next);
   },
- 
+
   commitProject: () => {
     get().pushHistory(get().project);
   },
